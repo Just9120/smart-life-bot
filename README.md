@@ -25,9 +25,9 @@ Smart Life Ops Bot is a Telegram assistant focused on fast and reliable event ca
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e ".[dev]"
 python -m smart_life_bot.main
-pytest
+python -m pytest
 ```
 
 The current application entry point is intentionally a placeholder and does not yet implement Telegram handlers, Google Calendar integration, OAuth flow, or FSM logic.
