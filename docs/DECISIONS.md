@@ -1,56 +1,56 @@
-# Initial Decisions Log (ADR-like)
+# Журнал начальных решений (ADR-like)
 
-## Status legend
+## Легенда статусов
 
-- **Accepted** — active baseline decision.
-- **Pending** — not decided yet.
+- **Accepted** — активное базовое решение.
+- **Pending** — пока не принято.
 
 ---
 
-## D-001: Telegram bot is the primary input channel
+## D-001: Telegram-бот — основной канал ввода
 
 - **Status:** Accepted
-- **Decision:** Use Telegram bot as the main entry point for MVP.
-- **Rationale:** Fast user interaction loop and clear message-driven workflow.
+- **Decision:** Использовать Telegram-бот как основную точку входа для MVP.
+- **Rationale:** Быстрый цикл взаимодействия с пользователем и прозрачный workflow на основе сообщений.
 
-## D-002: “Saved Messages / Избранное” is not the primary integration path
-
-- **Status:** Accepted
-- **Decision:** Do not rely on Telegram Saved Messages as core product integration path.
-- **Rationale:** Product should work as explicit bot-based assistant, not as a side workflow.
-
-## D-003: Modular monolith for MVP
+## D-002: “Saved Messages / Избранное” не является основным путем интеграции
 
 - **Status:** Accepted
-- **Decision:** Build MVP as modular monolith.
-- **Rationale:** Minimize ops complexity and keep feature iteration speed high.
+- **Decision:** Не опираться на Telegram Saved Messages как на основной путь продуктовой интеграции.
+- **Rationale:** Продукт должен работать как явный bot-based assistant, а не как побочный сценарий.
 
-## D-004: Google Calendar is the first integration
-
-- **Status:** Accepted
-- **Decision:** Prioritize Google Calendar event creation in MVP.
-- **Rationale:** Direct alignment with target user value and initial scope.
-
-## D-005: OAuth is target auth design
+## D-003: Modular monolith для MVP
 
 - **Status:** Accepted
-- **Decision:** `oauth_user_mode` is the intended long-term auth path.
-- **Rationale:** Proper user-level authorization model for scalable product behavior.
+- **Decision:** Реализовывать MVP как modular monolith.
+- **Rationale:** Минимизация ops-сложности и сохранение высокой скорости итераций по функционалу.
 
-## D-006: Service Account + shared calendar is fallback only
-
-- **Status:** Accepted
-- **Decision:** `service_account_shared_calendar_mode` is allowed only as fallback / quick personal mode.
-- **Rationale:** Useful for early practicality, but not target architecture.
-
-## D-007: CI/CD readiness from day one
+## D-004: Google Calendar — первая интеграция
 
 - **Status:** Accepted
-- **Decision:** Prepare CI/CD foundation from project start.
-- **Rationale:** Preserve engineering discipline and reduce integration risks.
+- **Decision:** В MVP приоритизировать создание событий в Google Calendar.
+- **Rationale:** Прямое соответствие целевой пользовательской ценности и начальному scope.
 
-## D-008: Documentation and code evolve together
+## D-005: OAuth — целевой auth design
 
 - **Status:** Accepted
-- **Decision:** Any architecture/config/workflow/deployment/behavior change must include documentation update.
-- **Rationale:** Keep project understandable and maintainable during fast iteration.
+- **Decision:** `oauth_user_mode` — предполагаемый долгосрочный путь аутентификации.
+- **Rationale:** Корректная модель авторизации на уровне пользователя для масштабируемого поведения продукта.
+
+## D-006: Service Account + shared calendar — только fallback
+
+- **Status:** Accepted
+- **Decision:** `service_account_shared_calendar_mode` допустим только как fallback / quick personal mode.
+- **Rationale:** Полезно для ранней практичности, но не является целевой архитектурой.
+
+## D-007: Готовность CI/CD с первого дня
+
+- **Status:** Accepted
+- **Decision:** Подготовить фундамент CI/CD с самого старта проекта.
+- **Rationale:** Сохранение инженерной дисциплины и снижение интеграционных рисков.
+
+## D-008: Документация и код развиваются вместе
+
+- **Status:** Accepted
+- **Decision:** Любое изменение архитектуры/конфига/workflow/deployment/поведения должно сопровождаться обновлением документации.
+- **Rationale:** Поддерживать понятность и сопровождаемость проекта при быстрых итерациях.

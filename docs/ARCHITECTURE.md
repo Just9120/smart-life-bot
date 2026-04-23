@@ -1,102 +1,102 @@
 # Architecture Baseline — Smart Life Ops Bot
 
-## 1. Overview
+## 1. Обзор
 
-Smart Life Ops Bot is designed as a modular monolith with clear internal boundaries and unified product logic for event capture and calendar write flows.
+Smart Life Ops Bot проектируется как modular monolith с четкими внутренними границами и единой продуктовой логикой для сценариев фиксации событий и записи в календарь.
 
-## 2. Architectural principles
+## 2. Архитектурные принципы
 
-- Reliability before feature breadth.
-- Explicit confirmation before external side effects.
-- Single business flow independent from concrete auth-mode implementation.
-- Keep bootstrap simple; defer low-level choices until required.
-- Documentation-first change discipline.
+- Надежность важнее широты функционала.
+- Явное подтверждение перед внешними side effects.
+- Единый бизнес-поток, независимый от конкретной реализации auth-mode.
+- Поддерживать простоту bootstrap-этапа; низкоуровневые выборы откладывать до необходимости.
+- Дисциплина documentation-first.
 
-## 3. Modular monolith approach
+## 3. Подход modular monolith
 
-The system remains one deployable application for MVP, with modules separated by responsibilities and contracts. This reduces operational complexity while preserving evolution path for future extraction if needed.
+Для MVP система остается одним разворачиваемым приложением, где модули разделены по зонам ответственности и контрактам. Это снижает операционную сложность и одновременно сохраняет путь эволюции для возможного выделения сервисов в будущем.
 
-## 4. Planned modules
+## 4. Планируемые модули
 
-- `bot_entry` — Telegram ingress and outbound messaging adapter.
-- `orchestration` — flow control across parse/preview/confirm/create steps.
-- `parsing` — extraction and normalization of event fields.
-- `confirmation` — preview rendering and confirm/edit/cancel decision handling.
-- `calendar` — provider abstraction and concrete Google Calendar adapter.
-- `auth` — auth abstraction for supported Google auth modes.
-- `storage` — state and authorization persistence interface.
-- `logging_observability` — structured logs and error reporting foundation.
+- `bot_entry` — Telegram ingress и адаптер исходящих сообщений.
+- `orchestration` — управление потоком между шагами parse/preview/confirm/create.
+- `parsing` — извлечение и нормализация полей события.
+- `confirmation` — рендер preview и обработка решений confirm/edit/cancel.
+- `calendar` — абстракция провайдера и конкретный адаптер Google Calendar.
+- `auth` — auth-абстракция для поддерживаемых режимов Google auth.
+- `storage` — интерфейс персистентности состояния и авторизационных данных.
+- `logging_observability` — основа для структурных логов и отчетности об ошибках.
 
-> Pending: final package/module split and interfaces will be formalized during implementation phases.
+> Pending: финальное разбиение на пакеты/модули и интерфейсы будет формализовано на этапах реализации.
 
 ## 5. Auth abstraction
 
-A unified auth abstraction will hide auth-mode specifics from product flow:
+Единая auth-абстракция скрывает детали конкретного auth-mode от продуктового потока:
 
 - `oauth_user_mode` (target design)
 - `service_account_shared_calendar_mode` (fallback quick personal mode)
 
-No duplicated user-flow logic is allowed per auth mode.
+Дублирование логики пользовательского потока по auth-mode не допускается.
 
-> Pending: token lifecycle details, credential refresh handling, and error taxonomy.
+> Pending: детали жизненного цикла токенов, обработка обновления credentials и taxonomy ошибок.
 
 ## 6. Storage layer
 
-Storage layer is responsible for:
+Storage layer отвечает за:
 
-- conversation/session state,
-- confirmation state transitions,
-- auth-related metadata.
+- состояние conversation/session,
+- переходы состояния подтверждения,
+- метаданные, связанные с auth.
 
-Bootstrap keeps storage as interface-level design; concrete backend choice is pending.
+На bootstrap-этапе storage остается на уровне проектирования интерфейса; выбор конкретного backend пока pending.
 
-> Pending: backend selection, schema, migration strategy, retention policy.
+> Pending: выбор backend, схема, стратегия миграций, политика retention.
 
 ## 7. Bot/FSM layer
 
-Bot layer and state-machine behavior are planned as separate concerns:
+Bot-layer и поведение state machine планируются как отдельные зоны ответственности:
 
-- bot transport adapter (Telegram),
-- state orchestration logic.
+- transport adapter бота (Telegram),
+- логика state orchestration.
 
-Bootstrap does not implement handlers or FSM internals.
+На bootstrap-этапе handlers и внутренности FSM не реализуются.
 
-> Pending: FSM model, command policy, retry and idempotency behavior.
+> Pending: модель FSM, политика команд, поведение retry и idempotency.
 
 ## 8. Parsing layer
 
-Parsing transforms incoming text into a normalized event draft for preview and later confirmation.
+Parsing преобразует входящий текст в нормализованный draft события для preview и последующего подтверждения.
 
-Bootstrap defines the parsing role only.
+Bootstrap фиксирует только роль parsing-слоя.
 
-> Pending: parsing strategy, confidence model, locale/timezone handling, ambiguity resolution policy.
+> Pending: стратегия parsing, модель confidence, работа с locale/timezone, политика разрешения неоднозначностей.
 
-## 9. Calendar integration layer
+## 9. Layer интеграции с календарем
 
-Calendar module provides a stable internal interface for event creation.
+Модуль calendar предоставляет стабильный внутренний интерфейс для создания событий.
 
-Google Calendar is the first integration target.
+Google Calendar — первая целевая интеграция.
 
-Bootstrap intentionally excludes low-level API implementation.
+На этапе bootstrap низкоуровневая реализация API намеренно исключена.
 
-> Pending: API client choice, error mapping, quota handling, idempotent create semantics.
+> Pending: выбор API-клиента, mapping ошибок, обработка quota, семантика idempotent create.
 
-## 10. Deployment overview
+## 10. Обзор деплоя
 
 Deployment baseline:
 
-- source of truth in GitHub,
-- CI/CD via GitHub Actions,
-- Docker-based runtime,
-- target host: VPS (Contabo),
-- production hostname via Cloudflare-managed subdomain.
+- source of truth в GitHub,
+- CI/CD через GitHub Actions,
+- runtime на базе Docker,
+- целевой хост: VPS (Contabo),
+- production hostname через Cloudflare-managed subdomain.
 
-Detailed procedures are intentionally deferred to later deployment hardening.
+Подробные процедуры намеренно отложены до последующего этапа hardening деплоя.
 
-## 11. Technical decisions still pending
+## 11. Технические решения, которые пока pending
 
-- Concrete storage technology.
-- FSM implementation style and boundaries.
-- Detailed parsing algorithm and tooling.
-- Google OAuth callback and secure token storage pattern.
-- Runtime process model and observability stack depth.
+- Конкретная технология storage.
+- Стиль и границы реализации FSM.
+- Детальный алгоритм и инструменты parsing.
+- Паттерн callback для Google OAuth и безопасного хранения токенов.
+- Модель runtime-процессов и глубина observability-стека.

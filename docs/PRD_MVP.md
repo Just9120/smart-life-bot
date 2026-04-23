@@ -1,57 +1,57 @@
 # PRD — Smart Life Ops Bot MVP
 
-## 1. Product
+## 1. Продукт
 
-- **Project name:** Smart Life Ops Bot.
-- **Primary input channel:** Telegram bot.
-- **MVP target outcome:** reliable creation of Google Calendar events from natural user messages.
+- **Название проекта:** Smart Life Ops Bot.
+- **Основной канал ввода:** Telegram-бот.
+- **Целевой результат MVP:** надежное создание событий Google Calendar из естественных сообщений пользователя.
 
-## 2. Core user scenario
+## 2. Базовый пользовательский сценарий
 
 `message → parsing → preview → confirm / edit / cancel → create event`
 
-The event is created only after explicit user confirmation.
+Событие создается только после явного подтверждения пользователя.
 
-## 3. MVP priorities
+## 3. Приоритеты MVP
 
-1. Reliability
-2. Transparency
-3. Manageability
-4. Speed to useful result
+1. Надежность
+2. Прозрачность
+3. Управляемость
+4. Скорость получения полезного результата
 
-## 4. In scope for MVP
+## 4. В scope MVP
 
-- Telegram bot entry point.
-- Parsing of basic event entities (title/date/time/basic metadata).
-- Event preview before write.
-- User actions: confirm / cancel / edit.
-- Google Calendar event creation.
-- Logging of key actions and errors.
-- Basic storage for state and authorization data.
+- Точка входа Telegram-бота.
+- Парсинг базовых сущностей события (title/date/time/basic metadata).
+- Предпросмотр события перед записью.
+- Действия пользователя: confirm / cancel / edit.
+- Создание события в Google Calendar.
+- Логирование ключевых действий и ошибок.
+- Базовое хранилище состояния и данных авторизации.
 
-## 5. Out of scope for MVP
+## 5. Вне scope MVP
 
-- Tasks as a full second product contour.
-- Multi-calendar complexity.
-- Microservice decomposition.
-- Autonomous event creation without confirmation.
+- Задачи как полноценный второй контур продукта.
+- Сложная работа с несколькими календарями.
+- Декомпозиция на микросервисы.
+- Автономное создание событий без подтверждения.
 
-## 6. Authentication modes for Google Calendar
+## 6. Режимы аутентификации для Google Calendar
 
-Supported in design:
+Поддерживаются на уровне дизайна:
 
-1. `oauth_user_mode` — target architecture and primary product mode.
+1. `oauth_user_mode` — целевая архитектура и основной режим продукта.
 2. `service_account_shared_calendar_mode` — fallback / quick personal mode.
 
-Fallback mode is not considered the target long-term product architecture.
+Fallback-режим не считается целевой долгосрочной архитектурой продукта.
 
-## 7. Roadmap phases
+## 7. Фазы roadmap
 
 - **Phase 1 — Reliable Event Capture MVP**
 - **Phase 2 — Reliability, Editing, and Trust**
 - **Phase 3 — Task Layer**
 - **Phase 4 — Smart Routing and Context Layer**
 
-## 8. Non-goals for bootstrap stage
+## 8. Non-goals для bootstrap-этапа
 
-At repository bootstrap stage, business logic and external integrations are intentionally not implemented. This document defines direction and constraints for next implementation steps.
+На этапе bootstrap репозитория бизнес-логика и внешние интеграции намеренно не реализуются. Этот документ фиксирует направление и ограничения для следующих шагов реализации.

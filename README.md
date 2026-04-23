@@ -1,26 +1,26 @@
 # Smart Life Ops Bot
 
-Smart Life Ops Bot is a Telegram assistant focused on fast and reliable event capture into Google Calendar with mandatory confirmation before writing any event.
+Smart Life Ops Bot — это Telegram-ассистент, сфокусированный на быстром и надежном добавлении событий в Google Calendar с обязательным подтверждением перед записью каждого события.
 
-**Current status:** repository bootstrap / phase 1 foundation.
+**Текущий статус:** bootstrap репозитория / foundation phase 1.
 
-## Product intent (MVP)
+## Назначение продукта (MVP)
 
-- Input channel: Telegram bot.
-- Core flow: message → parsing → preview → confirm / edit / cancel → create Google Calendar event.
-- Priorities: reliability, transparency, controllability, speed to useful outcome.
+- Канал ввода: Telegram-бот.
+- Основной поток: message → parsing → preview → confirm / edit / cancel → create Google Calendar event.
+- Приоритеты: надежность, прозрачность, управляемость, быстрый выход к полезному результату.
 
-## Repository structure
+## Структура репозитория
 
-- `docs/PRD_MVP.md` — concise MVP product requirements.
-- `docs/ARCHITECTURE.md` — architecture baseline for modular monolith.
-- `docs/DEPLOYMENT.md` — deployment foundation and environment constraints.
-- `docs/DECISIONS.md` — initial ADR-like decision log.
-- `src/smart_life_bot/` — Python package scaffold.
-- `tests/` — smoke-level tests for foundation.
-- `.github/workflows/ci.yml` — minimal CI pipeline.
+- `docs/PRD_MVP.md` — краткие продуктовые требования MVP.
+- `docs/ARCHITECTURE.md` — архитектурный baseline для modular monolith.
+- `docs/DEPLOYMENT.md` — базовые принципы деплоя и ограничения окружения.
+- `docs/DECISIONS.md` — начальный журнал решений в формате ADR-like.
+- `src/smart_life_bot/` — каркас Python-пакета.
+- `tests/` — smoke-уровень тестов для foundation-слоя.
+- `.github/workflows/ci.yml` — минимальный CI pipeline.
 
-## Local stub run
+## Локальный запуск заглушки
 
 ```bash
 python -m venv .venv
@@ -30,4 +30,4 @@ python -m smart_life_bot.main
 python -m pytest
 ```
 
-The current application entry point is intentionally a placeholder and does not yet implement Telegram handlers, Google Calendar integration, OAuth flow, or FSM logic.
+Текущая точка входа приложения намеренно оставлена как placeholder и пока не реализует Telegram handlers, интеграцию с Google Calendar, OAuth flow и FSM-логику.

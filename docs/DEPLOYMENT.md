@@ -2,36 +2,36 @@
 
 ## 1. Source of truth
 
-- GitHub repository is the canonical source of code and documentation.
-- Main delivery flow is based on branches + pull requests.
+- GitHub-репозиторий — канонический источник кода и документации.
+- Основной delivery flow построен на ветках и pull request.
 
 ## 2. CI/CD baseline
 
-- GitHub Actions is used for CI (and later CD expansion).
-- Initial CI validates Python environment setup and test execution.
+- Для CI (и в дальнейшем расширения в CD) используется GitHub Actions.
+- Начальный CI проверяет настройку Python-окружения и выполнение тестов.
 
-## 3. Target runtime environment
+## 3. Целевое runtime-окружение
 
-- Deployment target: VPS on Contabo.
-- Runtime packaging: Docker-based deployment.
+- Целевая среда деплоя: VPS в Contabo.
+- Формат поставки в runtime: deployment на базе Docker.
 
-## 4. Secrets handling
+## 4. Работа с секретами
 
-- Secrets must be provided only through GitHub Secrets and/or server environment variables.
-- Secrets must not be committed to repository files, examples, or docs.
+- Secrets должны передаваться только через GitHub Secrets и/или переменные окружения сервера.
+- Secrets не должны коммититься в файлы репозитория, примеры или документацию.
 
-## 5. Networking and hostname plan
+## 5. План по сети и hostname
 
-- Planned production hostname: dedicated subdomain on existing domain via Cloudflare.
-- Target OAuth architecture requires a proper HTTPS endpoint.
+- Планируемый production hostname: выделенный subdomain существующего домена через Cloudflare.
+- Целевая OAuth-архитектура требует корректного HTTPS endpoint.
 
-## 6. Auth-mode deployment notes
+## 6. Примечания по деплою auth-mode
 
-- Target mode: `oauth_user_mode`, requires secure external callback endpoint.
-- Fallback mode: `service_account_shared_calendar_mode`, can work without OAuth and without domain in personal setup (e.g., long polling).
+- Целевой режим: `oauth_user_mode`, требует защищенный внешний callback endpoint.
+- Fallback-режим: `service_account_shared_calendar_mode`, может работать без OAuth и без домена в персональной конфигурации (например, long polling).
 
-Fallback mode is operationally acceptable for quick personal runs but not target product architecture.
+Fallback-режим операционно допустим для быстрого персонального запуска, но не является целевой архитектурой продукта.
 
-## 7. Current stage limitations
+## 7. Ограничения текущего этапа
 
-This document is a foundation only. A final production playbook (rollout, rollback, monitoring, backups, incident steps) is intentionally deferred to a later phase.
+Этот документ — только foundation. Финальный production playbook (rollout, rollback, monitoring, backups, incident steps) намеренно отложен на более поздний этап.
