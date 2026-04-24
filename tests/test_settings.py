@@ -15,6 +15,7 @@ def test_load_settings_success(base_env: None) -> None:
     settings = load_settings()
     assert settings.google_auth_mode.value == "oauth_user_mode"
     assert settings.app_env == "dev"
+    assert settings.log_level == "INFO"
 
 
 def test_load_settings_fails_on_missing_required(monkeypatch: pytest.MonkeyPatch) -> None:
