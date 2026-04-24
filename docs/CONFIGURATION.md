@@ -21,6 +21,10 @@
 
 \* Может считаться чувствительной, если включает credentials (например, future PostgreSQL DSN с паролем).
 
+Текущая runtime-реализация storage поддерживает минимум:
+- `sqlite:///./data/smart_life_bot.db` (file-based SQLite, директория создается автоматически);
+- `sqlite:///:memory:` (in-memory для тестов).
+
 ## 3. Optional переменные с default в коде
 
 | Переменная | Default в `load_settings()` | Пример placeholder | Чувствительная | Назначение |

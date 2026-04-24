@@ -215,19 +215,26 @@
 - `created_at`
 - `updated_at`
 
-### 3.3 Почему `provider_credentials` отдельно от `users`
+### 3.3 Runtime notes для SQLite foundation (PR #5)
+
+- Runtime storage реализован на stdlib `sqlite3` без ORM/миграционного фреймворка.
+- `draft_payload` и `parsed_payload` сериализуются в JSON (TEXT).
+- Timestamp-поля (`created_at`, `updated_at`) сохраняются в ISO-8601 строках.
+- В `provider_credentials.credentials_encrypted` на этом шаге хранится переданная строка-placeholder; реальное шифрование и key management выносятся в отдельный шаг.
+
+### 3.4 Почему `provider_credentials` отдельно от `users`
 
 - разделение зон ответственности: профиль пользователя и provider auth lifecycle;
 - поддержка нескольких провайдеров/режимов без изменения базовой user-модели;
 - снижение риска несанкционированного доступа: credentials изолируются и обслуживаются отдельным репозиторием/политикой шифрования.
 
-### 3.4 Почему для MVP не нужен отдельный metrics storage
+### 3.5 Почему для MVP не нужен отдельный metrics storage
 
 - MVP-фокус на надежном основном потоке, а не на отдельной аналитической подсистеме;
 - `events_log` закрывает ключевые операционные потребности (статус, ошибка, источник, тайминг по timestamp);
 - отдельное metrics storage увеличивает ops-сложность до подтверждения продуктовой необходимости.
 
-### 3.5 Какие метрики можно получать из `events_log`
+### 3.6 Какие метрики можно получать из `events_log`
 
 - доля успешных `confirm → created`;
 - частота `parsing ambiguity`;
