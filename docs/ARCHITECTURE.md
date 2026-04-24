@@ -1,102 +1,226 @@
-# Architecture Baseline — Smart Life Ops Bot
+# Архитектура Phase 1 — Smart Life Ops Bot
 
-## 1. Обзор
+## 1. Цель технической архитектуры Phase 1
 
-Smart Life Ops Bot проектируется как modular monolith с четкими внутренними границами и единой продуктовой логикой для сценариев фиксации событий и записи в календарь.
+Цель этого этапа — зафиксировать рабочую техническую архитектуру для реализации MVP-сценария:
 
-## 2. Архитектурные принципы
+`message → parsing → preview → confirm / edit / cancel → create event`
 
-- Надежность важнее широты функционала.
-- Явное подтверждение перед внешними side effects.
-- Единый бизнес-поток, независимый от конкретной реализации auth-mode.
-- Поддерживать простоту bootstrap-этапа; низкоуровневые выборы откладывать до необходимости.
-- Дисциплина documentation-first.
+Этот документ не вводит production-реализацию интеграций, а задает:
 
-## 3. Подход modular monolith
+- границы модулей;
+- правила зависимостей;
+- единый application flow;
+- baseline по хранению состояния, авторизации и логированию.
 
-Для MVP система остается одним разворачиваемым приложением, где модули разделены по зонам ответственности и контрактам. Это снижает операционную сложность и одновременно сохраняет путь эволюции для возможного выделения сервисов в будущем.
+## 2. Границы реализации
 
-## 4. Планируемые модули
+В рамках Phase 1 (design-only technical architecture pass):
 
-- `bot_entry` — Telegram ingress и адаптер исходящих сообщений.
-- `orchestration` — управление потоком между шагами parse/preview/confirm/create.
-- `parsing` — извлечение и нормализация полей события.
-- `confirmation` — рендер preview и обработка решений confirm/edit/cancel.
-- `calendar` — абстракция провайдера и конкретный адаптер Google Calendar.
-- `auth` — auth-абстракция для поддерживаемых режимов Google auth.
-- `storage` — интерфейс персистентности состояния и авторизационных данных.
-- `logging_observability` — основа для структурных логов и отчетности об ошибках.
+- фиксируются архитектурные контракты и ответственность слоев;
+- фиксируется рекомендуемая storage/FSM/config-модель;
+- фиксируется единая схема event creation flow.
 
-> Pending: финальное разбиение на пакеты/модули и интерфейсы будет формализовано на этапах реализации.
+Явно вне реализации этого шага:
 
-## 5. Auth abstraction
+- runtime Google API calls;
+- OAuth callback implementation;
+- aiogram handlers и FSM runtime;
+- ORM, migrations и реальная DB-логика;
+- production-ready deployment hardening.
 
-Единая auth-абстракция скрывает детали конкретного auth-mode от продуктового потока:
+## 3. Общий flow системы
 
-- `oauth_user_mode` (target design)
-- `service_account_shared_calendar_mode` (fallback quick personal mode)
+1. Пользователь отправляет текстовое сообщение в Telegram.
+2. Bot transport layer передает текст в application layer.
+3. Parsing pipeline строит `event draft` и оценку уверенности.
+4. Application layer формирует preview и переводит диалог в состояние ожидания решения.
+5. Пользователь выбирает: `confirm`, `cancel` или `edit`.
+6. При `edit` изменяется draft и повторно показывается preview.
+7. При `confirm` запускается сохранение события через calendar integration layer.
+8. Результат пишется в `events_log`, пользователь получает success/error ответ.
 
-Дублирование логики пользовательского потока по auth-mode не допускается.
+## 4. Слои системы
 
-> Pending: детали жизненного цикла токенов, обработка обновления credentials и taxonomy ошибок.
+### 4.1 Bot transport layer
 
-## 6. Storage layer
+Отвечает за входящие/исходящие сообщения Telegram и трансляцию transport-событий в application-команды.
 
-Storage layer отвечает за:
+Не содержит:
 
-- состояние conversation/session,
-- переходы состояния подтверждения,
-- метаданные, связанные с auth.
+- доменную валидацию;
+- работу с credentials;
+- прямой вызов провайдера календаря.
 
-На bootstrap-этапе storage остается на уровне проектирования интерфейса; выбор конкретного backend пока pending.
+### 4.2 Application / use case layer
 
-> Pending: выбор backend, схема, стратегия миграций, политика retention.
+Оркестрация сценариев: parse, preview, confirm/edit/cancel, save event.
 
-## 7. Bot/FSM layer
+Содержит use-case уровень и координацию между domain/auth/calendar/storage.
 
-Bot-layer и поведение state machine планируются как отдельные зоны ответственности:
+### 4.3 Domain layer
 
-- transport adapter бота (Telegram),
-- логика state orchestration.
+Содержит доменные модели и инварианты event draft, validation и transition-правил.
 
-На bootstrap-этапе handlers и внутренности FSM не реализуются.
+Не зависит от Telegram SDK, Google SDK и storage-деталей.
 
-> Pending: модель FSM, политика команд, поведение retry и idempotency.
+### 4.4 Auth / provider layer
 
-## 8. Parsing layer
+Предоставляет единый интерфейс получения credentials/client для выбранного `auth_mode`.
 
-Parsing преобразует входящий текст в нормализованный draft события для preview и последующего подтверждения.
+### 4.5 Calendar integration layer
 
-Bootstrap фиксирует только роль parsing-слоя.
+Единая абстракция записи события в календарь.
 
-> Pending: стратегия parsing, модель confidence, работа с locale/timezone, политика разрешения неоднозначностей.
+Google Calendar — первая реализация провайдера.
 
-## 9. Layer интеграции с календарем
+### 4.6 Storage layer
 
-Модуль calendar предоставляет стабильный внутренний интерфейс для создания событий.
+Персистентность:
 
-Google Calendar — первая целевая интеграция.
+- пользователя;
+- credentials провайдера;
+- состояния диалога (FSM snapshot);
+- операционного журнала событий.
 
-На этапе bootstrap низкоуровневая реализация API намеренно исключена.
+### 4.7 Observability / logging layer
 
-> Pending: выбор API-клиента, mapping ошибок, обработка quota, семантика idempotent create.
+Структурные логи, error-категории, correlation identifiers, операционные статусы.
 
-## 10. Обзор деплоя
+## 5. Границы модулей
 
-Deployment baseline:
+Базовые модули в modular monolith:
 
-- source of truth в GitHub,
-- CI/CD через GitHub Actions,
-- runtime на базе Docker,
-- целевой хост: VPS (Contabo),
-- production hostname через Cloudflare-managed subdomain.
+- `smart_life_bot.bot`
+- `smart_life_bot.application`
+- `smart_life_bot.domain`
+- `smart_life_bot.parsing`
+- `smart_life_bot.calendar`
+- `smart_life_bot.auth`
+- `smart_life_bot.storage`
+- `smart_life_bot.config`
+- `smart_life_bot.observability`
 
-Подробные процедуры намеренно отложены до последующего этапа hardening деплоя.
+Детальные границы модулей зафиксированы в `docs/PHASE1_TECHNICAL_SPEC.md`.
 
-## 11. Технические решения, которые пока pending
+## 6. Правило зависимости между слоями
 
-- Конкретная технология storage.
-- Стиль и границы реализации FSM.
-- Детальный алгоритм и инструменты parsing.
-- Паттерн callback для Google OAuth и безопасного хранения токенов.
-- Модель runtime-процессов и глубина observability-стека.
+Dependency rule:
+
+- внешние слои могут зависеть от внутренних контрактов;
+- внутренние слои не зависят от внешних реализаций.
+
+Практически:
+
+- `bot` зависит от `application`;
+- `application` зависит от контрактов `domain/parsing/auth/calendar/storage/observability`;
+- `domain` не зависит от `bot`, SDK и инфраструктурных адаптеров;
+- адаптеры (`calendar`, `storage`, `auth`) реализуют интерфейсы, используемые application layer.
+
+## 7. Единый event creation flow без дублирования под разные auth-mode
+
+Ключевое архитектурное правило: application flow один и тот же для любого `GOOGLE_AUTH_MODE`.
+
+`auth_mode` влияет только на этап получения действующего calendar client / credentials.
+
+Недопустимо:
+
+- дублировать use-case ветки `confirm/save` под каждый auth-mode;
+- переносить auth-specific if/else в доменные модели.
+
+## 8. Auth abstraction
+
+Поддерживаются два режима:
+
+1. `oauth_user_mode` (target design)
+2. `service_account_shared_calendar_mode` (fallback / quick personal)
+
+Auth abstraction должна предоставлять единый контракт уровня application:
+
+- получить auth context для пользователя;
+- вернуть ошибку класса `missing_auth` или `provider_auth_failure`;
+- отдать provider-ready credentials/client handle.
+
+**Pending:** конкретный lifecycle refresh token и secure key management policy.
+
+## 9. Storage architecture
+
+Recommended baseline для MVP:
+
+- SQLite как стартовый storage backend;
+- схема проектируется с учетом дальнейшей миграции на PostgreSQL без переделки domain contract.
+
+Основные сущности хранения:
+
+- `users`
+- `provider_credentials`
+- `conversation_state`
+- `events_log`
+
+Детальная модель и rationale — в `docs/PHASE1_TECHNICAL_SPEC.md`.
+
+## 10. FSM / conversation state model
+
+Recommended persisted states:
+
+- `IDLE`
+- `WAITING_PREVIEW_CONFIRMATION`
+- `EDITING_FIELD`
+- `SAVING`
+
+`SUCCESS`/`ERROR` трактуются как outcome transition, а не обязательные долгоживущие persisted states.
+
+## 11. Parsing pipeline
+
+Recommended pipeline:
+
+1. raw Telegram message
+2. normalization
+3. entity extraction
+4. confidence/ambiguity check
+5. event draft
+6. preview payload
+
+При низкой уверенности система должна запрашивать уточнение, а не выполнять silent action.
+
+## 12. Configuration / env model
+
+Единая config-модель включает:
+
+- общие переменные runtime;
+- auth-mode-specific переменные;
+- чувствительные секреты с явной маркировкой.
+
+Подробный перечень — в `docs/CONFIGURATION.md`.
+
+## 13. Ошибки и recovery strategy
+
+Минимальная классификация:
+
+- parsing ambiguity;
+- validation error;
+- missing auth;
+- provider auth failure;
+- calendar write failure;
+- state inconsistency;
+- unexpected internal error.
+
+Recovery baseline:
+
+- пользовательские ошибки → понятный ответ + предложение исправить/повторить;
+- системные ошибки → логирование с контекстом, безопасный user-facing ответ, без утечки чувствительных данных;
+- сбои состояния (`state inconsistency`) → reset к `IDLE` с информированием пользователя.
+
+## 14. Что остается вне реализации текущего шага
+
+- Реальный код интеграции Google Calendar.
+- Реальный OAuth redirect/callback сервер.
+- Реализация Telegram handlers/FSM runtime.
+- Реальные SQL migrations и ORM-схема.
+- Производственный observability stack (dashboards, alerting).
+
+## 15. Open questions
+
+1. Нужна ли отдельная стратегия retention/TTL для `conversation_state` в MVP или достаточно manual reset. **Pending**.
+2. Нужен ли отдельный `idempotency_key` в `events_log` уже в Phase 1 runtime-реализации. **Open question**.
+3. Какие поля parsing confidence хранить в `events_log` в обязательном минимуме. **Pending**.
