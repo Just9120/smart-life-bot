@@ -41,7 +41,11 @@ class FakeParser:
 
 
 class FakeAuthProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
     def resolve_auth_context(self, user_id: int) -> AuthContext:
+        self.calls += 1
         return AuthContext(
             user_id=user_id,
             auth_mode=GoogleAuthMode.OAUTH_USER_MODE,
@@ -67,12 +71,31 @@ class FakeCalendarService:
 
 
 class FailingCalendarService:
+    def __init__(self) -> None:
+        self.calls = 0
+
     def create_event(
         self,
         auth_context: AuthContext,
         request: CalendarEventCreateRequest,
     ) -> CalendarEventCreateResult:
+        self.calls += 1
         raise RuntimeError("calendar provider unavailable")
+
+
+class MissingStartAtParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=None,
+                timezone="UTC",
+                metadata={"source": "missing-start-parser"},
+            ),
+            confidence=0.99,
+            is_ambiguous=False,
+            issues=[],
+        )
 
 
 class SilentLogger:
@@ -185,6 +208,32 @@ def test_confirm_failure_keeps_pending_draft_and_marks_log_failed() -> None:
     logs = deps.events_log_repo.list_for_user(user_id)
     assert len(logs) == 1
     assert logs[0].status is EventLogStatus.FAILED
+
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
+    assert state.draft is not None
+
+
+def test_confirm_validation_failure_when_start_at_missing() -> None:
+    deps, user_id = _build_dependencies()
+    deps.parser = MissingStartAtParser()
+
+    ProcessIncomingMessageUseCase(deps).execute(
+        IncomingMessageInput(user_id=user_id, text="Event without explicit time")
+    )
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert "start time is required" in result.message
+
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+
+    logs = deps.events_log_repo.list_for_user(user_id)
+    assert len(logs) == 1
+    assert logs[0].status is EventLogStatus.FAILED
+    assert logs[0].error_code == "validation_error"
 
     state = deps.state_repo.get(user_id)
     assert state is not None

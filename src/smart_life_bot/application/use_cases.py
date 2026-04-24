@@ -102,6 +102,26 @@ class ConfirmEventDraftUseCase:
         if log_id is not None:
             self.deps.events_log_repo.update_status(entry_id=log_id, status=EventLogStatus.CONFIRMED)
 
+        if draft.start_at is None:
+            if log_id is not None:
+                self.deps.events_log_repo.update_status(
+                    entry_id=log_id,
+                    status=EventLogStatus.FAILED,
+                    error_category=EventLogErrorCategory.VALIDATION_ERROR,
+                    error_details="Missing required start_at in event draft",
+                )
+            self.deps.state_repo.set(
+                ConversationStateSnapshot(
+                    user_id=payload.user_id,
+                    state=ConversationState.WAITING_PREVIEW_CONFIRMATION,
+                    draft=draft,
+                )
+            )
+            return UseCaseResult(
+                status="failed",
+                message="Cannot confirm event: start time is required before saving.",
+            )
+
         try:
             auth_context = self.deps.auth_provider.resolve_auth_context(user_id=payload.user_id)
             request = CalendarEventCreateRequest(
