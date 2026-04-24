@@ -2,7 +2,7 @@
 
 Smart Life Ops Bot — это Telegram-ассистент, сфокусированный на быстром и надежном добавлении событий в Google Calendar с обязательным подтверждением перед записью каждого события.
 
-**Текущий статус:** runtime foundation phase 1 (зафиксированы модульный каркас и контракты).
+**Текущий статус:** runtime foundation phase 1 (включая SQLite storage foundation для users/credentials/state/events_log).
 
 ## Назначение продукта (MVP)
 
@@ -37,3 +37,9 @@ python -m pytest
 ```
 
 Текущая точка входа приложения намеренно оставлена как placeholder и пока не реализует Telegram handlers, интеграцию с Google Calendar, OAuth flow и FSM-логику.
+
+Storage foundation тесты можно запускать общим тестовым набором:
+
+```bash
+python -m pytest
+```

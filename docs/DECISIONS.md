@@ -90,3 +90,9 @@
 - **Status:** Accepted
 - **Decision:** На этапе MVP не вводить отдельное metrics/analytics хранилище.
 - **Rationale:** Снижение объема инфраструктуры при сохранении операционной наблюдаемости через `events_log` и структурные логи.
+
+## D-015: SQLite runtime implementation на stdlib `sqlite3` без ORM/миграций
+
+- **Status:** Accepted
+- **Decision:** Первый runtime storage implementation для Phase 1 реализовать напрямую на `sqlite3` (stdlib), с инициализацией схемы через SQL `CREATE TABLE IF NOT EXISTS`.
+- **Rationale:** Минимальная сложность для MVP, быстрый запуск и проверяемый baseline репозиториев; ORM/migrations откладываются до подтвержденной необходимости.
