@@ -96,3 +96,9 @@
 - **Status:** Accepted
 - **Decision:** Первый runtime storage implementation для Phase 1 реализовать напрямую на `sqlite3` (stdlib), с инициализацией схемы через SQL `CREATE TABLE IF NOT EXISTS`.
 - **Rationale:** Минимальная сложность для MVP, быстрый запуск и проверяемый baseline репозиториев; ORM/migrations откладываются до подтвержденной необходимости.
+
+## D-016: Telegram transport foundation без жёсткой привязки к Telegram SDK
+
+- **Status:** Accepted
+- **Decision:** На шаге transport foundation реализовать Telegram routing abstraction (handlers mapping в application use-cases) без добавления `python-telegram-bot`/`aiogram` runtime зависимости.
+- **Rationale:** Проверка корректности прикладного flow (`/start`, text, confirm/edit/cancel) без сетевого рантайма и без расширения scope до webhook/long-polling инфраструктуры.

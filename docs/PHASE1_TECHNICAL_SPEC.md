@@ -22,6 +22,12 @@
 - auth/provider logic;
 - прямой доступ к calendar API.
 
+**Runtime status (PR #9 foundation):**
+- реализован минимальный Telegram transport router поверх application use-cases;
+- поддержаны маршруты `/start`, plain text draft-preview, `confirm`, `cancel`, `edit` command (`/edit <field> <value>`);
+- для очистки optional полей в transport используется детерминированная форма `/edit description --clear` и `/edit location --clear`;
+- real Telegram SDK polling/webhook runtime остаётся pending.
+
 **Разрешённые зависимости:**
 - `smart_life_bot.application`
 - `smart_life_bot.config`

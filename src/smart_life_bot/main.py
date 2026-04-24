@@ -5,13 +5,14 @@ from smart_life_bot.observability.logger import get_logger
 
 
 def run() -> str:
-    """Load settings and print foundation bootstrap message."""
+    """Load settings and print transport foundation bootstrap message."""
     settings: Settings = load_settings()
     logger = get_logger()
     message = (
         "Smart Life Ops Bot runtime foundation is ready "
         f"(env={settings.app_env}, auth_mode={settings.google_auth_mode.value}). "
-        "Runtime integrations are pending implementation."
+        "Telegram transport routing foundation is implemented; "
+        "runtime Telegram SDK wiring and external providers remain pending."
     )
     logger.info(message)
     print(message)
