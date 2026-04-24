@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime
 
 from smart_life_bot.calendar.models import CalendarEventCreateRequest
 from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus
@@ -52,6 +53,61 @@ def _require_valid_event_log_id(draft: EventDraft) -> int | None:
         return int(str(value))
     except (TypeError, ValueError) as error:
         raise ValueError("Malformed event_log_id in pending draft metadata") from error
+
+
+def _parse_datetime_field(value: str, field_name: str) -> datetime:
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError as error:
+        raise ValueError(f"Invalid datetime format for '{field_name}'") from error
+
+
+def _clone_draft_with_update(draft: EventDraft, **changes: object) -> EventDraft:
+    updated_draft = replace(draft, **changes)
+    updated_draft.metadata = dict(draft.metadata)
+    return updated_draft
+
+
+def _apply_draft_field_edit(draft: EventDraft, field_name: str, field_value: str) -> EventDraft:
+    if field_name == "title":
+        normalized = field_value.strip()
+        if not normalized:
+            raise ValueError("Title must be a non-empty string")
+        return _clone_draft_with_update(draft, title=normalized)
+
+    if field_name == "start_at":
+        normalized = field_value.strip()
+        if not normalized:
+            raise ValueError("start_at must be a non-empty ISO-8601 datetime")
+        parsed = _parse_datetime_field(normalized, field_name)
+        return _clone_draft_with_update(draft, start_at=parsed)
+
+    if field_name == "end_at":
+        normalized = field_value.strip()
+        if not normalized:
+            return _clone_draft_with_update(draft, end_at=None)
+        parsed = _parse_datetime_field(normalized, field_name)
+        return _clone_draft_with_update(draft, end_at=parsed)
+
+    if field_name == "timezone":
+        normalized = field_value.strip()
+        if not normalized:
+            raise ValueError("Timezone must be a non-empty string")
+        return _clone_draft_with_update(draft, timezone=normalized)
+
+    if field_name == "description":
+        normalized = field_value.strip()
+        if not normalized:
+            return _clone_draft_with_update(draft, description=None)
+        return _clone_draft_with_update(draft, description=field_value)
+
+    if field_name == "location":
+        normalized = field_value.strip()
+        if not normalized:
+            return _clone_draft_with_update(draft, location=None)
+        return _clone_draft_with_update(draft, location=field_value)
+
+    raise ValueError(f"Unsupported editable field '{field_name}'")
 
 
 @dataclass(slots=True)
@@ -184,13 +240,38 @@ class EditEventDraftFieldUseCase:
     deps: ApplicationDependencies
 
     def execute(self, payload: EditEventDraftFieldInput) -> UseCaseResult:
-        # TODO: apply draft field mutation and re-generate preview.
+        snapshot = self.deps.state_repo.get(payload.user_id)
+        if snapshot is None:
+            return UseCaseResult(status="failed", message="No pending draft for editing")
+
+        if snapshot.state is not ConversationState.WAITING_PREVIEW_CONFIRMATION:
+            return UseCaseResult(status="failed", message="Draft editing is unavailable in current state")
+
+        if snapshot.draft is None:
+            return UseCaseResult(status="failed", message="Pending state has no draft payload")
+
+        try:
+            updated_draft = _apply_draft_field_edit(
+                draft=snapshot.draft,
+                field_name=payload.field_name,
+                field_value=payload.field_value,
+            )
+        except ValueError as error:
+            return UseCaseResult(status="failed", message=str(error))
+
+        self.deps.state_repo.set(
+            ConversationStateSnapshot(
+                user_id=payload.user_id,
+                state=ConversationState.WAITING_PREVIEW_CONFIRMATION,
+                draft=updated_draft,
+            )
+        )
         self.deps.logger.info(
-            "Edit draft placeholder invoked",
+            "Draft field updated",
             user_id=payload.user_id,
             field_name=payload.field_name,
         )
-        return UseCaseResult(status="pending", message="Draft editing is pending implementation")
+        return UseCaseResult(status="preview_ready", message="Draft updated and ready for preview")
 
 
 @dataclass(slots=True)
