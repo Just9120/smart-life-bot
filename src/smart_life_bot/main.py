@@ -1,12 +1,19 @@
-"""Application entry point for Smart Life Ops Bot bootstrap stage."""
+"""Application entry point for Smart Life Ops Bot runtime foundation stage."""
+
+from smart_life_bot.config.settings import Settings, load_settings
+from smart_life_bot.observability.logger import get_logger
 
 
 def run() -> str:
-    """Run placeholder application and return status message."""
+    """Load settings and print foundation bootstrap message."""
+    settings: Settings = load_settings()
+    logger = get_logger()
     message = (
-        "Smart Life Ops Bot bootstrap is ready. "
-        "Core integrations (Telegram/Google Calendar/OAuth/FSM) are pending."
+        "Smart Life Ops Bot runtime foundation is ready "
+        f"(env={settings.app_env}, auth_mode={settings.google_auth_mode.value}). "
+        "Runtime integrations are pending implementation."
     )
+    logger.info(message)
     print(message)
     return message
 
