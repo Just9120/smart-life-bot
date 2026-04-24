@@ -144,6 +144,37 @@ def test_events_log_repository_append_update_and_get() -> None:
     assert for_user[0].id == inserted.id
 
 
+def test_events_log_update_status_keeps_existing_optional_fields_when_not_passed() -> None:
+    connection = _create_initialized_memory_connection()
+    user = SQLiteUsersRepository(connection).create(telegram_user_id=1005)
+    repo = SQLiteEventsLogRepository(connection)
+
+    inserted = repo.append(
+        EventLogEntry(
+            id=None,
+            user_id=user.id,
+            raw_text="Создай событие",
+            parsed_payload={"title": "Событие"},
+            status=EventLogStatus.CONFIRMED,
+        )
+    )
+    assert inserted.id is not None
+
+    repo.update_status(
+        entry_id=inserted.id,
+        status=EventLogStatus.SAVED,
+        google_event_id="provider-id-1",
+    )
+    repo.update_status(
+        entry_id=inserted.id,
+        status=EventLogStatus.CONFIRMED,
+    )
+
+    updated = repo.get_by_id(inserted.id)
+    assert updated is not None
+    assert updated.google_event_id == "provider-id-1"
+
+
 def test_foreign_keys_are_enabled_and_enforced() -> None:
     connection = _create_initialized_memory_connection()
     credentials_repo = SQLiteProviderCredentialsRepository(connection)

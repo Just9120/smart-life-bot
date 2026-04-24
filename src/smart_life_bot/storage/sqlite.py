@@ -371,7 +371,12 @@ class SQLiteEventsLogRepository:
         self._connection.execute(
             """
             UPDATE events_log
-            SET status = ?, google_event_id = ?, error_code = ?, error_details = ?, updated_at = ?
+            SET
+                status = ?,
+                google_event_id = COALESCE(?, google_event_id),
+                error_code = COALESCE(?, error_code),
+                error_details = COALESCE(?, error_details),
+                updated_at = ?
             WHERE id = ?
             """,
             (status.value, google_event_id, resolved_error_code, error_details, utcnow_iso(), entry_id),
