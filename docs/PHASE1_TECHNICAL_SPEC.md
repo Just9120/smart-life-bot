@@ -359,6 +359,16 @@ Recommended pipeline:
 8. event log updated;
 9. success or error response shown.
 
+## 7.1 Runtime foundation status (PR #6)
+
+Implemented in runtime foundation with integration-style tests on real SQLite repositories:
+
+- `ProcessIncomingMessageUseCase` persists `WAITING_PREVIEW_CONFIRMATION` with draft payload;
+- `events_log` is written as `received` and moved to `preview_ready`;
+- `ConfirmEventDraftUseCase` loads pending draft, transitions state to `SAVING`, resolves auth via abstraction, and calls calendar abstraction;
+- successful create writes `saved` status with provider event id and resets conversation state to `IDLE` (implemented as state reset);
+- parser/auth/calendar are currently validated through fake/stub adapters in tests, without Telegram runtime, OAuth callback server, Google Calendar SDK/API runtime, or LLM parsing runtime.
+
 ## 8. Error model
 
 Минимальная классификация:

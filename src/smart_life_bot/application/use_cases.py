@@ -1,11 +1,13 @@
-"""Skeleton use-cases for Phase 1 event capture flow."""
+"""Use-cases for Phase 1 event capture flow."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from smart_life_bot.domain.enums import ConversationState
-from smart_life_bot.domain.models import ConversationStateSnapshot
+from smart_life_bot.calendar.models import CalendarEventCreateRequest
+from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus
+from smart_life_bot.domain.models import ConversationStateSnapshot, EventDraft
+from smart_life_bot.storage.interfaces import EventLogEntry
 
 from .dto import (
     CancelEventDraftInput,
@@ -17,16 +19,46 @@ from .dto import (
 from .interfaces import ApplicationDependencies
 
 
+def _draft_to_payload(draft: EventDraft) -> dict[str, object]:
+    return {
+        "title": draft.title,
+        "start_at": draft.start_at.isoformat() if draft.start_at else None,
+        "end_at": draft.end_at.isoformat() if draft.end_at else None,
+        "timezone": draft.timezone,
+        "description": draft.description,
+        "location": draft.location,
+        "metadata": draft.metadata,
+    }
+
+
 @dataclass(slots=True)
 class ProcessIncomingMessageUseCase:
     deps: ApplicationDependencies
 
     def execute(self, payload: IncomingMessageInput) -> UseCaseResult:
         parsing_result = self.deps.parser.parse(text=payload.text, user_id=payload.user_id)
+        draft = parsing_result.draft
+
+        log_entry = self.deps.events_log_repo.append(
+            EventLogEntry(
+                id=None,
+                user_id=payload.user_id,
+                raw_text=payload.text,
+                parsed_payload=_draft_to_payload(draft),
+                status=EventLogStatus.RECEIVED,
+            )
+        )
+        if log_entry.id is not None:
+            self.deps.events_log_repo.update_status(
+                entry_id=log_entry.id,
+                status=EventLogStatus.PREVIEW_READY,
+            )
+            draft.metadata["event_log_id"] = str(log_entry.id)
+
         snapshot = ConversationStateSnapshot(
             user_id=payload.user_id,
             state=ConversationState.WAITING_PREVIEW_CONFIRMATION,
-            draft=parsing_result.draft,
+            draft=draft,
         )
         self.deps.state_repo.set(snapshot)
         return UseCaseResult(status="preview_ready", message="Event draft prepared for preview")
@@ -37,14 +69,65 @@ class ConfirmEventDraftUseCase:
     deps: ApplicationDependencies
 
     def execute(self, payload: ConfirmEventDraftInput) -> UseCaseResult:
-        # TODO: implement full confirm flow with auth/calendar integration.
+        snapshot = self.deps.state_repo.get(payload.user_id)
+        if snapshot is None or snapshot.state is not ConversationState.WAITING_PREVIEW_CONFIRMATION:
+            return UseCaseResult(status="failed", message="No pending draft for confirmation")
+
+        if snapshot.draft is None:
+            return UseCaseResult(status="failed", message="Pending state has no draft payload")
+
+        draft = snapshot.draft
         self.deps.state_repo.set(
             ConversationStateSnapshot(
                 user_id=payload.user_id,
                 state=ConversationState.SAVING,
+                draft=draft,
             )
         )
-        return UseCaseResult(status="pending", message="Event save flow is pending implementation")
+
+        log_id = int(draft.metadata["event_log_id"]) if draft.metadata.get("event_log_id") else None
+        if log_id is not None:
+            self.deps.events_log_repo.update_status(entry_id=log_id, status=EventLogStatus.CONFIRMED)
+
+        try:
+            auth_context = self.deps.auth_provider.resolve_auth_context(user_id=payload.user_id)
+            request = CalendarEventCreateRequest(
+                title=draft.title,
+                start_at_iso=draft.start_at.isoformat() if draft.start_at else "",
+                end_at_iso=draft.end_at.isoformat() if draft.end_at else None,
+                timezone=draft.timezone or "UTC",
+                description=draft.description,
+                location=draft.location,
+            )
+            calendar_result = self.deps.calendar_service.create_event(
+                auth_context=auth_context,
+                request=request,
+            )
+        except Exception as error:  # noqa: BLE001
+            if log_id is not None:
+                self.deps.events_log_repo.update_status(
+                    entry_id=log_id,
+                    status=EventLogStatus.FAILED,
+                    error_category=EventLogErrorCategory.INTERNAL_ERROR,
+                    error_details=str(error),
+                )
+            self.deps.state_repo.reset(payload.user_id)
+            self.deps.logger.error("Confirm flow failed", user_id=payload.user_id, error=str(error))
+            return UseCaseResult(status="failed", message="Event creation failed")
+
+        if log_id is not None:
+            self.deps.events_log_repo.update_status(
+                entry_id=log_id,
+                status=EventLogStatus.SAVED,
+                google_event_id=calendar_result.provider_event_id,
+            )
+
+        self.deps.state_repo.reset(payload.user_id)
+        return UseCaseResult(
+            status="success",
+            message="Event created successfully",
+            provider_event_id=calendar_result.provider_event_id,
+        )
 
 
 @dataclass(slots=True)
