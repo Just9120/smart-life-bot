@@ -239,3 +239,32 @@ def test_confirm_validation_failure_when_start_at_missing() -> None:
     assert state is not None
     assert state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
     assert state.draft is not None
+
+
+def test_confirm_failure_when_event_log_id_is_malformed() -> None:
+    deps, user_id = _build_dependencies()
+
+    ProcessIncomingMessageUseCase(deps).execute(
+        IncomingMessageInput(user_id=user_id, text="Malformed event log id case")
+    )
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.draft is not None
+    state.draft.metadata["event_log_id"] = "bad-log-id"
+    deps.state_repo.set(state)
+
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+
+    restored_state = deps.state_repo.get(user_id)
+    assert restored_state is not None
+    assert restored_state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
+    assert restored_state.draft is not None
+
+    logs = deps.events_log_repo.list_for_user(user_id)
+    assert len(logs) == 1
+    assert logs[0].status is EventLogStatus.PREVIEW_READY
