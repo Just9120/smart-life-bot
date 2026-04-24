@@ -46,6 +46,8 @@
 
 Отвечает за входящие/исходящие сообщения Telegram и трансляцию transport-событий в application-команды.
 
+На текущем runtime-этапе реализован минимальный transport router (без Telegram SDK runtime): `/start`, plain text, `confirm`, `cancel`, `edit` command routing в application use-cases.
+
 Не содержит:
 
 - доменную валидацию;
