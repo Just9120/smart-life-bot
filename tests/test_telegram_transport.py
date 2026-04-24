@@ -108,6 +108,7 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
 
     router = TelegramTransportRouter(
         users_repo=deps.users_repo,
+        state_repo=deps.state_repo,
         process_incoming_message=ProcessIncomingMessageUseCase(deps),
         confirm_draft=ConfirmEventDraftUseCase(deps),
         cancel_draft=CancelEventDraftUseCase(deps),
@@ -173,6 +174,38 @@ def test_edit_command_maps_to_edit_use_case() -> None:
     assert state is not None
     assert state.draft is not None
     assert state.draft.title == "Updated title"
+
+
+def test_edit_description_clear_flag_clears_optional_field() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90007, text="Draft for description clear")
+    router.handle_text_message(telegram_user_id=90007, text="/edit description New description")
+
+    response = router.handle_text_message(telegram_user_id=90007, text="/edit description --clear")
+
+    assert "description:" not in response.text
+    user = deps.users_repo.get_by_telegram_id(90007)
+    assert user is not None
+    state = deps.state_repo.get(user.id)
+    assert state is not None
+    assert state.draft is not None
+    assert state.draft.description is None
+
+
+def test_edit_location_clear_flag_clears_optional_field() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90008, text="Draft for location clear")
+    router.handle_text_message(telegram_user_id=90008, text="/edit location HQ")
+
+    response = router.handle_text_message(telegram_user_id=90008, text="/edit location --clear")
+
+    assert "location:" not in response.text
+    user = deps.users_repo.get_by_telegram_id(90008)
+    assert user is not None
+    state = deps.state_repo.get(user.id)
+    assert state is not None
+    assert state.draft is not None
+    assert state.draft.location is None
 
 
 def test_preview_formatting_contains_required_fields_and_disclaimer() -> None:

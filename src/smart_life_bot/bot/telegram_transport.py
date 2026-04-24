@@ -17,7 +17,7 @@ from smart_life_bot.application.use_cases import (
     ProcessIncomingMessageUseCase,
 )
 from smart_life_bot.domain.models import EventDraft
-from smart_life_bot.storage.interfaces import UsersRepository
+from smart_life_bot.storage.interfaces import ConversationStateRepository, UsersRepository
 
 CALLBACK_CONFIRM = "draft:confirm"
 CALLBACK_CANCEL = "draft:cancel"
@@ -33,6 +33,7 @@ class TelegramTransportResponse:
 @dataclass(frozen=True, slots=True)
 class TelegramTransportRouter:
     users_repo: UsersRepository
+    state_repo: ConversationStateRepository
     process_incoming_message: ProcessIncomingMessageUseCase
     confirm_draft: ConfirmEventDraftUseCase
     cancel_draft: CancelEventDraftUseCase
@@ -49,8 +50,7 @@ class TelegramTransportRouter:
         )
 
     def handle_text_message(self, telegram_user_id: int, text: str) -> TelegramTransportResponse:
-        normalized = text.strip()
-        if not normalized:
+        if not text.strip():
             return TelegramTransportResponse(text="Пустое сообщение. Отправьте текст события.")
 
         user = self.users_repo.get_or_create_by_telegram_id(
@@ -58,8 +58,10 @@ class TelegramTransportRouter:
             timezone=self.default_timezone,
         )
 
-        if normalized.startswith("/edit"):
-            return self._handle_edit_command(user_id=user.id, command=normalized)
+        if text.startswith("/edit"):
+            return self._handle_edit_command(user_id=user.id, command=text)
+
+        normalized = text.strip()
 
         result = self.process_incoming_message.execute(IncomingMessageInput(user_id=user.id, text=normalized))
         if result.status != "preview_ready":
@@ -104,8 +106,11 @@ class TelegramTransportRouter:
             )
 
         _, field_name, field_value = parts
+        normalized_value = field_value
+        if field_name in {"description", "location"} and field_value.strip() == "--clear":
+            normalized_value = ""
         result = self.edit_draft_field.execute(
-            EditEventDraftFieldInput(user_id=user_id, field_name=field_name, field_value=field_value)
+            EditEventDraftFieldInput(user_id=user_id, field_name=field_name, field_value=normalized_value)
         )
         if result.status != "preview_ready":
             return TelegramTransportResponse(text=result.message)
@@ -120,7 +125,7 @@ class TelegramTransportRouter:
         )
 
     def _get_pending_draft_text(self, user_id: int) -> str:
-        snapshot = self.process_incoming_message.deps.state_repo.get(user_id)
+        snapshot = self.state_repo.get(user_id)
         if snapshot is None or snapshot.draft is None:
             return "Черновик не найден. Отправьте событие заново."
         return format_preview_message(snapshot.draft)
