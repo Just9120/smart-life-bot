@@ -1,6 +1,6 @@
 """Observability helpers."""
 
-from .logger import get_logger
+from .logger import ContextLoggerAdapter, get_context_logger, get_logger
 from .models import ErrorCategory
 
-__all__ = ["ErrorCategory", "get_logger"]
+__all__ = ["ContextLoggerAdapter", "ErrorCategory", "get_context_logger", "get_logger"]

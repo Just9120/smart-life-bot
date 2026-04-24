@@ -1,0 +1,89 @@
+"""Explicit runtime composition for local/dev foundation wiring."""
+
+from __future__ import annotations
+
+import sqlite3
+from dataclasses import dataclass
+
+from smart_life_bot.application.use_cases import (
+    CancelEventDraftUseCase,
+    ConfirmEventDraftUseCase,
+    EditEventDraftFieldUseCase,
+    ProcessIncomingMessageUseCase,
+)
+from smart_life_bot.bot import TelegramBotRuntime, TelegramTransportRouter
+from smart_life_bot.config.settings import Settings
+from smart_life_bot.observability.logger import ContextLoggerAdapter, get_context_logger
+from smart_life_bot.storage.sqlite import (
+    SQLiteConversationStateRepository,
+    SQLiteEventsLogRepository,
+    SQLiteProviderCredentialsRepository,
+    SQLiteUsersRepository,
+    create_sqlite_connection,
+    init_sqlite_schema,
+)
+
+from .fakes import DevFakeCalendarService, DevFakeGoogleAuthProvider, DevFakeMessageParser
+
+
+@dataclass(slots=True)
+class RuntimeContainer:
+    settings: Settings
+    connection: sqlite3.Connection
+    users_repo: SQLiteUsersRepository
+    state_repo: SQLiteConversationStateRepository
+    events_log_repo: SQLiteEventsLogRepository
+    runtime: TelegramBotRuntime
+
+
+@dataclass(slots=True)
+class _Dependencies:
+    parser: DevFakeMessageParser
+    auth_provider: DevFakeGoogleAuthProvider
+    calendar_service: DevFakeCalendarService
+    users_repo: SQLiteUsersRepository
+    credentials_repo: SQLiteProviderCredentialsRepository
+    state_repo: SQLiteConversationStateRepository
+    events_log_repo: SQLiteEventsLogRepository
+    logger: ContextLoggerAdapter
+
+
+def build_runtime(settings: Settings) -> RuntimeContainer:
+    """Build runtime graph for local/dev execution without external SDK/API calls."""
+    connection = create_sqlite_connection(settings.database_url)
+    init_sqlite_schema(connection)
+
+    users_repo = SQLiteUsersRepository(connection)
+    credentials_repo = SQLiteProviderCredentialsRepository(connection)
+    state_repo = SQLiteConversationStateRepository(connection)
+    events_log_repo = SQLiteEventsLogRepository(connection)
+
+    deps = _Dependencies(
+        parser=DevFakeMessageParser(default_timezone=settings.default_timezone),
+        auth_provider=DevFakeGoogleAuthProvider(auth_mode=settings.google_auth_mode),
+        calendar_service=DevFakeCalendarService(),
+        users_repo=users_repo,
+        credentials_repo=credentials_repo,
+        state_repo=state_repo,
+        events_log_repo=events_log_repo,
+        logger=get_context_logger(),
+    )
+
+    router = TelegramTransportRouter(
+        users_repo=users_repo,
+        state_repo=state_repo,
+        process_incoming_message=ProcessIncomingMessageUseCase(deps=deps),
+        confirm_draft=ConfirmEventDraftUseCase(deps=deps),
+        cancel_draft=CancelEventDraftUseCase(deps=deps),
+        edit_draft_field=EditEventDraftFieldUseCase(deps=deps),
+        default_timezone=settings.default_timezone,
+    )
+
+    return RuntimeContainer(
+        settings=settings,
+        connection=connection,
+        users_repo=users_repo,
+        state_repo=state_repo,
+        events_log_repo=events_log_repo,
+        runtime=TelegramBotRuntime(router=router),
+    )
