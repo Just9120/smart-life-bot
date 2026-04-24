@@ -10,6 +10,7 @@ from smart_life_bot.application.use_cases import (
     ProcessIncomingMessageUseCase,
 )
 from smart_life_bot.auth.models import AuthContext
+from smart_life_bot.calendar.interfaces import CalendarService
 from smart_life_bot.calendar.models import CalendarEventCreateRequest, CalendarEventCreateResult
 from smart_life_bot.domain.enums import ConversationState, EventLogStatus, GoogleAuthMode
 from smart_life_bot.domain.models import EventDraft
@@ -65,6 +66,15 @@ class FakeCalendarService:
         )
 
 
+class FailingCalendarService:
+    def create_event(
+        self,
+        auth_context: AuthContext,
+        request: CalendarEventCreateRequest,
+    ) -> CalendarEventCreateResult:
+        raise RuntimeError("calendar provider unavailable")
+
+
 class SilentLogger:
     def info(self, message: str, **extra: object) -> None:
         return None
@@ -80,7 +90,7 @@ class SilentLogger:
 class ApplicationDependenciesFixture:
     parser: FakeParser
     auth_provider: FakeAuthProvider
-    calendar_service: FakeCalendarService
+    calendar_service: CalendarService
     users_repo: SQLiteUsersRepository
     credentials_repo: SQLiteProviderCredentialsRepository
     state_repo: SQLiteConversationStateRepository
@@ -150,7 +160,33 @@ def test_cancel_flow_resets_state_when_preview_is_pending() -> None:
     deps, user_id = _build_dependencies()
 
     ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Lunch at noon"))
+    preview_log = deps.events_log_repo.list_for_user(user_id)[0]
+    assert preview_log.status is EventLogStatus.PREVIEW_READY
+
     result = CancelEventDraftUseCase(deps).execute(CancelEventDraftInput(user_id=user_id))
 
     assert result.status == "cancelled"
     assert deps.state_repo.get(user_id) is None
+    cancelled_log = deps.events_log_repo.get_by_id(preview_log.id)
+    assert cancelled_log is not None
+    assert cancelled_log.status is EventLogStatus.CANCELLED
+
+
+def test_confirm_failure_keeps_pending_draft_and_marks_log_failed() -> None:
+    deps, user_id = _build_dependencies()
+    deps.calendar_service = FailingCalendarService()
+
+    ProcessIncomingMessageUseCase(deps).execute(
+        IncomingMessageInput(user_id=user_id, text="Prepare report tomorrow at 10")
+    )
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    logs = deps.events_log_repo.list_for_user(user_id)
+    assert len(logs) == 1
+    assert logs[0].status is EventLogStatus.FAILED
+
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
+    assert state.draft is not None

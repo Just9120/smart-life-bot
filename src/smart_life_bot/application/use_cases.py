@@ -31,6 +31,19 @@ def _draft_to_payload(draft: EventDraft) -> dict[str, object]:
     }
 
 
+def _extract_event_log_id(draft: EventDraft | None) -> int | None:
+    if draft is None:
+        return None
+
+    value = draft.metadata.get("event_log_id")
+    if value is None:
+        return None
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass(slots=True)
 class ProcessIncomingMessageUseCase:
     deps: ApplicationDependencies
@@ -85,7 +98,7 @@ class ConfirmEventDraftUseCase:
             )
         )
 
-        log_id = int(draft.metadata["event_log_id"]) if draft.metadata.get("event_log_id") else None
+        log_id = _extract_event_log_id(draft)
         if log_id is not None:
             self.deps.events_log_repo.update_status(entry_id=log_id, status=EventLogStatus.CONFIRMED)
 
@@ -111,7 +124,13 @@ class ConfirmEventDraftUseCase:
                     error_category=EventLogErrorCategory.INTERNAL_ERROR,
                     error_details=str(error),
                 )
-            self.deps.state_repo.reset(payload.user_id)
+            self.deps.state_repo.set(
+                ConversationStateSnapshot(
+                    user_id=payload.user_id,
+                    state=ConversationState.WAITING_PREVIEW_CONFIRMATION,
+                    draft=draft,
+                )
+            )
             self.deps.logger.error("Confirm flow failed", user_id=payload.user_id, error=str(error))
             return UseCaseResult(status="failed", message="Event creation failed")
 
@@ -149,5 +168,9 @@ class CancelEventDraftUseCase:
     deps: ApplicationDependencies
 
     def execute(self, payload: CancelEventDraftInput) -> UseCaseResult:
+        snapshot = self.deps.state_repo.get(payload.user_id)
+        log_id = _extract_event_log_id(snapshot.draft if snapshot is not None else None)
+        if log_id is not None:
+            self.deps.events_log_repo.update_status(entry_id=log_id, status=EventLogStatus.CANCELLED)
         self.deps.state_repo.reset(payload.user_id)
         return UseCaseResult(status="cancelled", message="Draft cancelled and state reset to IDLE")
