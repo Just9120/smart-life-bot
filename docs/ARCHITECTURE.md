@@ -46,13 +46,14 @@
 
 Отвечает за входящие/исходящие сообщения Telegram и трансляцию transport-событий в application-команды.
 
-На текущем runtime-этапе реализован минимальный transport router (без Telegram SDK runtime): `/start`, plain text, `confirm`, `cancel`, `edit` command routing в application use-cases.
+На текущем runtime-этапе реализован минимальный transport router (`/start`, plain text, `confirm`, `cancel`, `edit` command routing в application use-cases) и добавлен тонкий SDK adapter foundation на `python-telegram-bot`, который маппит Telegram updates в `TelegramBotRuntime` без переноса бизнес-логики в SDK handlers.
 
 Не содержит:
 
 - доменную валидацию;
 - работу с credentials;
 - прямой вызов провайдера календаря.
+- orchestration бизнес-flow вне runtime transport boundary.
 
 ### 4.2 Application / use case layer
 
@@ -98,11 +99,11 @@ Google Calendar — первая реализация провайдера.
 - подключение локальных fake/dev адаптеров parsing/auth/calendar;
 - wiring application use-cases;
 - wiring `TelegramTransportRouter` и `TelegramBotRuntime`.
+- wiring SDK adapter builder (`telegram.ext.Application`) для явного polling-entrypoint.
 
-Не содержит:
+Не содержит в bootstrap-режиме (`main.py`):
 
-- long polling/webhook lifecycle;
-- Telegram SDK integration;
+- auto-start long polling/webhook lifecycle;
 - сетевые вызовы Telegram/Google API.
 
 ## 5. Границы модулей
