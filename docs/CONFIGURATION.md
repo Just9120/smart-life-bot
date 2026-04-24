@@ -25,6 +25,8 @@
 - `sqlite:///./data/smart_life_bot.db` (file-based SQLite, директория создается автоматически);
 - `sqlite:///:memory:` (in-memory для тестов).
 
+Runtime composition layer использует `DATABASE_URL` напрямую при `build_runtime(settings)` и всегда выполняет инициализацию SQLite schema при bootstrap.
+
 ## 3. Optional переменные с default в коде
 
 | Переменная | Default в `load_settings()` | Пример placeholder | Чувствительная | Назначение |

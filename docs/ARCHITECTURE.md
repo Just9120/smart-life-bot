@@ -89,6 +89,22 @@ Google Calendar — первая реализация провайдера.
 
 Структурные логи, error-категории, correlation identifiers, операционные статусы.
 
+### 4.8 Runtime composition layer
+
+Отвечает за явную сборку runtime graph из `Settings` без глобального состояния:
+
+- инициализация SQLite connection + schema;
+- создание repository-реализаций;
+- подключение локальных fake/dev адаптеров parsing/auth/calendar;
+- wiring application use-cases;
+- wiring `TelegramTransportRouter` и `TelegramBotRuntime`.
+
+Не содержит:
+
+- long polling/webhook lifecycle;
+- Telegram SDK integration;
+- сетевые вызовы Telegram/Google API.
+
 ## 5. Границы модулей
 
 Базовые модули в modular monolith:
@@ -118,6 +134,7 @@ Dependency rule:
 - `application` зависит от контрактов `domain/parsing/auth/calendar/storage/observability`;
 - `domain` не зависит от `bot`, SDK и инфраструктурных адаптеров;
 - адаптеры (`calendar`, `storage`, `auth`) реализуют интерфейсы, используемые application layer.
+- `runtime` зависит от `config`, `storage`, `application`, `bot`, `observability` и только собирает граф зависимостей.
 
 ## 7. Единый event creation flow без дублирования под разные auth-mode
 

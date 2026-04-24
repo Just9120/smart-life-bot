@@ -391,6 +391,16 @@ Implemented minimal application-layer edit flow on top of persisted `WAITING_PRE
 - edit use case does not call auth provider or calendar service;
 - confirm flow after edit uses the latest persisted draft values.
 
+## 7.3 Runtime composition foundation status (PR #10)
+
+Implemented minimal runtime composition layer for local/dev execution:
+
+- added explicit `build_runtime(settings)` composition function to wire `Settings` → SQLite connection → schema init → repositories → fake/dev adapters → application use-cases → `TelegramTransportRouter` → `TelegramBotRuntime`;
+- composition uses existing `DATABASE_URL` and initializes schema on bootstrap (`CREATE TABLE IF NOT EXISTS` path from storage layer);
+- fake/dev adapters for parser/auth/calendar are deterministic and marked dev-only; they do not call Telegram API, Google API, OAuth callback, or LLM parsing runtime;
+- `main.py` now builds runtime graph and logs safe bootstrap status without starting Telegram polling/webhook;
+- added runtime composition tests for wiring, in-memory SQLite, transport callback flow, and no-network behavior.
+
 ## 8. Error model
 
 Минимальная классификация:
