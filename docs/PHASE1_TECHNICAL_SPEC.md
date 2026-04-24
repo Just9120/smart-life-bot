@@ -372,6 +372,19 @@ Implemented in runtime foundation with integration-style tests on real SQLite re
 - if `draft.metadata.event_log_id` exists but is malformed, confirm is guarded as failed before auth/calendar calls and state is restored to `WAITING_PREVIEW_CONFIRMATION` with draft preserved;
 - parser/auth/calendar are currently validated through fake/stub adapters in tests, without Telegram runtime, OAuth callback server, Google Calendar SDK/API runtime, or LLM parsing runtime.
 
+## 7.2 Edit-flow foundation status (PR #8)
+
+Implemented minimal application-layer edit flow on top of persisted `WAITING_PREVIEW_CONFIRMATION` state:
+
+- `EditEventDraftFieldUseCase` now loads current conversation state and fails fast when no pending draft exists, state is not `WAITING_PREVIEW_CONFIRMATION`, or draft payload is missing;
+- supported editable fields: `title`, `start_at`, `end_at`, `timezone`, `description`, `location`;
+- datetime fields (`start_at`, `end_at`) are validated via `datetime.fromisoformat`; invalid format fails without mutating state;
+- empty `title` or empty `timezone` is rejected; empty `description` / `location` clears the field; empty `end_at` clears optional end datetime;
+- unsupported fields fail with state unchanged;
+- successful edits persist updated draft back into `WAITING_PREVIEW_CONFIRMATION` and preserve draft metadata (including `metadata.event_log_id`);
+- edit use case does not call auth provider or calendar service;
+- confirm flow after edit uses the latest persisted draft values.
+
 ## 8. Error model
 
 Минимальная классификация:

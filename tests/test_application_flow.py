@@ -3,17 +3,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from smart_life_bot.application.dto import CancelEventDraftInput, ConfirmEventDraftInput, IncomingMessageInput
+from smart_life_bot.application.dto import (
+    CancelEventDraftInput,
+    ConfirmEventDraftInput,
+    EditEventDraftFieldInput,
+    IncomingMessageInput,
+)
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
+    EditEventDraftFieldUseCase,
     ProcessIncomingMessageUseCase,
 )
 from smart_life_bot.auth.models import AuthContext
 from smart_life_bot.calendar.interfaces import CalendarService
 from smart_life_bot.calendar.models import CalendarEventCreateRequest, CalendarEventCreateResult
 from smart_life_bot.domain.enums import ConversationState, EventLogStatus, GoogleAuthMode
-from smart_life_bot.domain.models import EventDraft
+from smart_life_bot.domain.models import ConversationStateSnapshot, EventDraft
 from smart_life_bot.parsing.models import ParsingResult
 from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
@@ -268,3 +274,164 @@ def test_confirm_failure_when_event_log_id_is_malformed() -> None:
     logs = deps.events_log_repo.list_for_user(user_id)
     assert len(logs) == 1
     assert logs[0].status is EventLogStatus.PREVIEW_READY
+
+
+def test_edit_title_updates_pending_draft() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Initial title"))
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="title", field_value="Updated title")
+    )
+
+    assert result.status == "preview_ready"
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.draft is not None
+    assert state.draft.title == "Updated title"
+
+
+def test_edit_start_at_is_used_by_confirm_flow() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Move meeting time"))
+
+    edit_result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(
+            user_id=user_id,
+            field_name="start_at",
+            field_value="2026-02-14T11:30:00+00:00",
+        )
+    )
+    assert edit_result.status == "preview_ready"
+
+    confirm_result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+    assert confirm_result.status == "success"
+    assert len(deps.calendar_service.requests) == 1
+    assert deps.calendar_service.requests[0].start_at_iso == "2026-02-14T11:30:00+00:00"
+
+
+def test_edit_description_and_location_empty_value_clears_fields() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Has optional fields"))
+
+    EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="description", field_value="Notes")
+    )
+    EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="location", field_value="Office")
+    )
+
+    description_result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="description", field_value="")
+    )
+    location_result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="location", field_value="")
+    )
+
+    assert description_result.status == "preview_ready"
+    assert location_result.status == "preview_ready"
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.draft is not None
+    assert state.draft.description is None
+    assert state.draft.location is None
+
+
+def test_edit_unsupported_field_fails_and_keeps_draft_unchanged() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Original draft"))
+    before = deps.state_repo.get(user_id)
+    assert before is not None
+    assert before.draft is not None
+    original_title = before.draft.title
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="attendees", field_value="alice@example.com")
+    )
+
+    assert result.status == "failed"
+    assert "Unsupported editable field" in result.message
+    after = deps.state_repo.get(user_id)
+    assert after is not None
+    assert after.draft is not None
+    assert after.draft.title == original_title
+
+
+def test_edit_invalid_datetime_fails_and_keeps_draft_unchanged() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Schedule item"))
+    before = deps.state_repo.get(user_id)
+    assert before is not None
+    assert before.draft is not None
+    original_start_at = before.draft.start_at
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="start_at", field_value="not-a-datetime")
+    )
+
+    assert result.status == "failed"
+    assert "Invalid datetime format" in result.message
+    after = deps.state_repo.get(user_id)
+    assert after is not None
+    assert after.draft is not None
+    assert after.draft.start_at == original_start_at
+
+
+def test_edit_without_pending_draft_fails() -> None:
+    deps, user_id = _build_dependencies()
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="title", field_value="No draft")
+    )
+    assert result.status == "failed"
+    assert result.message == "No pending draft for editing"
+
+
+def test_edit_fails_when_state_is_not_waiting_preview_confirmation() -> None:
+    deps, user_id = _build_dependencies()
+    deps.state_repo.set(
+        ConversationStateSnapshot(
+            user_id=user_id,
+            state=ConversationState.SAVING,
+            draft=EventDraft(title="Any"),
+        )
+    )
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="title", field_value="Updated")
+    )
+
+    assert result.status == "failed"
+    assert result.message == "Draft editing is unavailable in current state"
+
+
+def test_edit_preserves_event_log_id_metadata() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Metadata retention"))
+    state_before = deps.state_repo.get(user_id)
+    assert state_before is not None
+    assert state_before.draft is not None
+    event_log_id = state_before.draft.metadata.get("event_log_id")
+    assert event_log_id is not None
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="timezone", field_value="Europe/Berlin")
+    )
+
+    assert result.status == "preview_ready"
+    state_after = deps.state_repo.get(user_id)
+    assert state_after is not None
+    assert state_after.draft is not None
+    assert state_after.draft.metadata.get("event_log_id") == event_log_id
+
+
+def test_edit_does_not_call_auth_provider_or_calendar_service() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Edit only"))
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="title", field_value="Updated only")
+    )
+
+    assert result.status == "preview_ready"
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
