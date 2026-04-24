@@ -5,6 +5,7 @@ import socket
 from smart_life_bot.bot import CALLBACK_CANCEL, CALLBACK_CONFIRM, CALLBACK_EDIT
 from smart_life_bot.config.settings import Settings
 from smart_life_bot.domain.enums import GoogleAuthMode
+from smart_life_bot.runtime.fakes import DevFakeCalendarService
 from smart_life_bot.runtime import RuntimeContainer, build_runtime
 
 
@@ -96,5 +97,32 @@ def test_runtime_supports_in_memory_sqlite_database_url() -> None:
         assert user is not None
         logs = container.events_log_repo.list_for_user(user.id)
         assert len(logs) == 1
+    finally:
+        container.connection.close()
+
+
+def test_runtime_edit_path_with_context_logger_kwargs_does_not_raise() -> None:
+    container = build_runtime(_settings())
+    try:
+        container.runtime.on_text(telegram_user_id=1005, text="Edit logger check")
+        response = container.runtime.on_text(telegram_user_id=1005, text="/edit title Updated")
+        assert "Updated" in response.text
+    finally:
+        container.connection.close()
+
+
+def test_runtime_confirm_failure_returns_graceful_response_when_calendar_fails(
+    monkeypatch,
+) -> None:
+    def _raise_calendar_error(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("forced calendar failure")
+
+    monkeypatch.setattr(DevFakeCalendarService, "create_event", _raise_calendar_error)
+
+    container = build_runtime(_settings())
+    try:
+        container.runtime.on_text(telegram_user_id=1006, text="Force failure")
+        response = container.runtime.on_callback(telegram_user_id=1006, callback_data=CALLBACK_CONFIRM)
+        assert response.text == "Event creation failed"
     finally:
         container.connection.close()

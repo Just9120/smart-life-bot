@@ -9,3 +9,5 @@ def test_run_returns_foundation_message(monkeypatch) -> None:
 
     message = run()
     assert "runtime composition" in message.lower()
+    assert "database_url_configured=true" in message
+    assert "sqlite:///tmp.db" not in message

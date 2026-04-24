@@ -26,6 +26,7 @@
 - `sqlite:///:memory:` (in-memory для тестов).
 
 Runtime composition layer использует `DATABASE_URL` напрямую при `build_runtime(settings)` и всегда выполняет инициализацию SQLite schema при bootstrap.
+Bootstrap-сообщение runtime не должно выводить raw `DATABASE_URL`; вместо этого используется безопасный признак конфигурации/back-end marker.
 
 ## 3. Optional переменные с default в коде
 

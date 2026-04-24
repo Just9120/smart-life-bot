@@ -398,6 +398,7 @@ Implemented minimal runtime composition layer for local/dev execution:
 - added explicit `build_runtime(settings)` composition function to wire `Settings` → SQLite connection → schema init → repositories → fake/dev adapters → application use-cases → `TelegramTransportRouter` → `TelegramBotRuntime`;
 - composition uses existing `DATABASE_URL` and initializes schema on bootstrap (`CREATE TABLE IF NOT EXISTS` path from storage layer);
 - fake/dev adapters for parser/auth/calendar are deterministic and marked dev-only; they do not call Telegram API, Google API, OAuth callback, or LLM parsing runtime;
+- composition injects a context-safe logger adapter compatible with application use-cases (`logger.info/error(..., **context)`), avoiding stdlib kwargs incompatibility;
 - `main.py` now builds runtime graph and logs safe bootstrap status without starting Telegram polling/webhook;
 - added runtime composition tests for wiring, in-memory SQLite, transport callback flow, and no-network behavior.
 

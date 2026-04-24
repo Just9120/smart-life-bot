@@ -13,7 +13,7 @@ from smart_life_bot.application.use_cases import (
 )
 from smart_life_bot.bot import TelegramBotRuntime, TelegramTransportRouter
 from smart_life_bot.config.settings import Settings
-from smart_life_bot.observability.logger import get_logger
+from smart_life_bot.observability.logger import ContextLoggerAdapter, get_context_logger
 from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
     SQLiteEventsLogRepository,
@@ -45,7 +45,7 @@ class _Dependencies:
     credentials_repo: SQLiteProviderCredentialsRepository
     state_repo: SQLiteConversationStateRepository
     events_log_repo: SQLiteEventsLogRepository
-    logger: object
+    logger: ContextLoggerAdapter
 
 
 def build_runtime(settings: Settings) -> RuntimeContainer:
@@ -66,7 +66,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         credentials_repo=credentials_repo,
         state_repo=state_repo,
         events_log_repo=events_log_repo,
-        logger=get_logger(),
+        logger=get_context_logger(),
     )
 
     router = TelegramTransportRouter(

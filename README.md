@@ -36,7 +36,7 @@ python -m smart_life_bot.main
 python -m pytest
 ```
 
-Текущая точка входа приложения собирает runtime graph через composition layer (`settings → SQLite → repositories → fake adapters → use-cases → Telegram transport runtime`), выводит безопасный bootstrap-статус и не поднимает реальный Telegram SDK runtime (long polling/webhook), а также не реализует Google Calendar/OAuth integrations.
+Текущая точка входа приложения собирает runtime graph через composition layer (`settings → SQLite → repositories → fake adapters → use-cases → Telegram transport runtime`), выводит безопасный bootstrap-статус (без печати raw `DATABASE_URL`) и не поднимает реальный Telegram SDK runtime (long polling/webhook), а также не реализует Google Calendar/OAuth integrations.
 
 Storage foundation тесты можно запускать общим тестовым набором:
 
