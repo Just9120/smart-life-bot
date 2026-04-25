@@ -69,3 +69,20 @@ Bootstrap-сообщение runtime не должно выводить raw `DAT
 
 1. Нужен ли отдельный `ENCRYPTION_KEY` для шифрования `credentials_encrypted` на MVP-этапе runtime. **Open question**.
 2. Нужна ли отдельная env-переменная для явного разделения `GOOGLE_SERVICE_ACCOUNT_JSON_RAW` и `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` при переходе к production hardening. **Open question**.
+
+
+## 9. Safe preflight before VPS polling
+
+Перед запуском polling на VPS рекомендуется выполнить безопасную диагностику:
+
+```bash
+python -m smart_life_bot.runtime.preflight
+```
+
+Preflight проверяет конфигурацию, таймзону, SQLite schema и runtime composition без запуска polling и без сетевых вызовов Telegram/Google API.
+
+Для `service_account_shared_calendar_mode` допускаются два формата `GOOGLE_SERVICE_ACCOUNT_JSON`:
+- raw JSON string;
+- filesystem path до JSON-файла (рекомендуется для VPS эксплуатации).
+
+`service_account` JSON и `.env` нельзя коммитить в репозиторий.
