@@ -9,7 +9,11 @@ description = "Smart Life Ops Bot bootstrap foundation"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Smart Life Ops Team" }]
-dependencies = ["python-telegram-bot>=22.7,<23.0"]
+dependencies = [
+    "python-telegram-bot>=22.7,<23.0",
+    "google-api-python-client>=2.194,<3.0",
+    "google-auth>=2.49,<3.0",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]

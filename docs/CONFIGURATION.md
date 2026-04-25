@@ -55,15 +55,17 @@ Bootstrap-сообщение runtime не должно выводить raw `DAT
 
 | Переменная | Обязательность в режиме | Пример placeholder | Чувствительная | Назначение |
 |---|---|---|---|---|
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Optional (станет required при runtime service-account flow) | `<json_or_path_placeholder>` | **Да** | Service account credentials (JSON string или безопасный путь). |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | **Required** при `service_account_shared_calendar_mode` | `<json_or_path_placeholder>` | **Да** | Service account credentials (raw JSON string или путь до JSON файла). |
+| `GOOGLE_SHARED_CALENDAR_ID` | **Required** при `service_account_shared_calendar_mode` | `primary` / `<calendar_id>@group.calendar.google.com` | Нет | Calendar ID shared-календаря, куда выполняется запись событий. |
 
 ## 7. Правила безопасной работы с env
 
 - Секреты (`TELEGRAM_BOT_TOKEN`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_SERVICE_ACCOUNT_JSON`) не коммитятся в Git.
 - Для CI/CD и production используются только защищённые secret stores (GitHub Secrets/серверные env).
 - В логах секреты маскируются; полные значения не выводятся.
+- Для `service_account_shared_calendar_mode` целевой календарь должен быть явно расшарен на email service account, иначе create-event операции будут завершаться provider error.
 
 ## 8. Pending / Open questions
 
 1. Нужен ли отдельный `ENCRYPTION_KEY` для шифрования `credentials_encrypted` на MVP-этапе runtime. **Open question**.
-2. Финальный формат передачи `GOOGLE_SERVICE_ACCOUNT_JSON` (raw JSON vs file path) для production. **Pending**.
+2. Нужна ли отдельная env-переменная для явного разделения `GOOGLE_SERVICE_ACCOUNT_JSON_RAW` и `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` при переходе к production hardening. **Open question**.

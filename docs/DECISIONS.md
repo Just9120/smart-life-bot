@@ -114,3 +114,9 @@
 - **Status:** Accepted
 - **Decision:** Use a deterministic rule-based parser as the first real parser baseline before adding LLM parsing.
 - **Rationale:** Enables useful Telegram/VPS demo behavior without LLM cost, latency, external dependencies, or non-determinism.
+
+## D-019: Service-account shared calendar adapter before OAuth runtime
+
+- **Status:** Accepted
+- **Decision:** Implement service-account shared calendar adapter before OAuth user-mode runtime.
+- **Rationale:** Enables the first real VPS/Telegram calendar-write smoke test without introducing OAuth callback, HTTPS redirect URI, or user consent flow complexity.

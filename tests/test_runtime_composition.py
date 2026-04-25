@@ -4,6 +4,7 @@ import socket
 
 from smart_life_bot.bot import CALLBACK_CANCEL, CALLBACK_CONFIRM, CALLBACK_EDIT
 from smart_life_bot.config.settings import Settings
+from smart_life_bot.calendar.google_calendar import GoogleCalendarService
 from smart_life_bot.domain.enums import GoogleAuthMode
 from smart_life_bot.runtime.fakes import DevFakeCalendarService
 from smart_life_bot.runtime import RuntimeContainer, build_runtime
@@ -119,6 +120,38 @@ def test_runtime_edit_path_with_context_logger_kwargs_does_not_raise() -> None:
         container.runtime.on_text(telegram_user_id=1005, text="Edit logger check")
         response = container.runtime.on_text(telegram_user_id=1005, text="/edit title Updated")
         assert "Updated" in response.text
+    finally:
+        container.connection.close()
+
+
+def test_runtime_uses_real_google_calendar_service_for_service_account_mode() -> None:
+    settings = Settings(
+        app_env="dev",
+        log_level="INFO",
+        telegram_bot_token="token",
+        google_auth_mode=GoogleAuthMode.SERVICE_ACCOUNT_SHARED_CALENDAR_MODE,
+        database_url="sqlite:///:memory:",
+        default_timezone="UTC",
+        google_service_account_json="/tmp/service-account.json",
+        google_shared_calendar_id="calendar@example.com",
+    )
+    container = build_runtime(settings)
+    try:
+        assert isinstance(
+            container.runtime.router.confirm_draft.deps.calendar_service,
+            GoogleCalendarService,
+        )
+    finally:
+        container.connection.close()
+
+
+def test_runtime_keeps_fake_calendar_service_for_oauth_mode() -> None:
+    container = build_runtime(_settings())
+    try:
+        assert isinstance(
+            container.runtime.router.confirm_draft.deps.calendar_service,
+            DevFakeCalendarService,
+        )
     finally:
         container.connection.close()
 
