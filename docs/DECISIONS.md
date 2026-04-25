@@ -132,3 +132,15 @@
 - **Status:** Accepted
 - **Decision:** Store parser mode as a user-level preference and expose it through Telegram settings UI instead of requiring `.env` edits.
 - **Rationale:** Parser mode is a product behavior choice. Users should be able to change it without redeploying or editing server env variables. Runtime env remains deployment/configuration scope, while per-user parsing behavior belongs in persistent user preferences.
+
+## D-022: ParserModeRouter keeps non-implemented modes safe via Python fallback
+
+- **Status:** Accepted
+- **Decision:** Keep `ParserModeRouter` in the real parsing path and route `python` to Python parser, while `auto` and `llm` remain safe Python fallbacks until LLM parser is implemented.
+- **Rationale:** Preserves stable UX and deterministic behavior now, avoids dead routes, and keeps a clean extension point for future Claude parser integration without changing application use-cases.
+
+## D-023: Telegram voice input deferred to backlog with STT-first separation
+
+- **Status:** Accepted
+- **Decision:** Keep Telegram voice input out of current implementation scope and treat it as backlog; when implemented, flow must be `voice → STT → existing text parser flow → preview/confirm`.
+- **Rationale:** Limits current scope, preserves existing safety guarantees (mandatory preview before write), and enforces clear boundary between STT (audio→text) and parser (text→EventDraft). Preferred future STT candidate is ElevenLabs Scribe, with guardrails for max duration/file size and no processing of long lectures.
