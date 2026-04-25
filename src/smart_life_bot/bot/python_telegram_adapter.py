@@ -21,12 +21,25 @@ from .telegram_transport import (
     CALLBACK_CANCEL,
     CALLBACK_CONFIRM,
     CALLBACK_EDIT,
+    CALLBACK_SETTINGS_PARSER_AUTO,
+    CALLBACK_SETTINGS_PARSER_LLM,
+    CALLBACK_SETTINGS_PARSER_PYTHON,
     TelegramTransportResponse,
 )
 
 
-_ALLOWED_CALLBACKS = (CALLBACK_CONFIRM, CALLBACK_EDIT, CALLBACK_CANCEL)
-_CALLBACK_PATTERN = r"^(draft:confirm|draft:edit|draft:cancel)$"
+_ALLOWED_CALLBACKS = (
+    CALLBACK_CONFIRM,
+    CALLBACK_EDIT,
+    CALLBACK_CANCEL,
+    CALLBACK_SETTINGS_PARSER_PYTHON,
+    CALLBACK_SETTINGS_PARSER_AUTO,
+    CALLBACK_SETTINGS_PARSER_LLM,
+)
+_CALLBACK_PATTERN = (
+    r"^(draft:confirm|draft:edit|draft:cancel|"
+    r"settings:parser:python|settings:parser:auto|settings:parser:llm)$"
+)
 
 
 @dataclass(slots=True)
@@ -50,6 +63,17 @@ class TelegramSDKAdapter:
         response = self.runtime.on_text(
             telegram_user_id=update.effective_user.id,
             text=update.message.text,
+        )
+        await _reply_from_transport(update.message, response)
+
+    async def handle_settings(self, update: Update, context: CallbackContext[Application]) -> None:
+        del context
+        if update.message is None or update.effective_user is None:
+            return
+
+        response = self.runtime.on_text(
+            telegram_user_id=update.effective_user.id,
+            text="/settings",
         )
         await _reply_from_transport(update.message, response)
 
@@ -91,6 +115,7 @@ def build_telegram_application(settings: Settings, runtime: TelegramBotRuntime) 
 
     adapter = TelegramSDKAdapter(runtime=runtime)
     application.add_handler(CommandHandler("start", adapter.handle_start))
+    application.add_handler(CommandHandler("settings", adapter.handle_settings))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, adapter.handle_text_message))
     application.add_handler(CallbackQueryHandler(adapter.handle_callback_query, pattern=_CALLBACK_PATTERN))
 
