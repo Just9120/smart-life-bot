@@ -14,6 +14,8 @@ from smart_life_bot.application.use_cases import (
 from smart_life_bot.bot import TelegramBotRuntime, TelegramTransportRouter
 from smart_life_bot.config.settings import Settings
 from smart_life_bot.observability.logger import ContextLoggerAdapter, get_context_logger
+from smart_life_bot.parsing.interfaces import MessageParser
+from smart_life_bot.parsing.rule_based import RuleBasedMessageParser
 from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
     SQLiteEventsLogRepository,
@@ -23,7 +25,7 @@ from smart_life_bot.storage.sqlite import (
     init_sqlite_schema,
 )
 
-from .fakes import DevFakeCalendarService, DevFakeGoogleAuthProvider, DevFakeMessageParser
+from .fakes import DevFakeCalendarService, DevFakeGoogleAuthProvider
 
 
 @dataclass(slots=True)
@@ -38,7 +40,7 @@ class RuntimeContainer:
 
 @dataclass(slots=True)
 class _Dependencies:
-    parser: DevFakeMessageParser
+    parser: MessageParser
     auth_provider: DevFakeGoogleAuthProvider
     calendar_service: DevFakeCalendarService
     users_repo: SQLiteUsersRepository
@@ -59,7 +61,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
     events_log_repo = SQLiteEventsLogRepository(connection)
 
     deps = _Dependencies(
-        parser=DevFakeMessageParser(default_timezone=settings.default_timezone),
+        parser=RuleBasedMessageParser(default_timezone=settings.default_timezone),
         auth_provider=DevFakeGoogleAuthProvider(auth_mode=settings.google_auth_mode),
         calendar_service=DevFakeCalendarService(),
         users_repo=users_repo,

@@ -96,7 +96,7 @@ Google Calendar — первая реализация провайдера.
 
 - инициализация SQLite connection + schema;
 - создание repository-реализаций;
-- подключение локальных fake/dev адаптеров parsing/auth/calendar;
+- подключение детерминированного rule-based parsing адаптера и локальных fake/dev адаптеров auth/calendar;
 - wiring application use-cases;
 - wiring `TelegramTransportRouter` и `TelegramBotRuntime`.
 - wiring SDK adapter builder (`telegram.ext.Application`) для явного polling-entrypoint.
@@ -200,6 +200,8 @@ Recommended pipeline:
 4. confidence/ambiguity check
 5. event draft
 6. preview payload
+
+Текущий runtime baseline использует детерминированный rule-based parser implementation (без LLM, без Telegram SDK dependency и без Google Calendar dependency внутри parsing слоя).
 
 При низкой уверенности система должна запрашивать уточнение, а не выполнять silent action.
 

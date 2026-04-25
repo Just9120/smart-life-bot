@@ -56,11 +56,23 @@ def test_runtime_on_text_returns_preview_response() -> None:
         container.connection.close()
 
 
+
+
+def test_runtime_uses_rule_based_parser_instead_of_fixed_fake_datetime() -> None:
+    container = build_runtime(_settings())
+    try:
+        response = container.runtime.on_text(telegram_user_id=1007, text="завтра в 15:00 созвон")
+
+        assert "2026-01-01T09:00:00+00:00" not in response.text
+        assert "- start_at: " in response.text
+        assert "T15:00:00+00:00" in response.text
+    finally:
+        container.connection.close()
 def test_runtime_callback_flow_confirm_cancel_and_edit_mapping() -> None:
     container = build_runtime(_settings())
     try:
         user_id = 1002
-        container.runtime.on_text(telegram_user_id=user_id, text="First event")
+        container.runtime.on_text(telegram_user_id=user_id, text="First event 2026-04-26 09:00")
 
         edit_response = container.runtime.on_callback(telegram_user_id=user_id, callback_data=CALLBACK_EDIT)
         assert "/edit <field> <value>" in edit_response.text
@@ -68,7 +80,7 @@ def test_runtime_callback_flow_confirm_cancel_and_edit_mapping() -> None:
         confirm_response = container.runtime.on_callback(telegram_user_id=user_id, callback_data=CALLBACK_CONFIRM)
         assert confirm_response.text == "Event created successfully"
 
-        container.runtime.on_text(telegram_user_id=user_id, text="Second event")
+        container.runtime.on_text(telegram_user_id=user_id, text="Second event 2026-04-26 10:00")
         cancel_response = container.runtime.on_callback(telegram_user_id=user_id, callback_data=CALLBACK_CANCEL)
         assert cancel_response.text == "Draft cancelled and state reset to IDLE"
     finally:
@@ -121,7 +133,7 @@ def test_runtime_confirm_failure_returns_graceful_response_when_calendar_fails(
 
     container = build_runtime(_settings())
     try:
-        container.runtime.on_text(telegram_user_id=1006, text="Force failure")
+        container.runtime.on_text(telegram_user_id=1006, text="Force failure 2026-04-26 11:00")
         response = container.runtime.on_callback(telegram_user_id=1006, callback_data=CALLBACK_CONFIRM)
         assert response.text == "Event creation failed"
     finally:

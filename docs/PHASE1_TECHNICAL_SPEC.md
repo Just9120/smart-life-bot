@@ -83,6 +83,13 @@
 - confidence/ambiguity scoring;
 - формирование preview payload.
 
+**Runtime status (PR #12 parser baseline):**
+- реализован детерминированный rule-based parser baseline;
+- поддержаны шаблоны `YYYY-MM-DD HH:MM`, `DD.MM.YYYY HH:MM`, `сегодня/завтра/послезавтра в HH:MM`, `в HH:MM`;
+- default duration = 60 минут, поддержаны `на N минут` и `на N час/часа/часов`;
+- при отсутствии start time парсер возвращает ambiguous draft (`start_at=None`, `end_at=None`, issue `missing_start_at`);
+- runtime composition использует rule-based parser вместо fixed fake parser output.
+
 **Не входит:**
 - отправка сообщений пользователю;
 - запись в календарь.

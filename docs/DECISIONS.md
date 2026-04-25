@@ -108,3 +108,9 @@
 - **Status:** Accepted
 - **Decision:** Использовать `python-telegram-bot` как Telegram SDK adapter поверх существующего `TelegramBotRuntime`/`TelegramTransportRouter`.
 - **Rationale:** Mature async SDK, straightforward handler model, и хорошее соответствие текущей transport-boundary архитектуре без внедрения Telegram SDK в application/domain слои.
+
+## D-018: Deterministic rule-based parser before LLM parser
+
+- **Status:** Accepted
+- **Decision:** Use a deterministic rule-based parser as the first real parser baseline before adding LLM parsing.
+- **Rationale:** Enables useful Telegram/VPS demo behavior without LLM cost, latency, external dependencies, or non-determinism.
