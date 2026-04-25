@@ -28,7 +28,7 @@
 - для очистки optional полей в transport используется детерминированная форма `/edit description --clear` и `/edit location --clear`;
 - добавлен `python-telegram-bot` adapter foundation (`build_telegram_application`), который маппит `/start`, plain text (без command payload) и callback (`draft:confirm/edit/cancel`) в `TelegramBotRuntime`;
 - добавлен `/settings` flow для parser mode preference foundation с callback `settings:parser:python|auto|llm`;
-- `python` можно переключать как active mode, `auto` сохраняется как planned mode с текущим Python fallback, `llm` явно возвращает `not implemented yet` и не активирует LLM parsing;
+- `python` можно переключать как active mode (единственная полностью активная parser-реализация), `auto` сохраняется как planned mode с текущим Python fallback, `llm` пока не реализован и defensively fallback-ится в Python parsing path;
 - long polling вынесен в отдельный явный entrypoint (`python -m smart_life_bot.bot.telegram_polling`) и не запускается из default bootstrap `main.py`.
 
 **Разрешённые зависимости:**
@@ -93,7 +93,7 @@
 - runtime composition использует rule-based parser вместо fixed fake parser output;
 - parser mode preference участвует в parsing path через `ParserModeRouter` (за `MessageParser`): `python` → Python parser, `auto` → Python fallback, `llm` → defensive Python fallback (`llm not implemented`);
 - routing metadata (`parser_mode`, `parser_router`, optional `llm_fallback_available=false`) добавляется поверх metadata базового Python parser;
-- реальный LLM parser и внешние LLM provider calls остаются pending.
+- реальный LLM parser и внешние LLM provider calls остаются pending; целевой first provider — Claude (model env-configurable, likely start from Haiku; Sonnet as future higher-quality option).
 
 **Не входит:**
 - отправка сообщений пользователю;
@@ -373,13 +373,40 @@ Recommended pipeline:
 - сложные допускают более гибкий parsing;
 - при низкой уверенности обязательно уточнение, без silent action.
 
-Текущий parser mode: Python/rule-based.
+Текущий parser mode runtime-реализации: Python/rule-based (единственный fully active parser).
 
 Поддерживаются compact форматы даты/времени (включая optional comma между датой и временем, `HH:MM` и `HH MM`), а также русские month-name форматы (genitive + common abbreviations).
 
 Для month-name форматов без явного года используется детерминированное правило: берётся текущий год, если дата не раньше `now`; иначе следующий год.
 
-Планируемые parser modes (future): Python, LLM, Auto/hybrid (Python first, LLM fallback).
+Parser mode выбирается как user-level preference через Telegram `/settings` и хранится в `user_preferences` (это не `.env`-переключатель поведения пользователя).
+
+Текущее routing-поведение `ParserModeRouter`:
+- `python` → Python/rule-based parser;
+- `auto` → Python fallback (до реализации LLM parser);
+- `llm` → not implemented / defensive Python fallback.
+
+Планируемые parser modes (future): Python, LLM, Auto/hybrid (Python first, Claude LLM fallback).
+
+## 6.1 Backlog: Telegram voice input (future)
+
+Voice input не входит в текущий scope Phase 1 runtime и фиксируется как backlog-направление.
+
+Целевой pipeline будущей реализации:
+
+`Telegram voice message → STT transcription → existing text parser flow → preview → confirm/edit/cancel → Google Calendar write`
+
+Требования для будущего этапа:
+- STT и parser разделены по ответственности:
+  - STT: audio → text;
+  - parser: text → `EventDraft`.
+- Предпочтительный STT-кандидат: ElevenLabs Scribe.
+- Voice pipeline не обходит preview/confirm/edit/cancel.
+- Cost/safety notes для будущей реализации:
+  - короткие voice-сообщения ожидаемо low-cost;
+  - нужны лимиты на max duration/file size;
+  - длинные лекции не должны идти через этот bot flow;
+  - не логировать API keys/credentials.
 
 ## 7. Event creation sequence
 

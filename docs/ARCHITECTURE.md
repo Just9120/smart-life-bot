@@ -204,7 +204,7 @@ Recommended pipeline:
 
 `MessageParser` — базовая абстракция parsing слоя.
 
-Текущая runtime-реализация: детерминированный Python/rule-based parser (без LLM, без Telegram SDK dependency и без Google Calendar dependency внутри parsing слоя). Parser покрывает common compact RU форматы даты/времени и форматы с русскими названиями/сокращениями месяцев.
+Текущая runtime-реализация: детерминированный Python/rule-based parser (без LLM, без Telegram SDK dependency и без Google Calendar dependency внутри parsing слоя). Это единственная полностью активная parser-реализация в production path. Parser покрывает common compact RU форматы даты/времени и форматы с русскими названиями/сокращениями месяцев.
 
 Планируемая отдельная реализация: LLM parser (pending, не реализован в текущем этапе).
 
@@ -213,13 +213,29 @@ Parser mode фиксируется как user-level preference в storage (`use
 На текущем этапе runtime parsing маршрутизируется через `ParserModeRouter` (за `MessageParser` abstraction), который читает `user_preferences` и выбирает безопасный маршрут без внешних сетевых вызовов:
 - `python` → Python/rule-based parser;
 - `auto` → Python fallback (до появления реального LLM parser);
-- `llm` → defensive Python fallback с признаком `llm not implemented`.
+- `llm` → defensive Python fallback с признаком `llm not implemented` (LLM route remains unavailable).
 
-Реального LLM parser implementation пока нет; будущая LLM-реализация может быть подключена за тем же router-контрактом без изменения application use-cases.
+Реального LLM parser implementation пока нет; будущая LLM-реализация может быть подключена за тем же router-контрактом без изменения application use-cases. Целевой первый LLM provider — Claude; модель должна оставаться env-configurable (без hardcode в коде/документации), вероятный стартовый вариант — Claude Haiku, с возможным переходом на Sonnet как higher-quality option позже.
 
 При низкой уверенности система должна запрашивать уточнение, а не выполнять silent action.
 
 Product flow при этом не меняется: preview и явное confirm перед записью события обязательны для всех parser-режимов.
+
+## 11.1 Backlog: Telegram voice input (future, out of current scope)
+
+Telegram voice input относится к будущему scope и не реализован в текущем runtime.
+
+Целевой будущий поток:
+
+`Telegram voice message → STT transcription → existing text parsing flow → preview → confirm/edit/cancel → create event`
+
+Архитектурные требования для backlog-реализации:
+- STT и parser остаются разными компонентами и не смешивают ответственность:
+  - STT: audio → text;
+  - parser: text → `EventDraft`.
+- Voice flow не должен обходить обязательный preview/confirm этап.
+- Предпочтительный кандидат STT для будущего этапа: ElevenLabs Scribe.
+- Нужны cost/safety guardrails на этапе внедрения: ограничения на длительность/размер voice-сообщения и отказ от обработки длинных лекций.
 
 ## 12. Configuration / env model
 

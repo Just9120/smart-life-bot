@@ -67,10 +67,36 @@ python -m pytest
 ```
 
 
-Парсинг на текущем этапе остаётся MVP-уровня: используется детерминированный Python/rule-based baseline без LLM/NLP SDK и без внешних сетевых вызовов. Rule-based parser поддерживает распространённые компактные RU форматы даты/времени (включая варианты с запятой, `HH:MM` и `HH MM`) и даты с русскими названиями/сокращениями месяцев.
+Парсинг на текущем этапе остаётся MVP-уровня: используется детерминированный Python/rule-based parser baseline (единственная полностью активная parser-реализация) без LLM/NLP SDK и без внешних сетевых вызовов. Rule-based parser поддерживает распространённые компактные RU форматы даты/времени (включая варианты с запятой, `HH:MM` и `HH MM`) и даты с русскими названиями/сокращениями месяцев.
 
-LLM parser пока не реализован. Целевая стратегия на следующих этапах — hybrid parsing mode: сначала Python/rule-based parser, затем fallback в LLM parser только для неоднозначных/низкоуверенных случаев.
-В Telegram добавлена команда `/settings` для foundation-настроек parser mode на уровне пользователя: сейчас полностью активен только `Python / rule-based`; `Auto` помечен как planned и пока работает через Python fallback; `LLM` помечен как planned/not implemented.
-Сохранённый parser mode теперь участвует в runtime parsing path через `ParserModeRouter` (за `MessageParser` abstraction): `python` маршрутизируется в Python parser, `auto` и `llm` пока явно маршрутизируются в Python fallback с routing metadata, без каких-либо LLM SDK/API вызовов.
+Parser mode хранится как user-level preference в `user_preferences` и настраивается через Telegram `/settings` (а не через `.env`). Сохранённый режим участвует в реальном parsing path через `ParserModeRouter` (за `MessageParser` abstraction):
+- `python` → Python/rule-based parser;
+- `auto` → Python fallback (текущий временный маршрут);
+- `llm` → не реализован, defensive fallback в Python parser.
+
+Текущая реализация LLM parser отсутствует. Целевое направление следующих этапов:
+- `auto` должен стать hybrid-режимом: Python first → Claude LLM fallback для ambiguity/low-confidence;
+- `llm` должен использовать Claude parser после реализации;
+- модель LLM должна оставаться env-configurable (не hardcoded), вероятный старт — Claude Haiku; Claude Sonnet — как future higher-quality option.
+
+## Backlog / Future scope
+
+Telegram voice input добавлен только в backlog и не входит в текущую реализацию.
+
+Целевой будущий поток:
+
+`Telegram voice message → STT transcription → existing text parser flow → preview → confirm/edit/cancel → Google Calendar write`
+
+Ключевые ограничения будущей реализации:
+- STT и parsing остаются разделёнными этапами:
+  - STT: audio → text;
+  - parser: text → `EventDraft`.
+- Предпочтительный STT-кандидат для будущего этапа: ElevenLabs Scribe (в проектном контексте уже есть ElevenLabs API key, но в репозитории не хранятся реальные ключи).
+- Voice input не должен обходить обязательный preview/confirm flow.
+- Cost/safety baseline для будущего этапа:
+  - короткие Telegram voice сообщения ожидаемо low-cost относительно длинных лекций;
+  - позже должны быть введены ограничения max duration / file size;
+  - длинные лекции не должны обрабатываться через bot flow;
+  - API keys/credentials не логируются.
 
 Реализован foundation-адаптер записи событий Google Calendar для `service_account_shared_calendar_mode` (через service account + shared calendar). `oauth_user_mode` остаётся pending и в runtime пока использует fake/dev calendar adapter. После успешного confirm бот также показывает ссылку на созданное событие, если календарный провайдер вернул `html_link`. Это позволяет подготовить будущий VPS smoke-сценарий `Telegram message → preview → confirm → Google Calendar create event` без добавления OAuth callback/user-consent flow в текущем PR.
