@@ -421,6 +421,17 @@ Implemented minimal real Telegram SDK adapter layer using `python-telegram-bot`:
 - callback queries are answered before sending response message;
 - tests validate handler registration and delegation behavior without bot token validation calls, Telegram API calls, or network.
 
+## 7.5 Google Calendar service-account adapter foundation status (PR #13)
+
+Implemented first real Google Calendar write adapter for `service_account_shared_calendar_mode`:
+
+- added `GoogleCalendarService` behind existing `CalendarService` contract;
+- adapter validates auth context mode and rejects writes outside service-account mode;
+- adapter maps `CalendarEventCreateRequest` to Google Calendar `events.insert` body (`summary`, optional `description/location`, `start/end` datetime + timezone);
+- runtime composition now wires real Google adapter when `GOOGLE_AUTH_MODE=service_account_shared_calendar_mode` and required service-account settings are present;
+- `oauth_user_mode` remains fake/dev for calendar writes (OAuth callback/user-consent flow remains out of scope);
+- tests cover event-body mapping, calendar-id routing, response mapping, error paths, and runtime wiring without real Google network calls.
+
 ## 8. Error model
 
 Минимальная классификация:

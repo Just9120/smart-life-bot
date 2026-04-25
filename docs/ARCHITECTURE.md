@@ -23,7 +23,7 @@
 
 Явно вне реализации этого шага:
 
-- runtime Google API calls;
+- runtime Google API calls для `oauth_user_mode`;
 - OAuth callback implementation;
 - aiogram handlers и FSM runtime;
 - ORM, migrations и реальная DB-логика;
@@ -75,7 +75,8 @@
 
 Единая абстракция записи события в календарь.
 
-Google Calendar — первая реализация провайдера.
+Google Calendar — первая реальная реализация провайдера для `service_account_shared_calendar_mode`.
+OAuth runtime-адаптер остается pending и пока не реализуется.
 
 ### 4.6 Storage layer
 
@@ -235,7 +236,6 @@ Recovery baseline:
 
 ## 14. Что остается вне реализации текущего шага
 
-- Реальный код интеграции Google Calendar.
 - Реальный OAuth redirect/callback сервер.
 - Реализация Telegram handlers/FSM runtime.
 - Реальные SQL migrations и ORM-схема.

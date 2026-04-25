@@ -2,7 +2,7 @@
 
 Smart Life Ops Bot — это Telegram-ассистент, сфокусированный на быстром и надежном добавлении событий в Google Calendar с обязательным подтверждением перед записью каждого события.
 
-**Текущий статус:** runtime foundation phase 1 (включая SQLite storage foundation, minimal Telegram transport foundation для `/start`, text, confirm/edit/cancel mapping, explicit runtime composition foundation, foundation-адаптер `python-telegram-bot` для маппинга real Telegram updates в существующий runtime и детерминированный rule-based parser baseline без LLM).
+**Текущий статус:** runtime foundation phase 1 (включая SQLite storage foundation, minimal Telegram transport foundation для `/start`, text, confirm/edit/cancel mapping, explicit runtime composition foundation, foundation-адаптер `python-telegram-bot` для маппинга real Telegram updates в существующий runtime, детерминированный rule-based parser baseline без LLM и foundation-адаптер реальной записи в Google Calendar для `service_account_shared_calendar_mode`).
 
 ## Назначение продукта (MVP)
 
@@ -36,7 +36,7 @@ python -m smart_life_bot.main
 python -m pytest
 ```
 
-Текущая точка входа приложения (`python -m smart_life_bot.main`) собирает runtime graph через composition layer (`settings → SQLite → repositories → fake adapters → use-cases → Telegram transport runtime`), выводит безопасный bootstrap-статус (без печати raw `DATABASE_URL`) и **не** поднимает polling/webhook автоматически, а также не реализует Google Calendar/OAuth integrations.
+Текущая точка входа приложения (`python -m smart_life_bot.main`) собирает runtime graph через composition layer (`settings → SQLite → repositories → adapters → use-cases → Telegram transport runtime`), выводит безопасный bootstrap-статус (без печати raw `DATABASE_URL`) и **не** поднимает polling/webhook автоматически.
 
 Foundation интеграция с `python-telegram-bot` доступна отдельным явным runtime-entrypoint:
 
@@ -54,3 +54,5 @@ python -m pytest
 
 
 Парсинг на текущем этапе остаётся MVP-уровня: используется детерминированный rule-based baseline без LLM/NLP SDK и без внешних сетевых вызовов.
+
+Реализован foundation-адаптер записи событий Google Calendar для `service_account_shared_calendar_mode` (через service account + shared calendar). `oauth_user_mode` остаётся pending и в runtime пока использует fake/dev calendar adapter. Это позволяет подготовить будущий VPS smoke-сценарий `Telegram message → preview → confirm → Google Calendar create event` без добавления OAuth callback/user-consent flow в текущем PR.
