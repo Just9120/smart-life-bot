@@ -89,6 +89,7 @@
 - default duration = 60 минут, поддержаны `на N минут` и `на N час/часа/часов`;
 - при отсутствии start time парсер возвращает ambiguous draft (`start_at=None`, `end_at=None`, issue `missing_start_at`);
 - runtime composition использует rule-based parser вместо fixed fake parser output.
+- LLM parser и Auto/hybrid mode остаются pending (без Telegram mode switching в текущем PR).
 
 **Не входит:**
 - отправка сообщений пользователю;
@@ -360,6 +361,14 @@ Recommended pipeline:
 - простые случаи обрабатываются максимально предсказуемо;
 - сложные допускают более гибкий parsing;
 - при низкой уверенности обязательно уточнение, без silent action.
+
+Текущий parser mode: Python/rule-based.
+
+Поддерживаются compact форматы даты/времени (включая optional comma между датой и временем, `HH:MM` и `HH MM`), а также русские month-name форматы (genitive + common abbreviations).
+
+Для month-name форматов без явного года используется детерминированное правило: берётся текущий год, если дата не раньше `now`; иначе следующий год.
+
+Планируемые parser modes (future): Python, LLM, Auto/hybrid (Python first, LLM fallback).
 
 ## 7. Event creation sequence
 

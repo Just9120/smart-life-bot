@@ -14,6 +14,37 @@ from .models import ParsingResult
 
 _DEFAULT_DURATION_MINUTES = 60
 
+# Two-digit year mapping rule is intentionally deterministic:
+# 00..69 -> 2000..2069, 70..99 -> 1970..1999.
+_TWO_DIGIT_YEAR_THRESHOLD = 69
+
+_MONTH_ALIASES: dict[str, int] = {
+    "января": 1,
+    "янв": 1,
+    "февраля": 2,
+    "фев": 2,
+    "марта": 3,
+    "мар": 3,
+    "апреля": 4,
+    "апр": 4,
+    "мая": 5,
+    "июня": 6,
+    "июн": 6,
+    "июля": 7,
+    "июл": 7,
+    "августа": 8,
+    "авг": 8,
+    "сентября": 9,
+    "сен": 9,
+    "сент": 9,
+    "октября": 10,
+    "окт": 10,
+    "ноября": 11,
+    "ноя": 11,
+    "декабря": 12,
+    "дек": 12,
+}
+
 
 @dataclass(slots=True)
 class RuleBasedMessageParser:
@@ -28,10 +59,10 @@ class RuleBasedMessageParser:
         now = _resolve_now(self.default_timezone, self.now_provider)
 
         consumed_spans: list[tuple[int, int]] = []
-        start_at = _extract_explicit_datetime(normalized, timezone, consumed_spans)
+        start_at, explicit_datetime_seen = _extract_explicit_datetime(normalized, timezone, now, consumed_spans)
 
         relative_day_offset: int | None = None
-        if start_at is None:
+        if start_at is None and not explicit_datetime_seen:
             relative_match = re.search(r"\b(послезавтра|завтра|сегодня)\b", normalized, flags=re.IGNORECASE)
             if relative_match:
                 consumed_spans.append(relative_match.span())
@@ -43,7 +74,7 @@ class RuleBasedMessageParser:
                 elif token == "послезавтра":
                     relative_day_offset = 2
 
-            time_match = re.search(r"\b(?:в\s*)?(\d{1,2}):(\d{2})\b", normalized, flags=re.IGNORECASE)
+            time_match = re.search(r"\b(?:в\s*)?(\d{1,2})(?::|\s)(\d{2})\b", normalized, flags=re.IGNORECASE)
             if time_match:
                 consumed_spans.append(time_match.span())
                 hour = int(time_match.group(1))
@@ -134,11 +165,22 @@ def _resolve_now(default_timezone: str, now_provider: Callable[[], datetime] | N
 def _extract_explicit_datetime(
     text: str,
     timezone: str,
+    now: datetime,
     consumed_spans: list[tuple[int, int]],
-) -> datetime | None:
-    for pattern, order in (
-        (r"\b(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})\b", (1, 2, 3, 4, 5)),
-        (r"\b(\d{2})\.(\d{2})\.(\d{4})\s+(\d{1,2}):(\d{2})\b", (3, 2, 1, 4, 5)),
+) -> tuple[datetime | None, bool]:
+    for pattern, parser in (
+        (
+            r"\b(\d{4})-(\d{2})-(\d{2})\s*,?\s*(\d{1,2})(?::|\s)(\d{2})\b",
+            _parse_iso_datetime_match,
+        ),
+        (
+            r"\b(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})\s*,?\s*(\d{1,2})(?::|\s)(\d{2})\b",
+            _parse_dotted_datetime_match,
+        ),
+        (
+            r"\b(\d{1,2})\s+([а-яё]+\.?)(?:\s+(\d{4}|\d{2}))?\s*,?\s*(\d{1,2})(?::|\s)(\d{2})\b",
+            _parse_month_name_datetime_match,
+        ),
     ):
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if not match:
@@ -146,15 +188,69 @@ def _extract_explicit_datetime(
 
         consumed_spans.append(match.span())
         try:
-            year = int(match.group(order[0]))
-            month = int(match.group(order[1]))
-            day = int(match.group(order[2]))
-            hour = int(match.group(order[3]))
-            minute = int(match.group(order[4]))
-            return datetime(year, month, day, hour, minute, tzinfo=ZoneInfo(timezone))
+            parsed = parser(match, timezone, now)
+            return parsed, True
         except ValueError:
-            return None
-    return None
+            return None, True
+    return None, False
+
+
+def _parse_iso_datetime_match(match: re.Match[str], timezone: str, now: datetime) -> datetime:
+    del now
+    year = int(match.group(1))
+    month = int(match.group(2))
+    day = int(match.group(3))
+    hour = int(match.group(4))
+    minute = int(match.group(5))
+    return datetime(year, month, day, hour, minute, tzinfo=ZoneInfo(timezone))
+
+
+def _parse_dotted_datetime_match(match: re.Match[str], timezone: str, now: datetime) -> datetime:
+    del now
+    day = int(match.group(1))
+    month = int(match.group(2))
+    year = _parse_year_token(match.group(3))
+    hour = int(match.group(4))
+    minute = int(match.group(5))
+    return datetime(year, month, day, hour, minute, tzinfo=ZoneInfo(timezone))
+
+
+def _parse_month_name_datetime_match(match: re.Match[str], timezone: str, now: datetime) -> datetime:
+    day = int(match.group(1))
+    month = _parse_month_token(match.group(2))
+    year_token = match.group(3)
+    hour = int(match.group(4))
+    minute = int(match.group(5))
+
+    if year_token is None:
+        year = _resolve_year_for_month_without_year(now=now, month=month, day=day)
+    else:
+        year = _parse_year_token(year_token)
+
+    return datetime(year, month, day, hour, minute, tzinfo=ZoneInfo(timezone))
+
+
+def _parse_year_token(year_token: str) -> int:
+    value = int(year_token)
+    if len(year_token) == 2:
+        if value <= _TWO_DIGIT_YEAR_THRESHOLD:
+            return 2000 + value
+        return 1900 + value
+    return value
+
+
+def _parse_month_token(month_token: str) -> int:
+    normalized_token = month_token.rstrip(".").lower()
+    month = _MONTH_ALIASES.get(normalized_token)
+    if month is None:
+        raise ValueError("unsupported month token")
+    return month
+
+
+def _resolve_year_for_month_without_year(now: datetime, month: int, day: int) -> int:
+    if (month, day) >= (now.month, now.day):
+        return now.year
+    return now.year + 1
 
 
 def _extract_title(text: str, spans: list[tuple[int, int]]) -> str:

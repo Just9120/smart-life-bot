@@ -120,3 +120,9 @@
 - **Status:** Accepted
 - **Decision:** Implement service-account shared calendar adapter before OAuth user-mode runtime.
 - **Rationale:** Enables the first real VPS/Telegram calendar-write smoke test without introducing OAuth callback, HTTPS redirect URI, or user consent flow complexity.
+
+## D-020: Separate parser strategies behind MessageParser abstraction
+
+- **Status:** Accepted
+- **Decision:** Keep parser implementations separated behind the `MessageParser` abstraction: Python/rule-based parser, future LLM parser, and future Auto/hybrid parser.
+- **Rationale:** Python parsing is cheap, fast and deterministic for common formats. LLM parsing should be used later for ambiguous or natural-language inputs, not necessarily for every message. This preserves cost control while keeping a path to better UX.
