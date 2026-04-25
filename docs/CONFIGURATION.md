@@ -1,5 +1,7 @@
 # Configuration / Env Model — Smart Life Ops Bot
 
+Связанный документ для первого ручного серверного теста: `docs/VPS_SMOKE_RUNBOOK.md`.
+
 ## 1. Назначение
 
 Документ фиксирует baseline переменных окружения для Phase 1 и разделяет:
@@ -83,6 +85,8 @@ Preflight проверяет конфигурацию, таймзону, SQLite 
 
 Для `service_account_shared_calendar_mode` допускаются два формата `GOOGLE_SERVICE_ACCOUNT_JSON`:
 - raw JSON string;
-- filesystem path до JSON-файла (рекомендуется для VPS эксплуатации).
+- filesystem path до JSON-файла (**рекомендуемый и приоритетный формат для VPS эксплуатации**).
+
+Для smoke-проверки на VPS используйте `.env.example` как безопасный шаблон и следуйте шагам из `docs/VPS_SMOKE_RUNBOOK.md`.
 
 `service_account` JSON и `.env` нельзя коммитить в репозиторий.
