@@ -22,11 +22,12 @@
 - auth/provider logic;
 - прямой доступ к calendar API.
 
-**Runtime status (PR #9 foundation):**
+**Runtime status (PR #11 foundation):**
 - реализован минимальный Telegram transport router поверх application use-cases;
 - поддержаны маршруты `/start`, plain text draft-preview, `confirm`, `cancel`, `edit` command (`/edit <field> <value>`);
 - для очистки optional полей в transport используется детерминированная форма `/edit description --clear` и `/edit location --clear`;
-- real Telegram SDK polling/webhook runtime остаётся pending.
+- добавлен `python-telegram-bot` adapter foundation (`build_telegram_application`), который маппит `/start`, plain text (без command payload) и callback (`draft:confirm/edit/cancel`) в `TelegramBotRuntime`;
+- long polling вынесен в отдельный явный entrypoint (`python -m smart_life_bot.bot.telegram_polling`) и не запускается из default bootstrap `main.py`.
 
 **Разрешённые зависимости:**
 - `smart_life_bot.application`
@@ -401,6 +402,17 @@ Implemented minimal runtime composition layer for local/dev execution:
 - composition injects a context-safe logger adapter compatible with application use-cases (`logger.info/error(..., **context)`), avoiding stdlib kwargs incompatibility;
 - `main.py` now builds runtime graph and logs safe bootstrap status without starting Telegram polling/webhook;
 - added runtime composition tests for wiring, in-memory SQLite, transport callback flow, and no-network behavior.
+
+## 7.4 Telegram SDK adapter foundation status (PR #11)
+
+Implemented minimal real Telegram SDK adapter layer using `python-telegram-bot`:
+
+- added adapter module that builds `telegram.ext.Application` from `settings.telegram_bot_token`;
+- registered deterministic handlers for `/start`, plain text (excluding commands), and callback query pattern for `draft:confirm`, `draft:edit`, `draft:cancel`;
+- SDK handlers delegate directly to existing runtime contract (`on_start`, `on_text`, `on_callback`) without duplicating application/domain behavior;
+- `TelegramTransportResponse` is mapped to Telegram replies, including `InlineKeyboardMarkup` when buttons are present;
+- callback queries are answered before sending response message;
+- tests validate handler registration and delegation behavior without bot token validation calls, Telegram API calls, or network.
 
 ## 8. Error model
 

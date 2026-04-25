@@ -2,7 +2,7 @@
 
 Smart Life Ops Bot — это Telegram-ассистент, сфокусированный на быстром и надежном добавлении событий в Google Calendar с обязательным подтверждением перед записью каждого события.
 
-**Текущий статус:** runtime foundation phase 1 (включая SQLite storage foundation, minimal Telegram transport foundation для `/start`, text, confirm/edit/cancel mapping, и explicit runtime composition foundation).
+**Текущий статус:** runtime foundation phase 1 (включая SQLite storage foundation, minimal Telegram transport foundation для `/start`, text, confirm/edit/cancel mapping, explicit runtime composition foundation и foundation-адаптер `python-telegram-bot` для маппинга real Telegram updates в существующий runtime).
 
 ## Назначение продукта (MVP)
 
@@ -36,7 +36,15 @@ python -m smart_life_bot.main
 python -m pytest
 ```
 
-Текущая точка входа приложения собирает runtime graph через composition layer (`settings → SQLite → repositories → fake adapters → use-cases → Telegram transport runtime`), выводит безопасный bootstrap-статус (без печати raw `DATABASE_URL`) и не поднимает реальный Telegram SDK runtime (long polling/webhook), а также не реализует Google Calendar/OAuth integrations.
+Текущая точка входа приложения (`python -m smart_life_bot.main`) собирает runtime graph через composition layer (`settings → SQLite → repositories → fake adapters → use-cases → Telegram transport runtime`), выводит безопасный bootstrap-статус (без печати raw `DATABASE_URL`) и **не** поднимает polling/webhook автоматически, а также не реализует Google Calendar/OAuth integrations.
+
+Foundation интеграция с `python-telegram-bot` доступна отдельным явным runtime-entrypoint:
+
+```bash
+python -m smart_life_bot.bot.telegram_polling
+```
+
+Этот entrypoint запускает long polling только по явной команде.
 
 Storage foundation тесты можно запускать общим тестовым набором:
 

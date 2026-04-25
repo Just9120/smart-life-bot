@@ -102,3 +102,9 @@
 - **Status:** Accepted
 - **Decision:** На шаге transport foundation реализовать Telegram routing abstraction (handlers mapping в application use-cases) без добавления `python-telegram-bot`/`aiogram` runtime зависимости.
 - **Rationale:** Проверка корректности прикладного flow (`/start`, text, confirm/edit/cancel) без сетевого рантайма и без расширения scope до webhook/long-polling инфраструктуры.
+
+## D-017: `python-telegram-bot` как SDK adapter для MVP runtime
+
+- **Status:** Accepted
+- **Decision:** Использовать `python-telegram-bot` как Telegram SDK adapter поверх существующего `TelegramBotRuntime`/`TelegramTransportRouter`.
+- **Rationale:** Mature async SDK, straightforward handler model, и хорошее соответствие текущей transport-boundary архитектуре без внедрения Telegram SDK в application/domain слои.
