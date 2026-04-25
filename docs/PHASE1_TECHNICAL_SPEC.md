@@ -430,6 +430,7 @@ Implemented first real Google Calendar write adapter for `service_account_shared
 - adapter maps `CalendarEventCreateRequest` to Google Calendar `events.insert` body (`summary`, optional `description/location`, `start/end` datetime + timezone);
 - runtime composition now wires real Google adapter when `GOOGLE_AUTH_MODE=service_account_shared_calendar_mode` and required service-account settings are present;
 - `oauth_user_mode` remains fake/dev for calendar writes (OAuth callback/user-consent flow remains out of scope);
+- confirm success response now surfaces provider event link when calendar adapter returns `html_link` (keeps backward-compatible success text when link is absent), which supports VPS smoke validation;
 - tests cover event-body mapping, calendar-id routing, response mapping, error paths, and runtime wiring without real Google network calls.
 
 ## 8. Error model

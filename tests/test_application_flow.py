@@ -89,6 +89,23 @@ class FailingCalendarService:
         raise RuntimeError("calendar provider unavailable")
 
 
+class NoHtmlLinkCalendarService:
+    def __init__(self) -> None:
+        self.requests: list[CalendarEventCreateRequest] = []
+
+    def create_event(
+        self,
+        auth_context: AuthContext,
+        request: CalendarEventCreateRequest,
+    ) -> CalendarEventCreateResult:
+        self.requests.append(request)
+        return CalendarEventCreateResult(
+            event_id="internal-no-link-1",
+            provider_event_id="fake-provider-event-no-link-123",
+            html_link=None,
+        )
+
+
 class MissingStartAtParser:
     def parse(self, text: str, user_id: int) -> ParsingResult:
         return ParsingResult(
@@ -174,6 +191,7 @@ def test_confirm_flow_creates_event_updates_log_and_resets_state() -> None:
 
     assert result.status == "success"
     assert result.provider_event_id == "fake-provider-event-123"
+    assert result.provider_event_html_link == "https://example.test/event/123"
     assert deps.state_repo.get(user_id) is None
 
     logs = deps.events_log_repo.list_for_user(user_id)
@@ -183,6 +201,21 @@ def test_confirm_flow_creates_event_updates_log_and_resets_state() -> None:
 
     assert len(deps.calendar_service.requests) == 1
     assert deps.calendar_service.requests[0].title.startswith("Parsed:")
+
+
+def test_confirm_flow_success_without_html_link_remains_backward_compatible() -> None:
+    deps, user_id = _build_dependencies()
+    deps.calendar_service = NoHtmlLinkCalendarService()
+
+    ProcessIncomingMessageUseCase(deps).execute(
+        IncomingMessageInput(user_id=user_id, text="No link result should still succeed")
+    )
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "success"
+    assert result.message == "Event created successfully"
+    assert result.provider_event_id == "fake-provider-event-no-link-123"
+    assert result.provider_event_html_link is None
 
 
 def test_cancel_flow_resets_state_when_preview_is_pending() -> None:

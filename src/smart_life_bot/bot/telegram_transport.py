@@ -85,6 +85,8 @@ class TelegramTransportRouter:
 
         if callback_data == CALLBACK_CONFIRM:
             result = self.confirm_draft.execute(ConfirmEventDraftInput(user_id=user.id))
+            if result.status == "success" and result.provider_event_html_link:
+                return TelegramTransportResponse(text=f"{result.message}\nGoogle Calendar: {result.provider_event_html_link}")
             return TelegramTransportResponse(text=result.message)
 
         if callback_data == CALLBACK_CANCEL:
