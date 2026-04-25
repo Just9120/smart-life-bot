@@ -90,8 +90,10 @@
 - поддержаны шаблоны `YYYY-MM-DD HH:MM`, `DD.MM.YYYY HH:MM`, `сегодня/завтра/послезавтра в HH:MM`, `в HH:MM`;
 - default duration = 60 минут, поддержаны `на N минут` и `на N час/часа/часов`;
 - при отсутствии start time парсер возвращает ambiguous draft (`start_at=None`, `end_at=None`, issue `missing_start_at`);
-- runtime composition использует rule-based parser вместо fixed fake parser output.
-- LLM parser и Auto/hybrid mode остаются pending (без Telegram mode switching в текущем PR).
+- runtime composition использует rule-based parser вместо fixed fake parser output;
+- parser mode preference участвует в parsing path через `ParserModeRouter` (за `MessageParser`): `python` → Python parser, `auto` → Python fallback, `llm` → defensive Python fallback (`llm not implemented`);
+- routing metadata (`parser_mode`, `parser_router`, optional `llm_fallback_available=false`) добавляется поверх metadata базового Python parser;
+- реальный LLM parser и внешние LLM provider calls остаются pending.
 
 **Не входит:**
 - отправка сообщений пользователю;
@@ -462,6 +464,17 @@ Implemented explicit safe preflight entrypoint for VPS/runtime readiness checks:
 - no Telegram/Google network calls are performed by preflight checks;
 - preflight output is safe: secrets (bot token, raw DATABASE_URL, service account/private key payloads) are not printed.
 
+
+
+## 7.7 Parser mode router foundation status (PR #19)
+
+Implemented parser mode routing foundation behind existing `MessageParser` contract:
+
+- added `ParserModeRouter`, which reads `user_preferences` via `get_or_create_for_user(..., default_parser_mode=python)` before parsing;
+- runtime composition now injects parser as `ParserModeRouter(user_preferences_repo, python_parser)` while keeping `ProcessIncomingMessageUseCase` unchanged;
+- current routing behavior is explicit and network-free: `python` routes to Python parser, `auto` routes to Python fallback, `llm` routes to defensive Python fallback (LLM not implemented);
+- router preserves underlying parser metadata (`source`, `raw_text`, `user_id`, etc.) and appends routing metadata for observability in draft/event-log payload;
+- invalid/stale parser mode values in DB are handled defensively with Python fallback instead of crashing the message flow.
 
 ## 8. Error model
 

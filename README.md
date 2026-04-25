@@ -71,5 +71,6 @@ python -m pytest
 
 LLM parser пока не реализован. Целевая стратегия на следующих этапах — hybrid parsing mode: сначала Python/rule-based parser, затем fallback в LLM parser только для неоднозначных/низкоуверенных случаев.
 В Telegram добавлена команда `/settings` для foundation-настроек parser mode на уровне пользователя: сейчас полностью активен только `Python / rule-based`; `Auto` помечен как planned и пока работает через Python fallback; `LLM` помечен как planned/not implemented.
+Сохранённый parser mode теперь участвует в runtime parsing path через `ParserModeRouter` (за `MessageParser` abstraction): `python` маршрутизируется в Python parser, `auto` и `llm` пока явно маршрутизируются в Python fallback с routing metadata, без каких-либо LLM SDK/API вызовов.
 
 Реализован foundation-адаптер записи событий Google Calendar для `service_account_shared_calendar_mode` (через service account + shared calendar). `oauth_user_mode` остаётся pending и в runtime пока использует fake/dev calendar adapter. После успешного confirm бот также показывает ссылку на созданное событие, если календарный провайдер вернул `html_link`. Это позволяет подготовить будущий VPS smoke-сценарий `Telegram message → preview → confirm → Google Calendar create event` без добавления OAuth callback/user-consent flow в текущем PR.
