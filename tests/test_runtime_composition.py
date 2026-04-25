@@ -30,7 +30,9 @@ def test_build_runtime_initializes_sqlite_schema() -> None:
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
             ).fetchall()
         }
-        assert {"users", "provider_credentials", "conversation_state", "events_log"}.issubset(tables)
+        assert {"users", "provider_credentials", "conversation_state", "events_log", "user_preferences"}.issubset(
+            tables
+        )
     finally:
         container.connection.close()
 
@@ -40,6 +42,7 @@ def test_build_runtime_wires_router_and_repositories() -> None:
     try:
         assert isinstance(container, RuntimeContainer)
         assert container.runtime.router.users_repo is container.users_repo
+        assert container.runtime.router.get_user_settings.deps.user_preferences_repo is container.user_preferences_repo
         assert container.runtime.router.state_repo is container.state_repo
         assert container.runtime.router.default_timezone == "UTC"
     finally:

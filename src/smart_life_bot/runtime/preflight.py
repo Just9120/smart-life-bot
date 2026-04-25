@@ -11,7 +11,13 @@ from smart_life_bot.config.settings import ConfigurationError, Settings, load_se
 from smart_life_bot.domain.enums import GoogleAuthMode
 from smart_life_bot.runtime.composition import build_runtime
 
-EXPECTED_SQLITE_TABLES = {"users", "provider_credentials", "conversation_state", "events_log"}
+EXPECTED_SQLITE_TABLES = {
+    "users",
+    "provider_credentials",
+    "conversation_state",
+    "events_log",
+    "user_preferences",
+}
 
 
 @dataclass(frozen=True, slots=True)

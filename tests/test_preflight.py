@@ -178,3 +178,4 @@ def test_preflight_sqlite_schema_check_includes_expected_tables(base_settings: S
     assert "provider_credentials" in sqlite_check.detail
     assert "conversation_state" in sqlite_check.detail
     assert "events_log" in sqlite_check.detail
+    assert "user_preferences" in sqlite_check.detail

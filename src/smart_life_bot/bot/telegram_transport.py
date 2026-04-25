@@ -14,14 +14,20 @@ from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
     EditEventDraftFieldUseCase,
+    GetUserSettingsUseCase,
     ProcessIncomingMessageUseCase,
+    SetParserModeUseCase,
 )
+from smart_life_bot.domain.enums import ParserMode
 from smart_life_bot.domain.models import EventDraft
 from smart_life_bot.storage.interfaces import ConversationStateRepository, UsersRepository
 
 CALLBACK_CONFIRM = "draft:confirm"
 CALLBACK_CANCEL = "draft:cancel"
 CALLBACK_EDIT = "draft:edit"
+CALLBACK_SETTINGS_PARSER_PYTHON = "settings:parser:python"
+CALLBACK_SETTINGS_PARSER_AUTO = "settings:parser:auto"
+CALLBACK_SETTINGS_PARSER_LLM = "settings:parser:llm"
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +44,8 @@ class TelegramTransportRouter:
     confirm_draft: ConfirmEventDraftUseCase
     cancel_draft: CancelEventDraftUseCase
     edit_draft_field: EditEventDraftFieldUseCase
+    get_user_settings: GetUserSettingsUseCase
+    set_parser_mode: SetParserModeUseCase
     default_timezone: str
 
     def handle_start(self) -> TelegramTransportResponse:
@@ -60,6 +68,8 @@ class TelegramTransportRouter:
 
         if text.startswith("/edit"):
             return self._handle_edit_command(user_id=user.id, command=text)
+        if text.strip() == "/settings":
+            return self._build_settings_response(user.id)
 
         normalized = text.strip()
 
@@ -97,6 +107,18 @@ class TelegramTransportRouter:
             return TelegramTransportResponse(
                 text="Для редактирования используйте: /edit <field> <value>. Например: /edit title Sync update"
             )
+        if callback_data == CALLBACK_SETTINGS_PARSER_PYTHON:
+            result, _ = self.set_parser_mode.execute(user_id=user.id, parser_mode=ParserMode.PYTHON)
+            settings_response = self._build_settings_response(user.id)
+            return TelegramTransportResponse(text=f"{result.message}\n\n{settings_response.text}", buttons=settings_response.buttons)
+        if callback_data == CALLBACK_SETTINGS_PARSER_AUTO:
+            result, _ = self.set_parser_mode.execute(user_id=user.id, parser_mode=ParserMode.AUTO)
+            settings_response = self._build_settings_response(user.id)
+            return TelegramTransportResponse(text=f"{result.message}\n\n{settings_response.text}", buttons=settings_response.buttons)
+        if callback_data == CALLBACK_SETTINGS_PARSER_LLM:
+            result, _ = self.set_parser_mode.execute(user_id=user.id, parser_mode=ParserMode.LLM)
+            settings_response = self._build_settings_response(user.id)
+            return TelegramTransportResponse(text=f"{result.message}\n\n{settings_response.text}", buttons=settings_response.buttons)
 
         return TelegramTransportResponse(text="Неизвестное действие кнопки.")
 
@@ -131,6 +153,33 @@ class TelegramTransportRouter:
         if snapshot is None or snapshot.draft is None:
             return "Черновик не найден. Отправьте событие заново."
         return format_preview_message(snapshot.draft)
+
+    def _build_settings_response(self, user_id: int) -> TelegramTransportResponse:
+        settings = self.get_user_settings.execute(user_id=user_id)
+        return TelegramTransportResponse(
+            text=(
+                "Settings\n\n"
+                "Parser mode:\n"
+                f"- Current: {self._human_parser_mode(settings.parser_mode)}\n\n"
+                "Available:\n"
+                "- 🐍 Python — active\n"
+                "- ⚡ Auto — planned, currently falls back to Python\n"
+                "- 🤖 LLM — planned, not available yet\n\n"
+                "For now, Python is the only fully active parser implementation."
+            ),
+            buttons=(
+                ("🐍 Python", CALLBACK_SETTINGS_PARSER_PYTHON),
+                ("⚡ Auto", CALLBACK_SETTINGS_PARSER_AUTO),
+                ("🤖 LLM", CALLBACK_SETTINGS_PARSER_LLM),
+            ),
+        )
+
+    def _human_parser_mode(self, parser_mode: ParserMode) -> str:
+        if parser_mode is ParserMode.PYTHON:
+            return "Python / rule-based"
+        if parser_mode is ParserMode.AUTO:
+            return "Auto (currently Python fallback)"
+        return "LLM (not implemented)"
 
 
 def format_preview_message(draft: EventDraft) -> str:

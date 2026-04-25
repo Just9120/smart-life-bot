@@ -7,10 +7,20 @@ from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
     EditEventDraftFieldUseCase,
+    GetUserSettingsUseCase,
     ProcessIncomingMessageUseCase,
+    SetParserModeUseCase,
 )
 from smart_life_bot.auth.models import AuthContext
-from smart_life_bot.bot import CALLBACK_CANCEL, CALLBACK_CONFIRM, CALLBACK_EDIT, TelegramTransportRouter
+from smart_life_bot.bot import (
+    CALLBACK_CANCEL,
+    CALLBACK_CONFIRM,
+    CALLBACK_EDIT,
+    CALLBACK_SETTINGS_PARSER_AUTO,
+    CALLBACK_SETTINGS_PARSER_LLM,
+    CALLBACK_SETTINGS_PARSER_PYTHON,
+    TelegramTransportRouter,
+)
 from smart_life_bot.calendar.models import CalendarEventCreateRequest, CalendarEventCreateResult
 from smart_life_bot.domain.enums import EventLogStatus, GoogleAuthMode
 from smart_life_bot.domain.models import EventDraft
@@ -19,6 +29,7 @@ from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
     SQLiteEventsLogRepository,
     SQLiteProviderCredentialsRepository,
+    SQLiteUserPreferencesRepository,
     SQLiteUsersRepository,
     create_sqlite_connection,
     init_sqlite_schema,
@@ -102,6 +113,7 @@ class Deps:
     auth_provider: FakeAuthProvider
     calendar_service: SpyCalendarService
     users_repo: SQLiteUsersRepository
+    user_preferences_repo: SQLiteUserPreferencesRepository
     credentials_repo: SQLiteProviderCredentialsRepository
     state_repo: SQLiteConversationStateRepository
     events_log_repo: SQLiteEventsLogRepository
@@ -117,6 +129,7 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         auth_provider=FakeAuthProvider(),
         calendar_service=SpyCalendarService(),
         users_repo=SQLiteUsersRepository(connection),
+        user_preferences_repo=SQLiteUserPreferencesRepository(connection),
         credentials_repo=SQLiteProviderCredentialsRepository(connection),
         state_repo=SQLiteConversationStateRepository(connection),
         events_log_repo=SQLiteEventsLogRepository(connection),
@@ -130,6 +143,8 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         confirm_draft=ConfirmEventDraftUseCase(deps),
         cancel_draft=CancelEventDraftUseCase(deps),
         edit_draft_field=EditEventDraftFieldUseCase(deps),
+        get_user_settings=GetUserSettingsUseCase(deps),
+        set_parser_mode=SetParserModeUseCase(deps),
         default_timezone="UTC",
     )
     return router, deps
@@ -144,6 +159,7 @@ def _build_router_no_html_link() -> tuple[TelegramTransportRouter, Deps]:
         auth_provider=FakeAuthProvider(),
         calendar_service=SpyCalendarServiceNoHtmlLink(),
         users_repo=SQLiteUsersRepository(connection),
+        user_preferences_repo=SQLiteUserPreferencesRepository(connection),
         credentials_repo=SQLiteProviderCredentialsRepository(connection),
         state_repo=SQLiteConversationStateRepository(connection),
         events_log_repo=SQLiteEventsLogRepository(connection),
@@ -157,6 +173,8 @@ def _build_router_no_html_link() -> tuple[TelegramTransportRouter, Deps]:
         confirm_draft=ConfirmEventDraftUseCase(deps),
         cancel_draft=CancelEventDraftUseCase(deps),
         edit_draft_field=EditEventDraftFieldUseCase(deps),
+        get_user_settings=GetUserSettingsUseCase(deps),
+        set_parser_mode=SetParserModeUseCase(deps),
         default_timezone="UTC",
     )
     return router, deps
@@ -289,3 +307,65 @@ def test_transport_layer_does_not_require_real_google_or_telegram_network() -> N
 
     assert "/edit <field> <value>" in response.text
     assert len(deps.calendar_service.requests) == 0
+
+
+def test_settings_command_creates_user_and_shows_parser_modes() -> None:
+    router, deps = _build_router()
+
+    response = router.handle_text_message(telegram_user_id=90100, text="/settings")
+
+    assert "Settings" in response.text
+    assert "Current: Python / rule-based" in response.text
+    assert ("🐍 Python", CALLBACK_SETTINGS_PARSER_PYTHON) in response.buttons
+    assert ("⚡ Auto", CALLBACK_SETTINGS_PARSER_AUTO) in response.buttons
+    assert ("🤖 LLM", CALLBACK_SETTINGS_PARSER_LLM) in response.buttons
+    user = deps.users_repo.get_by_telegram_id(90100)
+    assert user is not None
+    preferences = deps.user_preferences_repo.get_for_user(user.id)
+    assert preferences is not None
+    assert preferences.parser_mode.value == "python"
+
+
+def test_settings_python_selection_persists_python_mode() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90101, text="/settings")
+
+    response = router.handle_callback(telegram_user_id=90101, callback_data=CALLBACK_SETTINGS_PARSER_PYTHON)
+
+    assert "Python/rule-based parser is active." in response.text
+    user = deps.users_repo.get_by_telegram_id(90101)
+    assert user is not None
+    preferences = deps.user_preferences_repo.get_for_user(user.id)
+    assert preferences is not None
+    assert preferences.parser_mode.value == "python"
+
+
+def test_settings_auto_selection_persists_auto_mode_with_fallback_message() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90102, text="/settings")
+
+    response = router.handle_callback(telegram_user_id=90102, callback_data=CALLBACK_SETTINGS_PARSER_AUTO)
+
+    assert "Parser mode updated to Auto." in response.text
+    assert "currently uses Python/rule-based fallback" in response.text
+    user = deps.users_repo.get_by_telegram_id(90102)
+    assert user is not None
+    preferences = deps.user_preferences_repo.get_for_user(user.id)
+    assert preferences is not None
+    assert preferences.parser_mode.value == "auto"
+
+
+def test_settings_llm_selection_keeps_current_mode_unchanged() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90103, text="/settings")
+    router.handle_callback(telegram_user_id=90103, callback_data=CALLBACK_SETTINGS_PARSER_AUTO)
+
+    response = router.handle_callback(telegram_user_id=90103, callback_data=CALLBACK_SETTINGS_PARSER_LLM)
+
+    assert "LLM parser is not implemented yet." in response.text
+    assert "Current parser mode remains auto." in response.text
+    user = deps.users_repo.get_by_telegram_id(90103)
+    assert user is not None
+    preferences = deps.user_preferences_repo.get_for_user(user.id)
+    assert preferences is not None
+    assert preferences.parser_mode.value == "auto"

@@ -25,6 +25,7 @@ from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
     SQLiteEventsLogRepository,
     SQLiteProviderCredentialsRepository,
+    SQLiteUserPreferencesRepository,
     SQLiteUsersRepository,
     create_sqlite_connection,
     init_sqlite_schema,
@@ -138,6 +139,7 @@ class ApplicationDependenciesFixture:
     auth_provider: FakeAuthProvider
     calendar_service: CalendarService
     users_repo: SQLiteUsersRepository
+    user_preferences_repo: SQLiteUserPreferencesRepository
     credentials_repo: SQLiteProviderCredentialsRepository
     state_repo: SQLiteConversationStateRepository
     events_log_repo: SQLiteEventsLogRepository
@@ -156,6 +158,7 @@ def _build_dependencies() -> tuple[ApplicationDependenciesFixture, int]:
         auth_provider=FakeAuthProvider(),
         calendar_service=FakeCalendarService(),
         users_repo=users_repo,
+        user_preferences_repo=SQLiteUserPreferencesRepository(connection),
         credentials_repo=SQLiteProviderCredentialsRepository(connection),
         state_repo=SQLiteConversationStateRepository(connection),
         events_log_repo=SQLiteEventsLogRepository(connection),

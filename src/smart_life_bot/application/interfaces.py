@@ -9,6 +9,7 @@ from smart_life_bot.storage.interfaces import (
     ConversationStateRepository,
     EventsLogRepository,
     ProviderCredentialsRepository,
+    UserPreferencesRepository,
     UsersRepository,
 )
 
@@ -26,6 +27,7 @@ class ApplicationDependencies(Protocol):
     auth_provider: GoogleAuthProvider
     calendar_service: CalendarService
     users_repo: UsersRepository
+    user_preferences_repo: UserPreferencesRepository
     credentials_repo: ProviderCredentialsRepository
     state_repo: ConversationStateRepository
     events_log_repo: EventsLogRepository

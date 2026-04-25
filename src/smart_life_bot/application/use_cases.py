@@ -6,9 +6,9 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 
 from smart_life_bot.calendar.models import CalendarEventCreateRequest
-from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus
+from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus, ParserMode
 from smart_life_bot.domain.models import ConversationStateSnapshot, EventDraft
-from smart_life_bot.storage.interfaces import EventLogEntry
+from smart_life_bot.storage.interfaces import EventLogEntry, UserPreferencesRecord
 
 from .dto import (
     CancelEventDraftInput,
@@ -286,3 +286,54 @@ class CancelEventDraftUseCase:
             self.deps.events_log_repo.update_status(entry_id=log_id, status=EventLogStatus.CANCELLED)
         self.deps.state_repo.reset(payload.user_id)
         return UseCaseResult(status="cancelled", message="Draft cancelled and state reset to IDLE")
+
+
+@dataclass(frozen=True, slots=True)
+class GetUserSettingsResult:
+    parser_mode: ParserMode
+
+
+@dataclass(slots=True)
+class GetUserSettingsUseCase:
+    deps: ApplicationDependencies
+    default_parser_mode: ParserMode = ParserMode.PYTHON
+
+    def execute(self, *, user_id: int) -> GetUserSettingsResult:
+        preferences = self.deps.user_preferences_repo.get_or_create_for_user(
+            user_id=user_id,
+            default_parser_mode=self.default_parser_mode,
+        )
+        return GetUserSettingsResult(parser_mode=preferences.parser_mode)
+
+
+@dataclass(slots=True)
+class SetParserModeUseCase:
+    deps: ApplicationDependencies
+
+    def execute(self, *, user_id: int, parser_mode: ParserMode) -> tuple[UseCaseResult, UserPreferencesRecord]:
+        current = self.deps.user_preferences_repo.get_or_create_for_user(
+            user_id=user_id,
+            default_parser_mode=ParserMode.PYTHON,
+        )
+
+        if parser_mode is ParserMode.LLM:
+            return (
+                UseCaseResult(
+                    status="not_available",
+                    message=(
+                        "LLM parser is not implemented yet. "
+                        f"Current parser mode remains {current.parser_mode.value}."
+                    ),
+                ),
+                current,
+            )
+
+        updated = self.deps.user_preferences_repo.set_parser_mode(user_id=user_id, parser_mode=parser_mode)
+        if parser_mode is ParserMode.AUTO:
+            message = (
+                "Parser mode updated to Auto. "
+                "Auto is planned and currently uses Python/rule-based fallback."
+            )
+            return UseCaseResult(status="success", message=message), updated
+
+        return UseCaseResult(status="success", message="Python/rule-based parser is active."), updated

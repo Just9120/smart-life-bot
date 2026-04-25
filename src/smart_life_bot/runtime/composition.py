@@ -9,7 +9,9 @@ from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
     EditEventDraftFieldUseCase,
+    GetUserSettingsUseCase,
     ProcessIncomingMessageUseCase,
+    SetParserModeUseCase,
 )
 from smart_life_bot.bot import TelegramBotRuntime, TelegramTransportRouter
 from smart_life_bot.calendar.interfaces import CalendarService
@@ -23,6 +25,7 @@ from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
     SQLiteEventsLogRepository,
     SQLiteProviderCredentialsRepository,
+    SQLiteUserPreferencesRepository,
     SQLiteUsersRepository,
     create_sqlite_connection,
     init_sqlite_schema,
@@ -36,6 +39,7 @@ class RuntimeContainer:
     settings: Settings
     connection: sqlite3.Connection
     users_repo: SQLiteUsersRepository
+    user_preferences_repo: SQLiteUserPreferencesRepository
     state_repo: SQLiteConversationStateRepository
     events_log_repo: SQLiteEventsLogRepository
     runtime: TelegramBotRuntime
@@ -47,6 +51,7 @@ class _Dependencies:
     auth_provider: DevFakeGoogleAuthProvider
     calendar_service: CalendarService
     users_repo: SQLiteUsersRepository
+    user_preferences_repo: SQLiteUserPreferencesRepository
     credentials_repo: SQLiteProviderCredentialsRepository
     state_repo: SQLiteConversationStateRepository
     events_log_repo: SQLiteEventsLogRepository
@@ -60,6 +65,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
 
     users_repo = SQLiteUsersRepository(connection)
     credentials_repo = SQLiteProviderCredentialsRepository(connection)
+    user_preferences_repo = SQLiteUserPreferencesRepository(connection)
     state_repo = SQLiteConversationStateRepository(connection)
     events_log_repo = SQLiteEventsLogRepository(connection)
 
@@ -79,6 +85,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         auth_provider=DevFakeGoogleAuthProvider(auth_mode=settings.google_auth_mode),
         calendar_service=calendar_service,
         users_repo=users_repo,
+        user_preferences_repo=user_preferences_repo,
         credentials_repo=credentials_repo,
         state_repo=state_repo,
         events_log_repo=events_log_repo,
@@ -92,6 +99,8 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         confirm_draft=ConfirmEventDraftUseCase(deps=deps),
         cancel_draft=CancelEventDraftUseCase(deps=deps),
         edit_draft_field=EditEventDraftFieldUseCase(deps=deps),
+        get_user_settings=GetUserSettingsUseCase(deps=deps),
+        set_parser_mode=SetParserModeUseCase(deps=deps),
         default_timezone=settings.default_timezone,
     )
 
@@ -99,6 +108,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         settings=settings,
         connection=connection,
         users_repo=users_repo,
+        user_preferences_repo=user_preferences_repo,
         state_repo=state_repo,
         events_log_repo=events_log_repo,
         runtime=TelegramBotRuntime(router=router),

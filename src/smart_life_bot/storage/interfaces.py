@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from smart_life_bot.domain.enums import EventLogErrorCategory, EventLogStatus
+from smart_life_bot.domain.enums import EventLogErrorCategory, EventLogStatus, ParserMode
 from smart_life_bot.domain.models import ConversationStateSnapshot
 
 
@@ -26,6 +26,14 @@ class ProviderCredentialsRecord:
     provider: str
     auth_mode: str
     credentials_encrypted: str
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class UserPreferencesRecord:
+    user_id: int
+    parser_mode: ParserMode
     created_at: datetime
     updated_at: datetime
 
@@ -71,6 +79,18 @@ class ProviderCredentialsRepository(Protocol):
         auth_mode: str,
         credentials_encrypted: str,
     ) -> ProviderCredentialsRecord: ...
+
+
+class UserPreferencesRepository(Protocol):
+    def get_for_user(self, user_id: int) -> UserPreferencesRecord | None: ...
+
+    def get_or_create_for_user(
+        self,
+        user_id: int,
+        default_parser_mode: ParserMode,
+    ) -> UserPreferencesRecord: ...
+
+    def set_parser_mode(self, user_id: int, parser_mode: ParserMode) -> UserPreferencesRecord: ...
 
 
 class ConversationStateRepository(Protocol):
