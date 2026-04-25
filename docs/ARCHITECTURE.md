@@ -191,7 +191,7 @@ Recommended persisted states:
 
 `SUCCESS`/`ERROR` трактуются как outcome transition, а не обязательные долгоживущие persisted states.
 
-## 11. Parsing pipeline
+## 11. Parsing pipeline and strategy
 
 Recommended pipeline:
 
@@ -202,9 +202,17 @@ Recommended pipeline:
 5. event draft
 6. preview payload
 
-Текущий runtime baseline использует детерминированный rule-based parser implementation (без LLM, без Telegram SDK dependency и без Google Calendar dependency внутри parsing слоя).
+`MessageParser` — базовая абстракция parsing слоя.
+
+Текущая runtime-реализация: детерминированный Python/rule-based parser (без LLM, без Telegram SDK dependency и без Google Calendar dependency внутри parsing слоя). Parser покрывает common compact RU форматы даты/времени и форматы с русскими названиями/сокращениями месяцев.
+
+Планируемая отдельная реализация: LLM parser (pending, не реализован в текущем этапе).
+
+Целевой режим следующих этапов: Auto/hybrid parser mode, где pipeline пробует rule-based parser первым и использует fallback в LLM parser только при низкой уверенности или ambiguity.
 
 При низкой уверенности система должна запрашивать уточнение, а не выполнять silent action.
+
+Product flow при этом не меняется: preview и явное confirm перед записью события обязательны для всех parser-режимов.
 
 ## 12. Configuration / env model
 

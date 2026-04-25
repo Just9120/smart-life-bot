@@ -67,6 +67,8 @@ python -m pytest
 ```
 
 
-Парсинг на текущем этапе остаётся MVP-уровня: используется детерминированный rule-based baseline без LLM/NLP SDK и без внешних сетевых вызовов.
+Парсинг на текущем этапе остаётся MVP-уровня: используется детерминированный Python/rule-based baseline без LLM/NLP SDK и без внешних сетевых вызовов. Rule-based parser поддерживает распространённые компактные RU форматы даты/времени (включая варианты с запятой, `HH:MM` и `HH MM`) и даты с русскими названиями/сокращениями месяцев.
+
+LLM parser пока не реализован. Целевая стратегия на следующих этапах — hybrid parsing mode: сначала Python/rule-based parser, затем fallback в LLM parser только для неоднозначных/низкоуверенных случаев.
 
 Реализован foundation-адаптер записи событий Google Calendar для `service_account_shared_calendar_mode` (через service account + shared calendar). `oauth_user_mode` остаётся pending и в runtime пока использует fake/dev calendar adapter. После успешного confirm бот также показывает ссылку на созданное событие, если календарный провайдер вернул `html_link`. Это позволяет подготовить будущий VPS smoke-сценарий `Telegram message → preview → confirm → Google Calendar create event` без добавления OAuth callback/user-consent flow в текущем PR.
