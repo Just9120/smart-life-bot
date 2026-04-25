@@ -232,6 +232,7 @@ class ConfirmEventDraftUseCase:
             status="success",
             message="Event created successfully",
             provider_event_id=calendar_result.provider_event_id,
+            provider_event_html_link=calendar_result.html_link,
         )
 
 

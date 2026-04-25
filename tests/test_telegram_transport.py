@@ -68,6 +68,23 @@ class SpyCalendarService:
         )
 
 
+class SpyCalendarServiceNoHtmlLink:
+    def __init__(self) -> None:
+        self.requests: list[CalendarEventCreateRequest] = []
+
+    def create_event(
+        self,
+        auth_context: AuthContext,
+        request: CalendarEventCreateRequest,
+    ) -> CalendarEventCreateResult:
+        self.requests.append(request)
+        return CalendarEventCreateResult(
+            event_id="internal-2",
+            provider_event_id="provider-evt-2",
+            html_link=None,
+        )
+
+
 class SilentLogger:
     def info(self, message: str, **extra: object) -> None:
         return None
@@ -118,6 +135,33 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
     return router, deps
 
 
+def _build_router_no_html_link() -> tuple[TelegramTransportRouter, Deps]:
+    connection = create_sqlite_connection("sqlite:///:memory:")
+    init_sqlite_schema(connection)
+
+    deps = Deps(
+        parser=FakeParser(),
+        auth_provider=FakeAuthProvider(),
+        calendar_service=SpyCalendarServiceNoHtmlLink(),
+        users_repo=SQLiteUsersRepository(connection),
+        credentials_repo=SQLiteProviderCredentialsRepository(connection),
+        state_repo=SQLiteConversationStateRepository(connection),
+        events_log_repo=SQLiteEventsLogRepository(connection),
+        logger=SilentLogger(),
+    )
+
+    router = TelegramTransportRouter(
+        users_repo=deps.users_repo,
+        state_repo=deps.state_repo,
+        process_incoming_message=ProcessIncomingMessageUseCase(deps),
+        confirm_draft=ConfirmEventDraftUseCase(deps),
+        cancel_draft=CancelEventDraftUseCase(deps),
+        edit_draft_field=EditEventDraftFieldUseCase(deps),
+        default_timezone="UTC",
+    )
+    return router, deps
+
+
 def test_plain_text_handler_maps_to_process_incoming_use_case() -> None:
     router, deps = _build_router()
 
@@ -138,8 +182,24 @@ def test_confirm_callback_maps_to_confirm_use_case() -> None:
 
     response = router.handle_callback(telegram_user_id=90002, callback_data=CALLBACK_CONFIRM)
 
-    assert response.text == "Event created successfully"
+    assert "Event created successfully" in response.text
+    assert "Google Calendar: https://example.test/e/1" in response.text
     user = deps.users_repo.get_by_telegram_id(90002)
+    assert user is not None
+    logs = deps.events_log_repo.list_for_user(user.id)
+    assert len(logs) == 1
+    assert logs[0].status is EventLogStatus.SAVED
+    assert len(deps.calendar_service.requests) == 1
+
+
+def test_confirm_callback_without_html_link_keeps_backward_compatible_text() -> None:
+    router, deps = _build_router_no_html_link()
+    router.handle_text_message(telegram_user_id=90009, text="Confirm me no link")
+
+    response = router.handle_callback(telegram_user_id=90009, callback_data=CALLBACK_CONFIRM)
+
+    assert response.text == "Event created successfully"
+    user = deps.users_repo.get_by_telegram_id(90009)
     assert user is not None
     logs = deps.events_log_repo.list_for_user(user.id)
     assert len(logs) == 1

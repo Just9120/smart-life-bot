@@ -31,3 +31,4 @@ class UseCaseResult:
     status: str
     message: str
     provider_event_id: str | None = None
+    provider_event_html_link: str | None = None
