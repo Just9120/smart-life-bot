@@ -30,6 +30,9 @@
 Runtime composition layer использует `DATABASE_URL` напрямую при `build_runtime(settings)` и всегда выполняет инициализацию SQLite schema при bootstrap.
 Bootstrap-сообщение runtime не должно выводить raw `DATABASE_URL`; вместо этого используется безопасный признак конфигурации/back-end marker.
 
+Parser mode не предназначен для ежедневного переключения через `.env`: пользовательская настройка parser mode хранится на уровне пользователя (Telegram `/settings`, таблица `user_preferences`).
+`.env` остаётся источником deployment/runtime-конфига (токены, auth mode, DB, timezone и т.д.), а не пользовательских продуктовых предпочтений.
+
 ## 3. Optional переменные с default в коде
 
 | Переменная | Default в `load_settings()` | Пример placeholder | Чувствительная | Назначение |

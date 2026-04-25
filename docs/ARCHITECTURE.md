@@ -209,6 +209,9 @@ Recommended pipeline:
 Планируемая отдельная реализация: LLM parser (pending, не реализован в текущем этапе).
 
 Целевой режим следующих этапов: Auto/hybrid parser mode, где pipeline пробует rule-based parser первым и использует fallback в LLM parser только при низкой уверенности или ambiguity.
+Parser mode фиксируется как user-level preference в storage (`user_preferences`) и настраивается через Telegram `/settings`; это поведение transport/application уровня, а не env-only runtime switch.
+На текущем этапе runtime parsing по-прежнему безопасно выполняется существующим Python/rule-based parser для всех пользователей; сохранённые значения `auto`/`llm` не включают реальный LLM parser.
+Планируемый следующий шаг — отдельный parser router, который будет читать user preference и выбирать Python / LLM / Auto strategy при наличии реального LLM implementation.
 
 При низкой уверенности система должна запрашивать уточнение, а не выполнять silent action.
 

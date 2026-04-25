@@ -13,6 +13,9 @@ from smart_life_bot.bot import (
     CALLBACK_CANCEL,
     CALLBACK_CONFIRM,
     CALLBACK_EDIT,
+    CALLBACK_SETTINGS_PARSER_AUTO,
+    CALLBACK_SETTINGS_PARSER_LLM,
+    CALLBACK_SETTINGS_PARSER_PYTHON,
     TelegramTransportResponse,
 )
 from smart_life_bot.bot.python_telegram_adapter import (
@@ -66,18 +69,26 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
         application = build_telegram_application(_settings(), container.runtime)
 
         registered_handlers = [handler for handlers in application.handlers.values() for handler in handlers]
-        assert any(isinstance(handler, CommandHandler) for handler in registered_handlers)
+        command_handlers = [handler for handler in registered_handlers if isinstance(handler, CommandHandler)]
+        assert len(command_handlers) == 2
+        assert {command for handler in command_handlers for command in handler.commands} == {"start", "settings"}
         assert any(isinstance(handler, MessageHandler) for handler in registered_handlers)
 
         callback_handlers = [
             handler for handler in registered_handlers if isinstance(handler, CallbackQueryHandler)
         ]
         assert len(callback_handlers) == 1
-        assert callback_handlers[0].pattern.pattern == r"^(draft:confirm|draft:edit|draft:cancel)$"
+        assert (
+            callback_handlers[0].pattern.pattern
+            == r"^(draft:confirm|draft:edit|draft:cancel|settings:parser:python|settings:parser:auto|settings:parser:llm)$"
+        )
         assert tuple(application.bot_data["allowed_callback_data"]) == (
             CALLBACK_CONFIRM,
             CALLBACK_EDIT,
             CALLBACK_CANCEL,
+            CALLBACK_SETTINGS_PARSER_PYTHON,
+            CALLBACK_SETTINGS_PARSER_AUTO,
+            CALLBACK_SETTINGS_PARSER_LLM,
         )
     finally:
         container.connection.close()
@@ -131,6 +142,19 @@ def test_text_handler_delegates_to_runtime_on_text() -> None:
     assert message.reply_calls[0]["text"] == "Preview"
 
 
+def test_settings_handler_delegates_to_runtime_on_text_settings() -> None:
+    runtime = Mock()
+    runtime.on_text.return_value = TelegramTransportResponse(text="Settings")
+    adapter = TelegramSDKAdapter(runtime=runtime)
+    message = FakeMessage(text="/settings")
+    update = SimpleNamespace(message=message, effective_user=SimpleNamespace(id=778))
+
+    asyncio.run(adapter.handle_settings(update, context=None))
+
+    runtime.on_text.assert_called_once_with(telegram_user_id=778, text="/settings")
+    assert message.reply_calls[0]["text"] == "Settings"
+
+
 def test_callback_handler_delegates_and_answers_query() -> None:
     runtime = Mock()
     runtime.on_callback.return_value = TelegramTransportResponse(text="Handled callback")
@@ -163,4 +187,27 @@ def test_callback_handler_preserves_existing_callback_data_values() -> None:
         CALLBACK_CONFIRM,
         CALLBACK_EDIT,
         CALLBACK_CANCEL,
+    ]
+
+
+def test_callback_handler_accepts_settings_callback_data_values() -> None:
+    runtime = Mock()
+    runtime.on_callback.return_value = TelegramTransportResponse(text="ok")
+    adapter = TelegramSDKAdapter(runtime=runtime)
+
+    for callback_data in (
+        CALLBACK_SETTINGS_PARSER_PYTHON,
+        CALLBACK_SETTINGS_PARSER_AUTO,
+        CALLBACK_SETTINGS_PARSER_LLM,
+    ):
+        message = FakeMessage()
+        callback_query = FakeCallbackQuery(callback_data, user_id=999, message=message, calls=[])
+        update = SimpleNamespace(callback_query=callback_query)
+
+        asyncio.run(adapter.handle_callback_query(update, context=None))
+
+    assert [call.kwargs["callback_data"] for call in runtime.on_callback.call_args_list] == [
+        CALLBACK_SETTINGS_PARSER_PYTHON,
+        CALLBACK_SETTINGS_PARSER_AUTO,
+        CALLBACK_SETTINGS_PARSER_LLM,
     ]

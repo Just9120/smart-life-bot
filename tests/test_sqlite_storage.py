@@ -2,12 +2,13 @@ import sqlite3
 
 import pytest
 
-from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus
+from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus, ParserMode
 from smart_life_bot.domain.models import ConversationStateSnapshot, EventDraft
 from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
     SQLiteEventsLogRepository,
     SQLiteProviderCredentialsRepository,
+    SQLiteUserPreferencesRepository,
     SQLiteUsersRepository,
     create_sqlite_connection,
     init_sqlite_schema,
@@ -30,7 +31,7 @@ def test_schema_init_creates_expected_tables() -> None:
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
         ).fetchall()
     }
-    assert {"users", "provider_credentials", "conversation_state", "events_log"} <= tables
+    assert {"users", "provider_credentials", "conversation_state", "events_log", "user_preferences"} <= tables
 
 
 def test_users_repository_create_get_and_get_or_create() -> None:
@@ -142,6 +143,42 @@ def test_events_log_repository_append_update_and_get() -> None:
     for_user = repo.list_for_user(user_id=user.id)
     assert len(for_user) == 1
     assert for_user[0].id == inserted.id
+
+
+def test_user_preferences_repository_get_or_create_and_update_modes() -> None:
+    connection = _create_initialized_memory_connection()
+    user = SQLiteUsersRepository(connection).create(telegram_user_id=1010)
+    repo = SQLiteUserPreferencesRepository(connection)
+
+    created = repo.get_or_create_for_user(user_id=user.id, default_parser_mode=ParserMode.PYTHON)
+    assert created.parser_mode is ParserMode.PYTHON
+
+    loaded = repo.get_for_user(user.id)
+    assert loaded is not None
+    assert loaded.parser_mode is ParserMode.PYTHON
+
+    updated_python = repo.set_parser_mode(user_id=user.id, parser_mode=ParserMode.PYTHON)
+    assert updated_python.parser_mode is ParserMode.PYTHON
+
+    updated_auto = repo.set_parser_mode(user_id=user.id, parser_mode=ParserMode.AUTO)
+    assert updated_auto.parser_mode is ParserMode.AUTO
+
+
+def test_user_preferences_repository_rejects_invalid_parser_mode_in_db() -> None:
+    connection = _create_initialized_memory_connection()
+    user = SQLiteUsersRepository(connection).create(telegram_user_id=1011)
+    connection.execute(
+        """
+        INSERT INTO user_preferences (user_id, parser_mode, created_at, updated_at)
+        VALUES (?, 'invalid-mode', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
+        """,
+        (user.id,),
+    )
+    connection.commit()
+    repo = SQLiteUserPreferencesRepository(connection)
+
+    with pytest.raises(ValueError):
+        repo.get_for_user(user.id)
 
 
 def test_events_log_update_status_keeps_existing_optional_fields_when_not_passed() -> None:

@@ -27,6 +27,8 @@
 - поддержаны маршруты `/start`, plain text draft-preview, `confirm`, `cancel`, `edit` command (`/edit <field> <value>`);
 - для очистки optional полей в transport используется детерминированная форма `/edit description --clear` и `/edit location --clear`;
 - добавлен `python-telegram-bot` adapter foundation (`build_telegram_application`), который маппит `/start`, plain text (без command payload) и callback (`draft:confirm/edit/cancel`) в `TelegramBotRuntime`;
+- добавлен `/settings` flow для parser mode preference foundation с callback `settings:parser:python|auto|llm`;
+- `python` можно переключать как active mode, `auto` сохраняется как planned mode с текущим Python fallback, `llm` явно возвращает `not implemented yet` и не активирует LLM parsing;
 - long polling вынесен в отдельный явный entrypoint (`python -m smart_life_bot.bot.telegram_polling`) и не запускается из default bootstrap `main.py`.
 
 **Разрешённые зависимости:**
@@ -230,12 +232,19 @@
 - `created_at`
 - `updated_at`
 
+#### `user_preferences`
+- `user_id`
+- `parser_mode` (`python` | `auto` | `llm`)
+- `created_at`
+- `updated_at`
+
 ### 3.3 Runtime notes для SQLite foundation (PR #5)
 
 - Runtime storage реализован на stdlib `sqlite3` без ORM/миграционного фреймворка.
 - `draft_payload` и `parsed_payload` сериализуются в JSON (TEXT).
 - Timestamp-поля (`created_at`, `updated_at`) сохраняются в ISO-8601 строках.
 - В `provider_credentials.credentials_encrypted` на этом шаге хранится переданная строка-placeholder; реальное шифрование и key management выносятся в отдельный шаг.
+- Для parser mode preference используется отдельная таблица `user_preferences`; default mode при первом обращении — `python`.
 
 ### 3.4 Почему `provider_credentials` отдельно от `users`
 

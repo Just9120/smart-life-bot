@@ -126,3 +126,9 @@
 - **Status:** Accepted
 - **Decision:** Keep parser implementations separated behind the `MessageParser` abstraction: Python/rule-based parser, future LLM parser, and future Auto/hybrid parser.
 - **Rationale:** Python parsing is cheap, fast and deterministic for common formats. LLM parsing should be used later for ambiguous or natural-language inputs, not necessarily for every message. This preserves cost control while keeping a path to better UX.
+
+## D-021: Parser mode is a user preference, not an env-only runtime switch
+
+- **Status:** Accepted
+- **Decision:** Store parser mode as a user-level preference and expose it through Telegram settings UI instead of requiring `.env` edits.
+- **Rationale:** Parser mode is a product behavior choice. Users should be able to change it without redeploying or editing server env variables. Runtime env remains deployment/configuration scope, while per-user parsing behavior belongs in persistent user preferences.

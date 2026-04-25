@@ -15,6 +15,12 @@ class GoogleAuthMode(str, Enum):
     SERVICE_ACCOUNT_SHARED_CALENDAR_MODE = "service_account_shared_calendar_mode"
 
 
+class ParserMode(str, Enum):
+    PYTHON = "python"
+    AUTO = "auto"
+    LLM = "llm"
+
+
 class EventLogStatus(str, Enum):
     RECEIVED = "received"
     PREVIEW_READY = "preview_ready"

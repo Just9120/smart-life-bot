@@ -8,12 +8,13 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus
+from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus, ParserMode
 from smart_life_bot.domain.models import ConversationStateSnapshot, EventDraft
 from smart_life_bot.storage.interfaces import (
     EventLogEntry,
     ProviderCredentialsRecord,
     UserRecord,
+    UserPreferencesRecord,
 )
 
 
@@ -93,6 +94,14 @@ def init_sqlite_schema(connection: sqlite3.Connection) -> None:
             google_event_id TEXT,
             error_code TEXT,
             error_details TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS user_preferences (
+            user_id INTEGER PRIMARY KEY,
+            parser_mode TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
@@ -317,6 +326,58 @@ class SQLiteConversationStateRepository:
     def reset(self, user_id: int) -> None:
         self._connection.execute("DELETE FROM conversation_state WHERE user_id = ?", (user_id,))
         self._connection.commit()
+
+
+class SQLiteUserPreferencesRepository:
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+
+    def get_for_user(self, user_id: int) -> UserPreferencesRecord | None:
+        row = self._connection.execute(
+            """
+            SELECT user_id, parser_mode, created_at, updated_at
+            FROM user_preferences
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return UserPreferencesRecord(
+            user_id=row["user_id"],
+            parser_mode=ParserMode(row["parser_mode"]),
+            created_at=_parse_iso_datetime(row["created_at"]),
+            updated_at=_parse_iso_datetime(row["updated_at"]),
+        )
+
+    def get_or_create_for_user(
+        self,
+        user_id: int,
+        default_parser_mode: ParserMode,
+    ) -> UserPreferencesRecord:
+        existing = self.get_for_user(user_id=user_id)
+        if existing is not None:
+            return existing
+        return self.set_parser_mode(user_id=user_id, parser_mode=default_parser_mode)
+
+    def set_parser_mode(self, user_id: int, parser_mode: ParserMode) -> UserPreferencesRecord:
+        now_iso = utcnow_iso()
+        self._connection.execute(
+            """
+            INSERT INTO user_preferences (user_id, parser_mode, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (user_id)
+            DO UPDATE SET
+                parser_mode = excluded.parser_mode,
+                updated_at = excluded.updated_at
+            """,
+            (user_id, parser_mode.value, now_iso, now_iso),
+        )
+        self._connection.commit()
+        record = self.get_for_user(user_id)
+        if record is None:
+            raise LookupError("User preferences not found after write.")
+        return record
 
 
 class SQLiteEventsLogRepository:
