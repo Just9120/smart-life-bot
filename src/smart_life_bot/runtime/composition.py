@@ -20,6 +20,7 @@ from smart_life_bot.config.settings import Settings
 from smart_life_bot.domain.enums import GoogleAuthMode
 from smart_life_bot.observability.logger import ContextLoggerAdapter, get_context_logger
 from smart_life_bot.parsing.interfaces import MessageParser
+from smart_life_bot.parsing.router import ParserModeRouter
 from smart_life_bot.parsing.rule_based import RuleBasedMessageParser
 from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
@@ -80,8 +81,14 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
             service_account_json=settings.google_service_account_json,
         )
 
+    python_parser = RuleBasedMessageParser(default_timezone=settings.default_timezone)
+    parser = ParserModeRouter(
+        user_preferences_repo=user_preferences_repo,
+        python_parser=python_parser,
+    )
+
     deps = _Dependencies(
-        parser=RuleBasedMessageParser(default_timezone=settings.default_timezone),
+        parser=parser,
         auth_provider=DevFakeGoogleAuthProvider(auth_mode=settings.google_auth_mode),
         calendar_service=calendar_service,
         users_repo=users_repo,

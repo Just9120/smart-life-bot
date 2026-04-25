@@ -6,6 +6,7 @@ from smart_life_bot.bot import CALLBACK_CANCEL, CALLBACK_CONFIRM, CALLBACK_EDIT
 from smart_life_bot.config.settings import Settings
 from smart_life_bot.calendar.google_calendar import GoogleCalendarService
 from smart_life_bot.domain.enums import GoogleAuthMode
+from smart_life_bot.parsing.router import ParserModeRouter
 from smart_life_bot.runtime.fakes import DevFakeCalendarService
 from smart_life_bot.runtime import RuntimeContainer, build_runtime
 
@@ -49,6 +50,15 @@ def test_build_runtime_wires_router_and_repositories() -> None:
         container.connection.close()
 
 
+
+
+def test_build_runtime_wires_parser_mode_router() -> None:
+    container = build_runtime(_settings())
+    try:
+        assert isinstance(container.runtime.router.process_incoming_message.deps.parser, ParserModeRouter)
+    finally:
+        container.connection.close()
+
 def test_runtime_on_text_returns_preview_response() -> None:
     container = build_runtime(_settings())
     try:
@@ -56,6 +66,16 @@ def test_runtime_on_text_returns_preview_response() -> None:
 
         assert "Черновик события" in response.text
         assert any(label == "✅ Confirm" for label, _ in response.buttons)
+
+        user = container.users_repo.get_by_telegram_id(telegram_user_id=1001)
+        assert user is not None
+        logs = container.events_log_repo.list_for_user(user.id)
+        assert len(logs) == 1
+        assert logs[0].parsed_payload is not None
+        metadata = logs[0].parsed_payload.get("metadata")
+        assert isinstance(metadata, dict)
+        assert metadata["parser_mode"] == "python"
+        assert metadata["parser_router"] == "python"
     finally:
         container.connection.close()
 
