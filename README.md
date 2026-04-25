@@ -46,6 +46,16 @@ python -m smart_life_bot.bot.telegram_polling
 
 Этот entrypoint запускает long polling только по явной команде.
 
+
+Safe VPS/runtime preflight diagnostics are available via explicit entrypoint:
+
+```bash
+python -m smart_life_bot.runtime.preflight
+```
+
+Preflight validates runtime readiness (settings/timezone/SQLite/runtime composition), **does not** start Telegram polling, **does not** call real Telegram/Google APIs, and prints only safe status markers without secrets.
+
+
 Storage foundation тесты можно запускать общим тестовым набором:
 
 ```bash
