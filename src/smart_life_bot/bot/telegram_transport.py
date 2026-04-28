@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from smart_life_bot.application.dto import (
@@ -247,6 +248,8 @@ def _is_draft_confirmable(draft: EventDraft) -> bool:
         return False
     if not _is_valid_iana_timezone(draft.timezone):
         return False
+    if _has_mixed_datetime_timezone_format(draft.start_at, draft.end_at):
+        return False
     if draft.end_at is not None and draft.end_at <= draft.start_at:
         return False
     return True
@@ -257,9 +260,19 @@ def _non_confirmable_draft_hint(draft: EventDraft) -> str | None:
         return "Нужно указать start_at перед созданием события. Используйте /edit start_at <ISO-8601 datetime>."
     if not _is_valid_iana_timezone(draft.timezone):
         return "Нужно исправить timezone перед созданием события. Используйте /edit timezone Europe/Amsterdam."
+    if _has_mixed_datetime_timezone_format(draft.start_at, draft.end_at):
+        return "Нужно исправить формат времени: start_at и end_at должны использовать одинаковый формат timezone."
     if draft.end_at is not None and draft.end_at <= draft.start_at:
         return "Нужно исправить время: end_at должен быть позже start_at."
     return None
+
+
+def _has_mixed_datetime_timezone_format(start_at: datetime | None, end_at: datetime | None) -> bool:
+    if start_at is None or end_at is None:
+        return False
+    start_is_aware = start_at.tzinfo is not None and start_at.utcoffset() is not None
+    end_is_aware = end_at.tzinfo is not None and end_at.utcoffset() is not None
+    return start_is_aware != end_is_aware
 
 
 def _format_parser_diagnostics(metadata: dict[str, str]) -> list[str]:

@@ -90,6 +90,19 @@ class FailingCalendarService:
         raise RuntimeError("calendar provider unavailable")
 
 
+class ValueErrorCalendarService:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def create_event(
+        self,
+        auth_context: AuthContext,
+        request: CalendarEventCreateRequest,
+    ) -> CalendarEventCreateResult:
+        self.calls += 1
+        raise ValueError("internal calendar config exploded")
+
+
 class NoHtmlLinkCalendarService:
     def __init__(self) -> None:
         self.requests: list[CalendarEventCreateRequest] = []
@@ -161,6 +174,22 @@ class MissingTimezoneParser:
                 start_at=datetime(2026, 1, 10, 9, 0, tzinfo=UTC),
                 timezone=None,
                 metadata={"source": "missing-timezone-parser"},
+            ),
+            confidence=0.99,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
+class MixedTimezoneAwarenessParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 1, 10, 9, 0, tzinfo=UTC),
+                end_at=datetime(2026, 1, 10, 8, 0),
+                timezone="UTC",
+                metadata={"source": "mixed-timezone-awareness-parser"},
             ),
             confidence=0.99,
             is_ambiguous=False,
@@ -328,6 +357,28 @@ def test_confirm_failure_keeps_pending_draft_and_marks_log_failed() -> None:
     assert state.draft is not None
 
 
+def test_confirm_calendar_value_error_is_treated_as_internal_failure() -> None:
+    deps, user_id = _build_dependencies()
+    deps.calendar_service = ValueErrorCalendarService()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Calendar value error"))
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert result.message == "Event creation failed"
+    assert "internal calendar config exploded" not in result.message
+
+    logs = deps.events_log_repo.list_for_user(user_id)
+    assert len(logs) == 1
+    assert logs[0].status is EventLogStatus.FAILED
+    assert logs[0].error_code == "internal_error"
+
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
+    assert state.draft is not None
+
+
 def test_confirm_validation_failure_when_start_at_missing() -> None:
     deps, user_id = _build_dependencies()
     deps.parser = MissingStartAtParser()
@@ -340,6 +391,24 @@ def test_confirm_validation_failure_when_start_at_missing() -> None:
     assert result.status == "failed"
     assert result.message == "Cannot confirm event: start time is required before saving."
 
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+
+    logs = deps.events_log_repo.list_for_user(user_id)
+    assert len(logs) == 1
+    assert logs[0].status is EventLogStatus.FAILED
+    assert logs[0].error_code == "validation_error"
+
+
+def test_confirm_validation_failure_when_timezone_awareness_is_mixed() -> None:
+    deps, user_id = _build_dependencies()
+    deps.parser = MixedTimezoneAwarenessParser()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Mixed timezone awareness"))
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert result.message == "Invalid time range: start_at and end_at must use the same timezone format."
     assert deps.auth_provider.calls == 0
     assert len(deps.calendar_service.requests) == 0
 
@@ -660,6 +729,26 @@ def test_edit_end_at_earlier_than_start_at_fails_without_saving() -> None:
     assert state_after.draft.end_at == original_end_at
 
 
+def test_edit_end_at_naive_with_aware_start_at_fails_without_saving() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Mixed awareness end_at"))
+    state_before = deps.state_repo.get(user_id)
+    assert state_before is not None
+    assert state_before.draft is not None
+    original_end_at = state_before.draft.end_at
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="end_at", field_value="2026-01-10T08:00:00")
+    )
+
+    assert result.status == "failed"
+    assert result.message == "Invalid time range: start_at and end_at must use the same timezone format."
+    state_after = deps.state_repo.get(user_id)
+    assert state_after is not None
+    assert state_after.draft is not None
+    assert state_after.draft.end_at == original_end_at
+
+
 def test_edit_start_at_later_than_end_at_fails_without_saving() -> None:
     deps, user_id = _build_dependencies()
     ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Start-at validation"))
@@ -678,6 +767,30 @@ def test_edit_start_at_later_than_end_at_fails_without_saving() -> None:
 
     assert result.status == "failed"
     assert result.message == "Invalid time range: end_at must be later than start_at."
+    state_after = deps.state_repo.get(user_id)
+    assert state_after is not None
+    assert state_after.draft is not None
+    assert state_after.draft.start_at == original_start_at
+
+
+def test_edit_start_at_naive_with_aware_end_at_fails_without_saving() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Mixed awareness start_at"))
+    setup_end_at = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="end_at", field_value="2026-01-10T11:00:00+00:00")
+    )
+    assert setup_end_at.status == "preview_ready"
+    state_before = deps.state_repo.get(user_id)
+    assert state_before is not None
+    assert state_before.draft is not None
+    original_start_at = state_before.draft.start_at
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="start_at", field_value="2026-01-10T10:30:00")
+    )
+
+    assert result.status == "failed"
+    assert result.message == "Invalid time range: start_at and end_at must use the same timezone format."
     state_after = deps.state_repo.get(user_id)
     assert state_after is not None
     assert state_after.draft is not None

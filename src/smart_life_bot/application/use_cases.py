@@ -90,7 +90,13 @@ def _validate_timezone(timezone: str | None) -> None:
 
 
 def _validate_time_range(start_at: datetime | None, end_at: datetime | None) -> None:
-    if start_at is not None and end_at is not None and end_at <= start_at:
+    if start_at is None or end_at is None:
+        return
+    start_is_aware = start_at.tzinfo is not None and start_at.utcoffset() is not None
+    end_is_aware = end_at.tzinfo is not None and end_at.utcoffset() is not None
+    if start_is_aware != end_is_aware:
+        raise ValueError("Invalid time range: start_at and end_at must use the same timezone format.")
+    if end_at <= start_at:
         raise ValueError("Invalid time range: end_at must be later than start_at.")
 
 
@@ -207,7 +213,24 @@ class ConfirmEventDraftUseCase:
         try:
             log_id = _require_valid_event_log_id(draft)
             validate_draft_for_confirmation(draft)
+        except ValueError as error:
+            if log_id is not None:
+                self.deps.events_log_repo.update_status(
+                    entry_id=log_id,
+                    status=EventLogStatus.FAILED,
+                    error_category=EventLogErrorCategory.VALIDATION_ERROR,
+                    error_details=str(error),
+                )
+            self.deps.state_repo.set(
+                ConversationStateSnapshot(
+                    user_id=payload.user_id,
+                    state=ConversationState.WAITING_PREVIEW_CONFIRMATION,
+                    draft=draft,
+                )
+            )
+            return UseCaseResult(status="failed", message=str(error))
 
+        try:
             self.deps.state_repo.set(
                 ConversationStateSnapshot(
                     user_id=payload.user_id,
@@ -231,22 +254,6 @@ class ConfirmEventDraftUseCase:
                 auth_context=auth_context,
                 request=request,
             )
-        except ValueError as error:
-            if log_id is not None:
-                self.deps.events_log_repo.update_status(
-                    entry_id=log_id,
-                    status=EventLogStatus.FAILED,
-                    error_category=EventLogErrorCategory.VALIDATION_ERROR,
-                    error_details=str(error),
-                )
-            self.deps.state_repo.set(
-                ConversationStateSnapshot(
-                    user_id=payload.user_id,
-                    state=ConversationState.WAITING_PREVIEW_CONFIRMATION,
-                    draft=draft,
-                )
-            )
-            return UseCaseResult(status="failed", message=str(error))
         except Exception as error:  # noqa: BLE001
             if log_id is not None:
                 self.deps.events_log_repo.update_status(
