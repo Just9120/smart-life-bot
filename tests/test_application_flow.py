@@ -153,6 +153,21 @@ class InvalidTimeRangeParser:
         )
 
 
+class MissingTimezoneParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 1, 10, 9, 0, tzinfo=UTC),
+                timezone=None,
+                metadata={"source": "missing-timezone-parser"},
+            ),
+            confidence=0.99,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
 class ParserDiagnosticsParser:
     def parse(self, text: str, user_id: int) -> ParsingResult:
         return ParsingResult(
@@ -382,6 +397,30 @@ def test_confirm_validation_failure_when_time_range_is_invalid() -> None:
     assert state.draft.end_at is not None
     assert state.draft.start_at is not None
     assert state.draft.end_at <= state.draft.start_at
+
+    logs = deps.events_log_repo.list_for_user(user_id)
+    assert len(logs) == 1
+    assert logs[0].status is EventLogStatus.FAILED
+    assert logs[0].error_code == "validation_error"
+
+
+def test_confirm_validation_failure_when_timezone_is_missing() -> None:
+    deps, user_id = _build_dependencies()
+    deps.parser = MissingTimezoneParser()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Missing timezone"))
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert result.message == "Invalid timezone. Use a valid IANA timezone, for example Europe/Amsterdam or UTC."
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
+    assert state.draft is not None
+    assert state.draft.timezone is None
 
     logs = deps.events_log_repo.list_for_user(user_id)
     assert len(logs) == 1

@@ -77,7 +77,9 @@ def _clone_draft_with_update(draft: EventDraft, **changes: object) -> EventDraft
     return updated_draft
 
 
-def _validate_timezone(timezone: str) -> None:
+def _validate_timezone(timezone: str | None) -> None:
+    if timezone is None:
+        raise ValueError("Invalid timezone. Use a valid IANA timezone, for example Europe/Amsterdam or UTC.")
     normalized = timezone.strip()
     if not normalized:
         raise ValueError("Invalid timezone. Use a valid IANA timezone, for example Europe/Amsterdam or UTC.")

@@ -229,7 +229,9 @@ def _build_draft_buttons(draft: EventDraft) -> tuple[tuple[str, str], ...]:
     )
 
 
-def _is_valid_iana_timezone(value: str) -> bool:
+def _is_valid_iana_timezone(value: str | None) -> bool:
+    if value is None:
+        return False
     normalized = value.strip()
     if not normalized:
         return False

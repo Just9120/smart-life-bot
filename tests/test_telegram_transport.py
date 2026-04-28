@@ -99,6 +99,21 @@ class InvalidTimeRangeParser:
         )
 
 
+class MissingTimezoneParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+                end_at=datetime(2026, 3, 12, 11, 0, tzinfo=UTC),
+                timezone=None,
+            ),
+            confidence=0.60,
+            is_ambiguous=True,
+            issues=["missing_timezone"],
+        )
+
+
 class FakeAuthProvider:
     def resolve_auth_context(self, user_id: int) -> AuthContext:
         return AuthContext(
@@ -348,6 +363,18 @@ def test_preview_buttons_hide_confirm_when_time_range_invalid() -> None:
     assert "Нужно исправить время: end_at должен быть позже start_at." in response.text
 
 
+def test_preview_buttons_hide_confirm_when_timezone_missing() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingTimezoneParser()
+
+    response = router.handle_text_message(telegram_user_id=90015, text="Missing timezone")
+
+    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert "Нужно исправить timezone перед созданием события." in response.text
+
+
 def test_edit_invalid_start_at_keeps_confirm_hidden() -> None:
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()
@@ -461,6 +488,18 @@ def test_format_preview_message_shows_invalid_timezone_hint() -> None:
         title="Parsed title",
         start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
         timezone="Mars/Olympus",
+    )
+
+    preview = format_preview_message(draft)
+
+    assert "Нужно исправить timezone перед созданием события." in preview
+
+
+def test_format_preview_message_shows_invalid_timezone_hint_when_timezone_missing() -> None:
+    draft = EventDraft(
+        title="Parsed title",
+        start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+        timezone=None,
     )
 
     preview = format_preview_message(draft)
