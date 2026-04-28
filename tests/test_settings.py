@@ -90,3 +90,14 @@ def test_load_settings_sets_default_model_for_anthropic_provider(
     settings = load_settings()
     assert settings.llm_provider == "anthropic"
     assert settings.llm_model == "claude-haiku-4-5-20251001"
+
+
+@pytest.mark.parametrize("placeholder", ["<anthropic_api_key>", "your_key_here"])
+def test_load_settings_rejects_placeholder_anthropic_api_key(
+    base_env: None, monkeypatch: pytest.MonkeyPatch, placeholder: str
+) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", placeholder)
+
+    with pytest.raises(ConfigurationError, match="placeholder"):
+        load_settings()

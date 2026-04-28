@@ -64,6 +64,11 @@ def _optional_positive_int(name: str, default: int, *, allow_zero: bool = False)
     return value
 
 
+def _is_placeholder_secret(value: str) -> bool:
+    normalized = value.strip().lower()
+    return normalized in {"<anthropic_api_key>", "your_key_here"}
+
+
 def load_settings() -> Settings:
     """Load and validate runtime settings from environment variables."""
     raw_auth_mode = _require_env("GOOGLE_AUTH_MODE")
@@ -86,6 +91,8 @@ def load_settings() -> Settings:
     if llm_provider == "anthropic":
         if anthropic_api_key is None:
             raise ConfigurationError("ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic")
+        if _is_placeholder_secret(anthropic_api_key):
+            raise ConfigurationError("ANTHROPIC_API_KEY contains a placeholder value; set a real key")
         if llm_model is None:
             llm_model = _DEFAULT_ANTHROPIC_MODEL
 

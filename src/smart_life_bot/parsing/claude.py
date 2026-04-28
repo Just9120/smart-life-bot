@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from smart_life_bot.domain.models import EventDraft
 
@@ -152,9 +152,21 @@ def _payload_to_parsing_result(
     if not isinstance(payload, dict):
         raise ValueError("payload must be object")
 
-    timezone = payload.get("timezone")
-    if not isinstance(timezone, str) or not timezone.strip():
+    timezone_raw = payload.get("timezone")
+    if not isinstance(timezone_raw, str) or not timezone_raw.strip():
         timezone = default_timezone
+    else:
+        timezone = timezone_raw.strip()
+
+    try:
+        ZoneInfo(timezone)
+    except ZoneInfoNotFoundError:
+        return _ambiguous_validation_result(
+            issue="invalid_timezone",
+            title=normalized_text,
+            timezone=default_timezone,
+            metadata=metadata,
+        )
 
     title = payload.get("title")
     if not isinstance(title, str) or not title.strip():
@@ -164,6 +176,13 @@ def _payload_to_parsing_result(
     end_at = _parse_iso_datetime(payload.get("end_at"), timezone=timezone)
     if start_at is not None and end_at is None:
         end_at = start_at + timedelta(minutes=60)
+    if start_at is not None and end_at is not None and end_at <= start_at:
+        return _ambiguous_validation_result(
+            issue="invalid_time_range",
+            title=title,
+            timezone=timezone,
+            metadata=metadata,
+        )
 
     issues_raw = payload.get("issues")
     issues = [item for item in issues_raw if isinstance(item, str)] if isinstance(issues_raw, list) else []
@@ -198,4 +217,27 @@ def _payload_to_parsing_result(
         confidence=confidence,
         is_ambiguous=is_ambiguous,
         issues=issues,
+    )
+
+
+def _ambiguous_validation_result(
+    *,
+    issue: str,
+    title: str,
+    timezone: str,
+    metadata: dict[str, str],
+) -> ParsingResult:
+    draft_metadata = dict(metadata)
+    draft_metadata["llm_error"] = "validation_failed"
+    return ParsingResult(
+        draft=EventDraft(
+            title=title,
+            start_at=None,
+            end_at=None,
+            timezone=timezone,
+            metadata=draft_metadata,
+        ),
+        confidence=0.0,
+        is_ambiguous=True,
+        issues=[issue, "missing_start_at"],
     )
