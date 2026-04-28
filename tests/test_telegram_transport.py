@@ -85,6 +85,25 @@ class InvalidTimezoneParser:
         )
 
 
+class MalformedTimezoneParser:
+    def __init__(self, timezone: str) -> None:
+        self.timezone = timezone
+
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+                end_at=datetime(2026, 3, 12, 11, 0, tzinfo=UTC),
+                timezone=self.timezone,
+                metadata={"source": "rule-based-parser"},
+            ),
+            confidence=0.95,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
 class NoneTimezoneParser:
     def parse(self, text: str, user_id: int) -> ParsingResult:
         return ParsingResult(
@@ -347,15 +366,21 @@ def test_preview_buttons_hide_confirm_when_start_at_missing() -> None:
 
 
 def test_preview_buttons_hide_confirm_when_timezone_invalid() -> None:
-    router, deps = _build_router()
-    deps.parser = InvalidTimezoneParser()
+    parser_cases = (
+        (InvalidTimezoneParser(), "Invalid timezone"),
+        (MalformedTimezoneParser("/UTC"), "Malformed timezone /UTC"),
+        (MalformedTimezoneParser("../UTC"), "Malformed timezone ../UTC"),
+    )
+    for parser, text in parser_cases:
+        router, deps = _build_router()
+        deps.parser = parser
 
-    response = router.handle_text_message(telegram_user_id=90013, text="Invalid timezone")
+        response = router.handle_text_message(telegram_user_id=90013, text=text)
 
-    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
-    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
-    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
-    assert "Используйте /edit timezone Europe/Amsterdam." in response.text
+        assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+        assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
+        assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+        assert "Используйте /edit timezone Europe/Amsterdam." in response.text
 
 
 def test_preview_buttons_hide_confirm_when_timezone_is_none() -> None:
@@ -538,15 +563,16 @@ def test_format_preview_message_is_safe_for_invalid_timezone() -> None:
 
 
 def test_format_preview_message_is_safe_for_malformed_timezone_key() -> None:
-    draft = EventDraft(
-        title="Parsed title",
-        start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
-        timezone="../UTC",
-    )
+    for timezone_value in ("/UTC", "../UTC"):
+        draft = EventDraft(
+            title="Parsed title",
+            start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+            timezone=timezone_value,
+        )
 
-    preview = format_preview_message(draft)
+        preview = format_preview_message(draft)
 
-    assert "Используйте /edit timezone Europe/Amsterdam." in preview
+        assert "Используйте /edit timezone Europe/Amsterdam." in preview
 
 
 def test_format_preview_message_is_safe_for_mixed_awareness_range() -> None:

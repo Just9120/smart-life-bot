@@ -153,6 +153,24 @@ class InvalidTimezoneParser:
         )
 
 
+class MalformedTimezoneParser:
+    def __init__(self, timezone: str) -> None:
+        self.timezone = timezone
+
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 1, 10, 9, 0),
+                timezone=self.timezone,
+                metadata={"source": "malformed-timezone-parser"},
+            ),
+            confidence=0.99,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
 class NoneTimezoneParser:
     def parse(self, text: str, user_id: int) -> ParsingResult:
         return ParsingResult(
@@ -387,19 +405,25 @@ def test_confirm_validation_failure_when_start_at_missing() -> None:
 
 
 def test_confirm_validation_failure_when_timezone_invalid() -> None:
-    deps, user_id = _build_dependencies()
-    deps.parser = InvalidTimezoneParser()
+    for timezone_value, text in (("Not/AZone", "Bad timezone"), ("/UTC", "Malformed timezone /UTC"), ("../UTC", "Malformed timezone ../UTC")):
+        deps, user_id = _build_dependencies()
+        deps.parser = InvalidTimezoneParser() if timezone_value == "Not/AZone" else MalformedTimezoneParser(timezone_value)
 
-    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Bad timezone"))
-    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+        ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text=text))
+        result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
 
-    assert result.status == "failed"
-    assert "timezone must be a valid IANA timezone" in result.message
-    assert deps.auth_provider.calls == 0
-    assert len(deps.calendar_service.requests) == 0
-    logs = deps.events_log_repo.list_for_user(user_id)
-    assert logs[0].status is EventLogStatus.FAILED
-    assert logs[0].error_code == "validation_error"
+        assert result.status == "failed"
+        assert "timezone must be a valid IANA timezone" in result.message
+        assert deps.auth_provider.calls == 0
+        assert len(deps.calendar_service.requests) == 0
+        logs = deps.events_log_repo.list_for_user(user_id)
+        assert len(logs) == 1
+        assert logs[0].status is EventLogStatus.FAILED
+        assert logs[0].error_code == "validation_error"
+        state = deps.state_repo.get(user_id)
+        assert state is not None
+        assert state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
+        assert state.draft is not None
 
 
 def test_confirm_validation_failure_when_timezone_is_none() -> None:
