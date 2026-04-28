@@ -48,6 +48,24 @@ Parser mode не предназначен для ежедневного пере
 | `APP_PORT` | `8080` | Нет | Runtime-порт для web-компонентов (когда появятся). |
 | `STATE_TTL_HOURS` | `24` | Нет | Время жизни conversation state (если включено). **Pending в архитектуре.** |
 
+## 4.1 Optional LLM parser переменные (Anthropic Claude)
+
+Все переменные этого раздела optional, пока LLM parser не включён.  
+Если `LLM_PROVIDER` отсутствует/пустой — LLM route отключён и Python parser работает как обычно.
+
+| Переменная | Default | Обязательность | Пример placeholder | Чувствительная | Назначение |
+|---|---|---|---|---|---|
+| `LLM_PROVIDER` | `None` | Optional | `anthropic` | Нет | Включает LLM parser provider. Поддерживаемое значение: `anthropic`. |
+| `ANTHROPIC_API_KEY` | `None` | Required только при `LLM_PROVIDER=anthropic` | `<anthropic_api_key>` | **Да** | API key Anthropic Claude. |
+| `LLM_MODEL` | `claude-haiku-4-5-20251001` при `LLM_PROVIDER=anthropic` | Optional | `claude-haiku-4-5-20251001` | Нет | Модель Claude (env-configurable). |
+| `LLM_TIMEOUT_SECONDS` | `20` | Optional | `20` | Нет | Таймаут запроса LLM parser. |
+| `LLM_MAX_RETRIES` | `2` | Optional | `2` | Нет | Число retry запросов к LLM SDK. |
+| `LLM_MAX_TOKENS` | `1000` | Optional | `1000` | Нет | Верхняя граница output tokens для Claude ответа. |
+
+Рекомендованные model ids:
+- default / cost-efficient: `claude-haiku-4-5-20251001`;
+- higher-quality option: `claude-sonnet-4-6`.
+
 ## 5. Переменные только для `oauth_user_mode`
 
 | Переменная | Обязательность в режиме | Пример placeholder | Чувствительная | Назначение |

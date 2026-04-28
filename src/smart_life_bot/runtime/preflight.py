@@ -87,6 +87,15 @@ def _validate_service_account_settings(settings: Settings) -> None:
         raise ConfigurationError("GOOGLE_SERVICE_ACCOUNT_JSON file path is not readable") from error
 
 
+def _validate_llm_settings(settings: Settings) -> None:
+    if settings.llm_provider is None:
+        return
+    if settings.llm_provider != "anthropic":
+        raise ConfigurationError("Unsupported LLM_PROVIDER. Supported values: anthropic")
+    if not settings.anthropic_api_key:
+        raise ConfigurationError("ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic")
+
+
 def _format_report(settings: Settings, checks: list[PreflightCheck]) -> str:
     check_map = {check.name: check for check in checks}
 
@@ -99,6 +108,9 @@ def _format_report(settings: Settings, checks: list[PreflightCheck]) -> str:
         f"telegram_bot_token_configured={str(bool(settings.telegram_bot_token)).lower()}",
         f"google_service_account_configured={str(bool(settings.google_service_account_json)).lower()}",
         f"google_shared_calendar_id_configured={str(bool(settings.google_shared_calendar_id)).lower()}",
+        f"llm_provider={settings.llm_provider or 'none'}",
+        f"llm_configured={str(settings.llm_provider == 'anthropic' and bool(settings.anthropic_api_key)).lower()}",
+        f"llm_model_configured={str(bool(settings.llm_model)).lower()}",
         f"timezone={settings.default_timezone}",
         f"runtime_composition={check_map.get('runtime_composition', PreflightCheck('', 'failed', '')).status}",
         f"sqlite_schema={check_map.get('sqlite_schema', PreflightCheck('', 'failed', '')).status}",
@@ -145,6 +157,26 @@ def run_preflight(settings: Settings | None = None) -> PreflightResult:
             name="service_account_config",
             status="ok",
             detail="Auth-mode-specific configuration validated",
+        )
+    )
+
+    try:
+        _validate_llm_settings(resolved_settings)
+    except ConfigurationError as error:
+        checks.append(
+            PreflightCheck(
+                name="llm_config",
+                status="failed",
+                detail=str(error),
+            )
+        )
+        result = PreflightResult(ok=False, checks=checks)
+        raise PreflightError("Preflight failed: invalid llm configuration", result=result) from error
+    checks.append(
+        PreflightCheck(
+            name="llm_config",
+            status="ok",
+            detail="LLM configuration validated",
         )
     )
 

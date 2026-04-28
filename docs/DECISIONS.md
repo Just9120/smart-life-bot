@@ -144,3 +144,9 @@
 - **Status:** Accepted
 - **Decision:** Keep Telegram voice input out of current implementation scope and treat it as backlog; when implemented, flow must be `voice → STT → existing text parser flow → preview/confirm`.
 - **Rationale:** Limits current scope, preserves existing safety guarantees (mandatory preview before write), and enforces clear boundary between STT (audio→text) and parser (text→EventDraft). Preferred future STT candidate is ElevenLabs Scribe, with guardrails for max duration/file size and no processing of long lectures.
+
+## D-024: Claude is the first LLM parser provider
+
+- **Status:** Accepted
+- **Decision:** Use Anthropic Claude as the first LLM parser provider behind `MessageParser`.
+- **Rationale:** Claude provides strong natural-language parsing ability for Russian/English calendar inputs while preserving existing preview/confirm safety. Model choice remains env-configurable so Haiku can be used for cost-efficient parsing and Sonnet can be used later for higher-quality parsing.

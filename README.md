@@ -70,14 +70,13 @@ python -m pytest
 Парсинг на текущем этапе остаётся MVP-уровня: используется детерминированный Python/rule-based parser baseline (единственная полностью активная parser-реализация) без LLM/NLP SDK и без внешних сетевых вызовов. Rule-based parser поддерживает распространённые компактные RU форматы даты/времени (включая варианты с запятой, `HH:MM` и `HH MM`) и даты с русскими названиями/сокращениями месяцев.
 
 Parser mode хранится как user-level preference в `user_preferences` и настраивается через Telegram `/settings` (а не через `.env`). Сохранённый режим участвует в реальном parsing path через `ParserModeRouter` (за `MessageParser` abstraction):
-- `python` → Python/rule-based parser;
-- `auto` → Python fallback (текущий временный маршрут);
-- `llm` → не реализован, defensive fallback в Python parser.
+- `python` → Python/rule-based parser (основной дешёвый и детерминированный путь);
+- `auto` → Python first, затем Claude fallback только при ambiguous/low-confidence, если LLM настроен; иначе безопасный Python fallback;
+- `llm` → Claude parser только когда LLM настроен; иначе defensive Python fallback.
 
-Текущая реализация LLM parser отсутствует. Целевое направление следующих этапов:
-- `auto` должен стать hybrid-режимом: Python first → Claude LLM fallback для ambiguity/low-confidence;
-- `llm` должен использовать Claude parser после реализации;
-- модель LLM должна оставаться env-configurable (не hardcoded), вероятный старт — Claude Haiku; Claude Sonnet — как future higher-quality option.
+LLM parser foundation реализован через Anthropic Claude (optional runtime capability). Модель остаётся env-configurable через `LLM_MODEL` (без hardcode в runtime routing):
+- default / cost-efficient: `claude-haiku-4-5-20251001`;
+- higher-quality option: `claude-sonnet-4-6`.
 
 ## Backlog / Future scope
 

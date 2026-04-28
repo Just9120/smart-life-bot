@@ -179,3 +179,44 @@ def test_preflight_sqlite_schema_check_includes_expected_tables(base_settings: S
     assert "conversation_state" in sqlite_check.detail
     assert "events_log" in sqlite_check.detail
     assert "user_preferences" in sqlite_check.detail
+
+
+def test_preflight_does_not_require_llm_by_default(base_settings: Settings) -> None:
+    result = run_preflight(base_settings)
+    llm_check = next(check for check in result.checks if check.name == "llm_config")
+    assert llm_check.status == "ok"
+
+
+def test_preflight_requires_anthropic_key_when_llm_provider_is_set(base_settings: Settings) -> None:
+    settings = Settings(
+        app_env=base_settings.app_env,
+        log_level=base_settings.log_level,
+        telegram_bot_token=base_settings.telegram_bot_token,
+        google_auth_mode=base_settings.google_auth_mode,
+        database_url=base_settings.database_url,
+        default_timezone=base_settings.default_timezone,
+        llm_provider="anthropic",
+        anthropic_api_key=None,
+        llm_model="claude-haiku-4-5-20251001",
+    )
+    with pytest.raises(PreflightError, match="invalid llm configuration") as error:
+        run_preflight(settings)
+    assert "ANTHROPIC_API_KEY" in error.value.result.checks[-1].detail
+
+
+def test_preflight_result_does_not_include_anthropic_api_key(base_settings: Settings) -> None:
+    settings = Settings(
+        app_env=base_settings.app_env,
+        log_level=base_settings.log_level,
+        telegram_bot_token=base_settings.telegram_bot_token,
+        google_auth_mode=base_settings.google_auth_mode,
+        database_url=base_settings.database_url,
+        default_timezone=base_settings.default_timezone,
+        llm_provider="anthropic",
+        anthropic_api_key="test-secret-key",
+        llm_model="claude-haiku-4-5-20251001",
+    )
+
+    result = run_preflight(settings)
+    serialized = str(result)
+    assert "test-secret-key" not in serialized

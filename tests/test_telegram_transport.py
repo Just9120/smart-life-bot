@@ -316,6 +316,7 @@ def test_settings_command_creates_user_and_shows_parser_modes() -> None:
 
     assert "Settings" in response.text
     assert "Current: Python / rule-based" in response.text
+    assert "🤖 LLM — not available" in response.text
     assert ("🐍 Python", CALLBACK_SETTINGS_PARSER_PYTHON) in response.buttons
     assert ("⚡ Auto", CALLBACK_SETTINGS_PARSER_AUTO) in response.buttons
     assert ("🤖 LLM", CALLBACK_SETTINGS_PARSER_LLM) in response.buttons
@@ -347,7 +348,7 @@ def test_settings_auto_selection_persists_auto_mode_with_fallback_message() -> N
     response = router.handle_callback(telegram_user_id=90102, callback_data=CALLBACK_SETTINGS_PARSER_AUTO)
 
     assert "Parser mode updated to Auto." in response.text
-    assert "currently uses Python/rule-based fallback" in response.text
+    assert "because LLM is not configured" in response.text
     user = deps.users_repo.get_by_telegram_id(90102)
     assert user is not None
     preferences = deps.user_preferences_repo.get_for_user(user.id)
@@ -362,7 +363,7 @@ def test_settings_llm_selection_keeps_current_mode_unchanged() -> None:
 
     response = router.handle_callback(telegram_user_id=90103, callback_data=CALLBACK_SETTINGS_PARSER_LLM)
 
-    assert "LLM parser is not implemented yet." in response.text
+    assert "LLM parser is not available in current runtime configuration." in response.text
     assert "Current parser mode remains auto." in response.text
     user = deps.users_repo.get_by_telegram_id(90103)
     assert user is not None

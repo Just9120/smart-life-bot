@@ -47,6 +47,7 @@ class TelegramTransportRouter:
     get_user_settings: GetUserSettingsUseCase
     set_parser_mode: SetParserModeUseCase
     default_timezone: str
+    llm_available: bool = False
 
     def handle_start(self) -> TelegramTransportResponse:
         return TelegramTransportResponse(
@@ -163,9 +164,9 @@ class TelegramTransportRouter:
                 f"- Current: {self._human_parser_mode(settings.parser_mode)}\n\n"
                 "Available:\n"
                 "- 🐍 Python — active\n"
-                "- ⚡ Auto — planned, currently falls back to Python\n"
-                "- 🤖 LLM — planned, not available yet\n\n"
-                "For now, Python is the only fully active parser implementation."
+                f"- ⚡ Auto — {self._auto_availability_text()}\n"
+                f"- 🤖 LLM — {self._llm_availability_text()}\n\n"
+                "Python parser remains available as deterministic baseline."
             ),
             buttons=(
                 ("🐍 Python", CALLBACK_SETTINGS_PARSER_PYTHON),
@@ -178,8 +179,22 @@ class TelegramTransportRouter:
         if parser_mode is ParserMode.PYTHON:
             return "Python / rule-based"
         if parser_mode is ParserMode.AUTO:
+            if self.llm_available:
+                return "Auto (Python first, Claude fallback)"
             return "Auto (currently Python fallback)"
-        return "LLM (not implemented)"
+        if self.llm_available:
+            return "LLM (Claude)"
+        return "LLM (not available)"
+
+    def _llm_availability_text(self) -> str:
+        if self.llm_available:
+            return "available via Claude"
+        return "not available (configure Anthropic API key)"
+
+    def _auto_availability_text(self) -> str:
+        if self.llm_available:
+            return "Python first, Claude fallback"
+        return "Python fallback only (LLM not configured)"
 
 
 def format_preview_message(draft: EventDraft) -> str:

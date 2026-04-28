@@ -22,6 +22,7 @@ from smart_life_bot.observability.logger import ContextLoggerAdapter, get_contex
 from smart_life_bot.parsing.interfaces import MessageParser
 from smart_life_bot.parsing.router import ParserModeRouter
 from smart_life_bot.parsing.rule_based import RuleBasedMessageParser
+from smart_life_bot.parsing.claude import ClaudeMessageParser
 from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
     SQLiteEventsLogRepository,
@@ -82,9 +83,21 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         )
 
     python_parser = RuleBasedMessageParser(default_timezone=settings.default_timezone)
+    llm_parser: MessageParser | None = None
+    if settings.llm_provider == "anthropic" and settings.anthropic_api_key and settings.llm_model:
+        llm_parser = ClaudeMessageParser(
+            model=settings.llm_model,
+            api_key=settings.anthropic_api_key,
+            default_timezone=settings.default_timezone,
+            timeout_seconds=settings.llm_timeout_seconds,
+            max_retries=settings.llm_max_retries,
+            max_tokens=settings.llm_max_tokens,
+        )
+
     parser = ParserModeRouter(
         user_preferences_repo=user_preferences_repo,
         python_parser=python_parser,
+        llm_parser=llm_parser,
     )
 
     deps = _Dependencies(
@@ -107,8 +120,9 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         cancel_draft=CancelEventDraftUseCase(deps=deps),
         edit_draft_field=EditEventDraftFieldUseCase(deps=deps),
         get_user_settings=GetUserSettingsUseCase(deps=deps),
-        set_parser_mode=SetParserModeUseCase(deps=deps),
+        set_parser_mode=SetParserModeUseCase(deps=deps, llm_available=llm_parser is not None),
         default_timezone=settings.default_timezone,
+        llm_available=llm_parser is not None,
     )
 
     return RuntimeContainer(
