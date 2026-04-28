@@ -69,6 +69,36 @@ class MissingStartAtParser:
         )
 
 
+class InvalidTimezoneParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+                end_at=datetime(2026, 3, 12, 11, 0, tzinfo=UTC),
+                timezone="Mars/Olympus",
+            ),
+            confidence=0.60,
+            is_ambiguous=True,
+            issues=["invalid_timezone"],
+        )
+
+
+class InvalidTimeRangeParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+                end_at=datetime(2026, 3, 12, 9, 0, tzinfo=UTC),
+                timezone="UTC",
+            ),
+            confidence=0.60,
+            is_ambiguous=True,
+            issues=["invalid_time_range"],
+        )
+
+
 class FakeAuthProvider:
     def resolve_auth_context(self, user_id: int) -> AuthContext:
         return AuthContext(
@@ -294,6 +324,30 @@ def test_edit_start_at_restores_confirm_button() -> None:
     assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
 
 
+def test_preview_buttons_hide_confirm_when_timezone_invalid() -> None:
+    router, deps = _build_router()
+    deps.parser = InvalidTimezoneParser()
+
+    response = router.handle_text_message(telegram_user_id=90013, text="Invalid timezone")
+
+    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert "Нужно исправить timezone перед созданием события." in response.text
+
+
+def test_preview_buttons_hide_confirm_when_time_range_invalid() -> None:
+    router, deps = _build_router()
+    deps.parser = InvalidTimeRangeParser()
+
+    response = router.handle_text_message(telegram_user_id=90014, text="Invalid time range")
+
+    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert "Нужно исправить время: end_at должен быть позже start_at." in response.text
+
+
 def test_edit_invalid_start_at_keeps_confirm_hidden() -> None:
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()
@@ -400,6 +454,31 @@ def test_format_preview_message_shows_claude_diagnostics_and_issues() -> None:
     assert "- source: Claude" in preview
     assert "- confidence: 0.00" in preview
     assert "- issues: missing_start_at,invalid_timezone" in preview
+
+
+def test_format_preview_message_shows_invalid_timezone_hint() -> None:
+    draft = EventDraft(
+        title="Parsed title",
+        start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+        timezone="Mars/Olympus",
+    )
+
+    preview = format_preview_message(draft)
+
+    assert "Нужно исправить timezone перед созданием события." in preview
+
+
+def test_format_preview_message_shows_invalid_time_range_hint() -> None:
+    draft = EventDraft(
+        title="Parsed title",
+        start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+        end_at=datetime(2026, 3, 12, 9, 0, tzinfo=UTC),
+        timezone="UTC",
+    )
+
+    preview = format_preview_message(draft)
+
+    assert "Нужно исправить время: end_at должен быть позже start_at." in preview
 
 
 def test_format_preview_message_is_safe_when_parser_metadata_missing() -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from smart_life_bot.application.dto import (
     CancelEventDraftInput,
@@ -208,14 +209,15 @@ def format_preview_message(draft: EventDraft) -> str:
     if draft.location:
         lines.append(f"- location: {draft.location}")
     lines.extend(_format_parser_diagnostics(draft.metadata))
-    if draft.start_at is None:
-        lines.append("Нужно указать start_at перед созданием события. Используйте /edit start_at <ISO-8601 datetime>.")
+    validation_hint = _non_confirmable_draft_hint(draft)
+    if validation_hint is not None:
+        lines.append(validation_hint)
     lines.append("Событие НЕ будет создано, пока вы явно не нажмёте Confirm.")
     return "\n".join(lines)
 
 
 def _build_draft_buttons(draft: EventDraft) -> tuple[tuple[str, str], ...]:
-    if draft.start_at is None:
+    if not _is_draft_confirmable(draft):
         return (
             ("✏️ Edit", CALLBACK_EDIT),
             ("❌ Cancel", CALLBACK_CANCEL),
@@ -225,6 +227,37 @@ def _build_draft_buttons(draft: EventDraft) -> tuple[tuple[str, str], ...]:
         ("✏️ Edit", CALLBACK_EDIT),
         ("❌ Cancel", CALLBACK_CANCEL),
     )
+
+
+def _is_valid_iana_timezone(value: str) -> bool:
+    normalized = value.strip()
+    if not normalized:
+        return False
+    try:
+        ZoneInfo(normalized)
+    except ZoneInfoNotFoundError:
+        return False
+    return True
+
+
+def _is_draft_confirmable(draft: EventDraft) -> bool:
+    if draft.start_at is None:
+        return False
+    if not _is_valid_iana_timezone(draft.timezone):
+        return False
+    if draft.end_at is not None and draft.end_at <= draft.start_at:
+        return False
+    return True
+
+
+def _non_confirmable_draft_hint(draft: EventDraft) -> str | None:
+    if draft.start_at is None:
+        return "Нужно указать start_at перед созданием события. Используйте /edit start_at <ISO-8601 datetime>."
+    if not _is_valid_iana_timezone(draft.timezone):
+        return "Нужно исправить timezone перед созданием события. Используйте /edit timezone Europe/Amsterdam."
+    if draft.end_at is not None and draft.end_at <= draft.start_at:
+        return "Нужно исправить время: end_at должен быть позже start_at."
+    return None
 
 
 def _format_parser_diagnostics(metadata: dict[str, str]) -> list[str]:

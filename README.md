@@ -75,7 +75,8 @@ Parser mode хранится как user-level preference в `user_preferences` 
 - `llm` → Claude parser только когда LLM настроен; иначе defensive Python fallback.
 
 Telegram preview дополнительно показывает компактную parser diagnostics секцию (`mode/route/source/confidence`, и `issues` когда есть), чтобы пользователь видел, какой parser path был использован.
-Если в draft отсутствует обязательный `start_at`, в preview скрывается кнопка Confirm (остаются Edit/Cancel) и показывается явная подсказка использовать `/edit start_at <ISO-8601 datetime>`.
+Перед confirm и после `/edit` применяются application-level safety validations: обязательный `start_at` для confirm, валидный IANA timezone (`zoneinfo`) и корректный диапазон времени (`end_at > start_at`, если оба заданы).
+Если draft не confirmable (missing `start_at`, invalid timezone или invalid time range), в preview скрывается кнопка Confirm (остаются Edit/Cancel) и показывается явная подсказка для исправления через `/edit`.
 
 LLM parser foundation реализован через Anthropic Claude (optional runtime capability). Модель остаётся env-configurable через `LLM_MODEL` (без hardcode в runtime routing):
 - default / cost-efficient: `claude-haiku-4-5-20251001`;

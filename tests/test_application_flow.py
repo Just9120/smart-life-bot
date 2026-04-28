@@ -122,6 +122,37 @@ class MissingStartAtParser:
         )
 
 
+class InvalidTimezoneParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 1, 10, 9, 0, tzinfo=UTC),
+                timezone="Mars/Olympus",
+                metadata={"source": "invalid-timezone-parser"},
+            ),
+            confidence=0.99,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
+class InvalidTimeRangeParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 1, 10, 10, 0, tzinfo=UTC),
+                end_at=datetime(2026, 1, 10, 9, 0, tzinfo=UTC),
+                timezone="UTC",
+                metadata={"source": "invalid-time-range-parser"},
+            ),
+            confidence=0.99,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
 class ParserDiagnosticsParser:
     def parse(self, text: str, user_id: int) -> ParsingResult:
         return ParsingResult(
@@ -292,7 +323,7 @@ def test_confirm_validation_failure_when_start_at_missing() -> None:
     result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
 
     assert result.status == "failed"
-    assert "start time is required" in result.message
+    assert result.message == "Cannot confirm event: start time is required before saving."
 
     assert deps.auth_provider.calls == 0
     assert len(deps.calendar_service.requests) == 0
@@ -306,6 +337,56 @@ def test_confirm_validation_failure_when_start_at_missing() -> None:
     assert state is not None
     assert state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
     assert state.draft is not None
+
+
+def test_confirm_validation_failure_when_timezone_is_invalid() -> None:
+    deps, user_id = _build_dependencies()
+    deps.parser = InvalidTimezoneParser()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Invalid timezone"))
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert result.message == "Invalid timezone. Use a valid IANA timezone, for example Europe/Amsterdam or UTC."
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
+    assert state.draft is not None
+    assert state.draft.timezone == "Mars/Olympus"
+
+    logs = deps.events_log_repo.list_for_user(user_id)
+    assert len(logs) == 1
+    assert logs[0].status is EventLogStatus.FAILED
+    assert logs[0].error_code == "validation_error"
+
+
+def test_confirm_validation_failure_when_time_range_is_invalid() -> None:
+    deps, user_id = _build_dependencies()
+    deps.parser = InvalidTimeRangeParser()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Invalid time range"))
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert result.message == "Invalid time range: end_at must be later than start_at."
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
+    assert state.draft is not None
+    assert state.draft.end_at is not None
+    assert state.draft.start_at is not None
+    assert state.draft.end_at <= state.draft.start_at
+
+    logs = deps.events_log_repo.list_for_user(user_id)
+    assert len(logs) == 1
+    assert logs[0].status is EventLogStatus.FAILED
+    assert logs[0].error_code == "validation_error"
 
 
 def test_confirm_failure_when_event_log_id_is_malformed() -> None:
@@ -483,6 +564,100 @@ def test_edit_preserves_event_log_id_metadata() -> None:
     assert state_after is not None
     assert state_after.draft is not None
     assert state_after.draft.metadata.get("event_log_id") == event_log_id
+
+
+def test_edit_timezone_invalid_fails_and_keeps_original_timezone() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Timezone edit case"))
+    state_before = deps.state_repo.get(user_id)
+    assert state_before is not None
+    assert state_before.draft is not None
+    original_timezone = state_before.draft.timezone
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="timezone", field_value="Mars/Olympus")
+    )
+
+    assert result.status == "failed"
+    assert result.message == "Invalid timezone. Use a valid IANA timezone, for example Europe/Amsterdam or UTC."
+    state_after = deps.state_repo.get(user_id)
+    assert state_after is not None
+    assert state_after.draft is not None
+    assert state_after.draft.timezone == original_timezone
+
+
+def test_edit_timezone_valid_updates_timezone() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Timezone edit valid"))
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="timezone", field_value="Europe/Amsterdam")
+    )
+
+    assert result.status == "preview_ready"
+    state_after = deps.state_repo.get(user_id)
+    assert state_after is not None
+    assert state_after.draft is not None
+    assert state_after.draft.timezone == "Europe/Amsterdam"
+
+
+def test_edit_end_at_earlier_than_start_at_fails_without_saving() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="End-at validation"))
+    state_before = deps.state_repo.get(user_id)
+    assert state_before is not None
+    assert state_before.draft is not None
+    original_end_at = state_before.draft.end_at
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="end_at", field_value="2026-01-10T08:00:00+00:00")
+    )
+
+    assert result.status == "failed"
+    assert result.message == "Invalid time range: end_at must be later than start_at."
+    state_after = deps.state_repo.get(user_id)
+    assert state_after is not None
+    assert state_after.draft is not None
+    assert state_after.draft.end_at == original_end_at
+
+
+def test_edit_start_at_later_than_end_at_fails_without_saving() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Start-at validation"))
+    setup_end_at = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="end_at", field_value="2026-01-10T11:00:00+00:00")
+    )
+    assert setup_end_at.status == "preview_ready"
+    state_before = deps.state_repo.get(user_id)
+    assert state_before is not None
+    assert state_before.draft is not None
+    original_start_at = state_before.draft.start_at
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="start_at", field_value="2026-01-10T12:00:00+00:00")
+    )
+
+    assert result.status == "failed"
+    assert result.message == "Invalid time range: end_at must be later than start_at."
+    state_after = deps.state_repo.get(user_id)
+    assert state_after is not None
+    assert state_after.draft is not None
+    assert state_after.draft.start_at == original_start_at
+
+
+def test_edit_end_at_clear_remains_allowed() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Clear end-at"))
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="end_at", field_value="")
+    )
+
+    assert result.status == "preview_ready"
+    state_after = deps.state_repo.get(user_id)
+    assert state_after is not None
+    assert state_after.draft is not None
+    assert state_after.draft.end_at is None
 
 
 def test_edit_does_not_call_auth_provider_or_calendar_service() -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from smart_life_bot.calendar.models import CalendarEventCreateRequest
 from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus, ParserMode
@@ -74,6 +75,35 @@ def _clone_draft_with_update(draft: EventDraft, **changes: object) -> EventDraft
     updated_draft = replace(draft, **changes)
     updated_draft.metadata = dict(draft.metadata)
     return updated_draft
+
+
+def _validate_timezone(timezone: str) -> None:
+    normalized = timezone.strip()
+    if not normalized:
+        raise ValueError("Invalid timezone. Use a valid IANA timezone, for example Europe/Amsterdam or UTC.")
+    try:
+        ZoneInfo(normalized)
+    except ZoneInfoNotFoundError as error:
+        raise ValueError("Invalid timezone. Use a valid IANA timezone, for example Europe/Amsterdam or UTC.") from error
+
+
+def _validate_time_range(start_at: datetime | None, end_at: datetime | None) -> None:
+    if start_at is not None and end_at is not None and end_at <= start_at:
+        raise ValueError("Invalid time range: end_at must be later than start_at.")
+
+
+def validate_draft_for_confirmation(draft: EventDraft) -> None:
+    if draft.start_at is None:
+        raise ValueError("Cannot confirm event: start time is required before saving.")
+    _validate_timezone(draft.timezone)
+    _validate_time_range(draft.start_at, draft.end_at)
+
+
+def validate_draft_after_edit(draft: EventDraft, edited_field_name: str) -> None:
+    if edited_field_name == "timezone":
+        _validate_timezone(draft.timezone)
+    if edited_field_name in {"start_at", "end_at"}:
+        _validate_time_range(draft.start_at, draft.end_at)
 
 
 def _apply_draft_field_edit(draft: EventDraft, field_name: str, field_value: str) -> EventDraft:
@@ -170,37 +200,21 @@ class ConfirmEventDraftUseCase:
             return UseCaseResult(status="failed", message="Pending state has no draft payload")
 
         draft = snapshot.draft
-        self.deps.state_repo.set(
-            ConversationStateSnapshot(
-                user_id=payload.user_id,
-                state=ConversationState.SAVING,
-                draft=draft,
-            )
-        )
+        log_id = _extract_event_log_id(draft)
+
         try:
             log_id = _require_valid_event_log_id(draft)
+            validate_draft_for_confirmation(draft)
+
+            self.deps.state_repo.set(
+                ConversationStateSnapshot(
+                    user_id=payload.user_id,
+                    state=ConversationState.SAVING,
+                    draft=draft,
+                )
+            )
             if log_id is not None:
                 self.deps.events_log_repo.update_status(entry_id=log_id, status=EventLogStatus.CONFIRMED)
-
-            if draft.start_at is None:
-                if log_id is not None:
-                    self.deps.events_log_repo.update_status(
-                        entry_id=log_id,
-                        status=EventLogStatus.FAILED,
-                        error_category=EventLogErrorCategory.VALIDATION_ERROR,
-                        error_details="Missing required start_at in event draft",
-                    )
-                self.deps.state_repo.set(
-                    ConversationStateSnapshot(
-                        user_id=payload.user_id,
-                        state=ConversationState.WAITING_PREVIEW_CONFIRMATION,
-                        draft=draft,
-                    )
-                )
-                return UseCaseResult(
-                    status="failed",
-                    message="Cannot confirm event: start time is required before saving.",
-                )
 
             auth_context = self.deps.auth_provider.resolve_auth_context(user_id=payload.user_id)
             request = CalendarEventCreateRequest(
@@ -215,8 +229,23 @@ class ConfirmEventDraftUseCase:
                 auth_context=auth_context,
                 request=request,
             )
+        except ValueError as error:
+            if log_id is not None:
+                self.deps.events_log_repo.update_status(
+                    entry_id=log_id,
+                    status=EventLogStatus.FAILED,
+                    error_category=EventLogErrorCategory.VALIDATION_ERROR,
+                    error_details=str(error),
+                )
+            self.deps.state_repo.set(
+                ConversationStateSnapshot(
+                    user_id=payload.user_id,
+                    state=ConversationState.WAITING_PREVIEW_CONFIRMATION,
+                    draft=draft,
+                )
+            )
+            return UseCaseResult(status="failed", message=str(error))
         except Exception as error:  # noqa: BLE001
-            log_id = _extract_event_log_id(draft)
             if log_id is not None:
                 self.deps.events_log_repo.update_status(
                     entry_id=log_id,
@@ -271,6 +300,7 @@ class EditEventDraftFieldUseCase:
                 field_name=payload.field_name,
                 field_value=payload.field_value,
             )
+            validate_draft_after_edit(updated_draft, payload.field_name)
         except ValueError as error:
             return UseCaseResult(status="failed", message=str(error))
 
