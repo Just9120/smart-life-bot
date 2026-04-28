@@ -29,6 +29,8 @@
 - добавлен `python-telegram-bot` adapter foundation (`build_telegram_application`), который маппит `/start`, plain text (без command payload) и callback (`draft:confirm/edit/cancel`) в `TelegramBotRuntime`;
 - добавлен `/settings` flow для parser mode preference foundation с callback `settings:parser:python|auto|llm`;
 - `python` можно переключать как active mode (единственная полностью активная parser-реализация), `auto` сохраняется как planned mode с текущим Python fallback, `llm` пока не реализован и defensively fallback-ится в Python parsing path;
+- preview сообщения показывают компактные parser diagnostics (`mode/route/source/confidence` + `issues` при наличии) из metadata draft для прозрачности parser path;
+- кнопка Confirm не показывается для draft без `start_at` (остаются Edit/Cancel + явная подсказка `/edit start_at ...`), при этом server-side confirm validation остаётся обязательным safety-net;
 - long polling вынесен в отдельный явный entrypoint (`python -m smart_life_bot.bot.telegram_polling`) и не запускается из default bootstrap `main.py`.
 
 **Разрешённые зависимости:**

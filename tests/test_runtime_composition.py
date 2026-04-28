@@ -86,7 +86,7 @@ def test_build_runtime_wires_claude_parser_when_llm_is_configured() -> None:
 def test_runtime_on_text_returns_preview_response() -> None:
     container = build_runtime(_settings())
     try:
-        response = container.runtime.on_text(telegram_user_id=1001, text="Team sync tomorrow")
+        response = container.runtime.on_text(telegram_user_id=1001, text="Team sync tomorrow at 10:00")
 
         assert "Черновик события" in response.text
         assert any(label == "✅ Confirm" for label, _ in response.buttons)

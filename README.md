@@ -74,6 +74,9 @@ Parser mode хранится как user-level preference в `user_preferences` 
 - `auto` → Python first, затем Claude fallback только при ambiguous/low-confidence, если LLM настроен; иначе безопасный Python fallback;
 - `llm` → Claude parser только когда LLM настроен; иначе defensive Python fallback.
 
+Telegram preview дополнительно показывает компактную parser diagnostics секцию (`mode/route/source/confidence`, и `issues` когда есть), чтобы пользователь видел, какой parser path был использован.
+Если в draft отсутствует обязательный `start_at`, в preview скрывается кнопка Confirm (остаются Edit/Cancel) и показывается явная подсказка использовать `/edit start_at <ISO-8601 datetime>`.
+
 LLM parser foundation реализован через Anthropic Claude (optional runtime capability). Модель остаётся env-configurable через `LLM_MODEL` (без hardcode в runtime routing):
 - default / cost-efficient: `claude-haiku-4-5-20251001`;
 - higher-quality option: `claude-sonnet-4-6`.

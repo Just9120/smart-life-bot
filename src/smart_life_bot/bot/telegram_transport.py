@@ -81,11 +81,7 @@ class TelegramTransportRouter:
         draft = self._get_pending_draft_text(user.id)
         return TelegramTransportResponse(
             text=draft,
-            buttons=(
-                ("✅ Confirm", CALLBACK_CONFIRM),
-                ("✏️ Edit", CALLBACK_EDIT),
-                ("❌ Cancel", CALLBACK_CANCEL),
-            ),
+            buttons=self._build_draft_buttons_from_state(user.id),
         )
 
     def handle_callback(self, telegram_user_id: int, callback_data: str) -> TelegramTransportResponse:
@@ -142,11 +138,7 @@ class TelegramTransportRouter:
 
         return TelegramTransportResponse(
             text=self._get_pending_draft_text(user_id),
-            buttons=(
-                ("✅ Confirm", CALLBACK_CONFIRM),
-                ("✏️ Edit", CALLBACK_EDIT),
-                ("❌ Cancel", CALLBACK_CANCEL),
-            ),
+            buttons=self._build_draft_buttons_from_state(user_id),
         )
 
     def _get_pending_draft_text(self, user_id: int) -> str:
@@ -154,6 +146,12 @@ class TelegramTransportRouter:
         if snapshot is None or snapshot.draft is None:
             return "Черновик не найден. Отправьте событие заново."
         return format_preview_message(snapshot.draft)
+
+    def _build_draft_buttons_from_state(self, user_id: int) -> tuple[tuple[str, str], ...]:
+        snapshot = self.state_repo.get(user_id)
+        if snapshot is None or snapshot.draft is None:
+            return ()
+        return _build_draft_buttons(snapshot.draft)
 
     def _build_settings_response(self, user_id: int) -> TelegramTransportResponse:
         settings = self.get_user_settings.execute(user_id=user_id)
@@ -209,5 +207,55 @@ def format_preview_message(draft: EventDraft) -> str:
         lines.append(f"- description: {draft.description}")
     if draft.location:
         lines.append(f"- location: {draft.location}")
+    lines.extend(_format_parser_diagnostics(draft.metadata))
+    if draft.start_at is None:
+        lines.append("Нужно указать start_at перед созданием события. Используйте /edit start_at <ISO-8601 datetime>.")
     lines.append("Событие НЕ будет создано, пока вы явно не нажмёте Confirm.")
     return "\n".join(lines)
+
+
+def _build_draft_buttons(draft: EventDraft) -> tuple[tuple[str, str], ...]:
+    if draft.start_at is None:
+        return (
+            ("✏️ Edit", CALLBACK_EDIT),
+            ("❌ Cancel", CALLBACK_CANCEL),
+        )
+    return (
+        ("✅ Confirm", CALLBACK_CONFIRM),
+        ("✏️ Edit", CALLBACK_EDIT),
+        ("❌ Cancel", CALLBACK_CANCEL),
+    )
+
+
+def _format_parser_diagnostics(metadata: dict[str, str]) -> list[str]:
+    lines = ["", "Парсинг:"]
+    lines.append(f"- mode: {metadata.get('parser_mode', '—')}")
+    lines.append(f"- route: {_human_parser_route(metadata.get('parser_router'))}")
+    lines.append(f"- source: {_human_parser_source(metadata.get('source'))}")
+    confidence = metadata.get("parser_confidence")
+    lines.append(f"- confidence: {confidence if confidence else '—'}")
+    issues = metadata.get("parser_issues")
+    if issues:
+        lines.append(f"- issues: {issues}")
+    return lines
+
+
+def _human_parser_source(value: str | None) -> str:
+    mapping = {
+        "rule-based-parser": "Python",
+        "claude-parser": "Claude",
+    }
+    if value is None:
+        return "—"
+    return mapping.get(value, value)
+
+
+def _human_parser_route(value: str | None) -> str:
+    mapping = {
+        "python": "Python",
+        "llm_fallback": "Claude fallback",
+        "python_fallback_llm_not_configured": "Python fallback, LLM not configured",
+    }
+    if value is None:
+        return "—"
+    return mapping.get(value, value)

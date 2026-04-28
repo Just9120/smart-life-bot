@@ -20,6 +20,14 @@ from .dto import (
 from .interfaces import ApplicationDependencies
 
 
+def _normalized_parser_metadata(parsing_result_confidence: float, parsing_result_is_ambiguous: bool, parsing_result_issues: list[str]) -> dict[str, str]:
+    return {
+        "parser_confidence": f"{parsing_result_confidence:.2f}",
+        "parser_is_ambiguous": str(parsing_result_is_ambiguous).lower(),
+        "parser_issues": ",".join(parsing_result_issues),
+    }
+
+
 def _draft_to_payload(draft: EventDraft) -> dict[str, object]:
     return {
         "title": draft.title,
@@ -117,6 +125,12 @@ class ProcessIncomingMessageUseCase:
     def execute(self, payload: IncomingMessageInput) -> UseCaseResult:
         parsing_result = self.deps.parser.parse(text=payload.text, user_id=payload.user_id)
         draft = parsing_result.draft
+        parser_metadata = _normalized_parser_metadata(
+            parsing_result_confidence=parsing_result.confidence,
+            parsing_result_is_ambiguous=parsing_result.is_ambiguous,
+            parsing_result_issues=parsing_result.issues,
+        )
+        draft.metadata = {**draft.metadata, **parser_metadata}
 
         log_entry = self.deps.events_log_repo.append(
             EventLogEntry(

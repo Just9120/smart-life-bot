@@ -122,6 +122,31 @@ class MissingStartAtParser:
         )
 
 
+class ParserDiagnosticsParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 1, 10, 9, 0, tzinfo=UTC),
+                timezone="UTC",
+                metadata={
+                    "source": "rule-based-parser",
+                    "raw_text": text,
+                    "user_id": str(user_id),
+                    "parser_mode": "auto",
+                    "parser_router": "llm_fallback",
+                    "llm_fallback_available": "true",
+                    "llm_provider": "anthropic",
+                    "llm_model": "claude-haiku-4-5-20251001",
+                    "llm_parser": "claude",
+                },
+            ),
+            confidence=0.923,
+            is_ambiguous=False,
+            issues=["missing_start_at", "invalid_timezone"],
+        )
+
+
 class SilentLogger:
     def info(self, message: str, **extra: object) -> None:
         return None
@@ -471,3 +496,25 @@ def test_edit_does_not_call_auth_provider_or_calendar_service() -> None:
     assert result.status == "preview_ready"
     assert deps.auth_provider.calls == 0
     assert len(deps.calendar_service.requests) == 0
+
+
+def test_incoming_message_persists_parser_diagnostics_without_losing_router_metadata() -> None:
+    deps, user_id = _build_dependencies()
+    deps.parser = ParserDiagnosticsParser()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Diagnostics case"))
+
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.draft is not None
+    metadata = state.draft.metadata
+    assert metadata["source"] == "rule-based-parser"
+    assert metadata["parser_mode"] == "auto"
+    assert metadata["parser_router"] == "llm_fallback"
+    assert metadata["llm_fallback_available"] == "true"
+    assert metadata["llm_provider"] == "anthropic"
+    assert metadata["llm_model"] == "claude-haiku-4-5-20251001"
+    assert metadata["llm_parser"] == "claude"
+    assert metadata["parser_confidence"] == "0.92"
+    assert metadata["parser_is_ambiguous"] == "false"
+    assert metadata["parser_issues"] == "missing_start_at,invalid_timezone"
