@@ -38,7 +38,7 @@ def detect_draft_validation_issue(draft: EventDraft, *, require_start_at: bool) 
 
     try:
         ZoneInfo(timezone_value)
-    except ZoneInfoNotFoundError:
+    except (ZoneInfoNotFoundError, ValueError):
         return DraftValidationIssue(
             code="invalid_timezone",
             message="Cannot confirm event: timezone must be a valid IANA timezone (for example Europe/Amsterdam).",

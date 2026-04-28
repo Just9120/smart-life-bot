@@ -537,6 +537,18 @@ def test_format_preview_message_is_safe_for_invalid_timezone() -> None:
     assert "Используйте /edit timezone Europe/Amsterdam." in preview
 
 
+def test_format_preview_message_is_safe_for_malformed_timezone_key() -> None:
+    draft = EventDraft(
+        title="Parsed title",
+        start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+        timezone="../UTC",
+    )
+
+    preview = format_preview_message(draft)
+
+    assert "Используйте /edit timezone Europe/Amsterdam." in preview
+
+
 def test_format_preview_message_is_safe_for_mixed_awareness_range() -> None:
     draft = EventDraft(
         title="Parsed title",
