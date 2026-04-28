@@ -309,6 +309,7 @@ class GetUserSettingsUseCase:
 @dataclass(slots=True)
 class SetParserModeUseCase:
     deps: ApplicationDependencies
+    llm_available: bool = False
 
     def execute(self, *, user_id: int, parser_mode: ParserMode) -> tuple[UseCaseResult, UserPreferencesRecord]:
         current = self.deps.user_preferences_repo.get_or_create_for_user(
@@ -316,12 +317,12 @@ class SetParserModeUseCase:
             default_parser_mode=ParserMode.PYTHON,
         )
 
-        if parser_mode is ParserMode.LLM:
+        if parser_mode is ParserMode.LLM and not self.llm_available:
             return (
                 UseCaseResult(
                     status="not_available",
                     message=(
-                        "LLM parser is not implemented yet. "
+                        "LLM parser is not available in current runtime configuration. "
                         f"Current parser mode remains {current.parser_mode.value}."
                     ),
                 ),
@@ -330,10 +331,14 @@ class SetParserModeUseCase:
 
         updated = self.deps.user_preferences_repo.set_parser_mode(user_id=user_id, parser_mode=parser_mode)
         if parser_mode is ParserMode.AUTO:
-            message = (
-                "Parser mode updated to Auto. "
-                "Auto is planned and currently uses Python/rule-based fallback."
-            )
+            message = "Parser mode updated to Auto. "
+            if self.llm_available:
+                message += "Auto now uses Python first and Claude fallback for ambiguous cases."
+            else:
+                message += "Auto currently uses Python/rule-based fallback because LLM is not configured."
             return UseCaseResult(status="success", message=message), updated
+
+        if parser_mode is ParserMode.LLM:
+            return UseCaseResult(status="success", message="LLM parser mode is active (Claude)."), updated
 
         return UseCaseResult(status="success", message="Python/rule-based parser is active."), updated

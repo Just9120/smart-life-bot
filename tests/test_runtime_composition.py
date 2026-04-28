@@ -7,6 +7,7 @@ from smart_life_bot.config.settings import Settings
 from smart_life_bot.calendar.google_calendar import GoogleCalendarService
 from smart_life_bot.domain.enums import GoogleAuthMode
 from smart_life_bot.parsing.router import ParserModeRouter
+from smart_life_bot.parsing.claude import ClaudeMessageParser
 from smart_life_bot.runtime.fakes import DevFakeCalendarService
 from smart_life_bot.runtime import RuntimeContainer, build_runtime
 
@@ -56,6 +57,29 @@ def test_build_runtime_wires_parser_mode_router() -> None:
     container = build_runtime(_settings())
     try:
         assert isinstance(container.runtime.router.process_incoming_message.deps.parser, ParserModeRouter)
+        parser = container.runtime.router.process_incoming_message.deps.parser
+        assert parser.llm_parser is None
+    finally:
+        container.connection.close()
+
+
+def test_build_runtime_wires_claude_parser_when_llm_is_configured() -> None:
+    settings = Settings(
+        app_env="dev",
+        log_level="INFO",
+        telegram_bot_token="token",
+        google_auth_mode=GoogleAuthMode.OAUTH_USER_MODE,
+        database_url="sqlite:///:memory:",
+        default_timezone="UTC",
+        llm_provider="anthropic",
+        anthropic_api_key="test-key",
+        llm_model="claude-haiku-4-5-20251001",
+    )
+    container = build_runtime(settings)
+    try:
+        parser = container.runtime.router.process_incoming_message.deps.parser
+        assert isinstance(parser, ParserModeRouter)
+        assert isinstance(parser.llm_parser, ClaudeMessageParser)
     finally:
         container.connection.close()
 

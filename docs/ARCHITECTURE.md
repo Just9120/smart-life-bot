@@ -210,12 +210,12 @@ Recommended pipeline:
 
 Целевой режим следующих этапов: Auto/hybrid parser mode, где pipeline пробует rule-based parser первым и использует fallback в LLM parser только при низкой уверенности или ambiguity.
 Parser mode фиксируется как user-level preference в storage (`user_preferences`) и настраивается через Telegram `/settings`; это поведение transport/application уровня, а не env-only runtime switch.
-На текущем этапе runtime parsing маршрутизируется через `ParserModeRouter` (за `MessageParser` abstraction), который читает `user_preferences` и выбирает безопасный маршрут без внешних сетевых вызовов:
-- `python` → Python/rule-based parser;
-- `auto` → Python fallback (до появления реального LLM parser);
-- `llm` → defensive Python fallback с признаком `llm not implemented` (LLM route remains unavailable).
+Runtime parsing маршрутизируется через `ParserModeRouter` (за `MessageParser` abstraction), который читает `user_preferences` и выбирает безопасный маршрут:
+- `python` → Python/rule-based parser (без вызовов LLM);
+- `llm` → Claude parser только когда LLM configured; иначе defensive Python fallback;
+- `auto` → Python first; если результат ambiguous/low-confidence (или `missing_start_at`), router пробует Claude fallback только когда LLM configured; иначе возвращается Python fallback.
 
-Реального LLM parser implementation пока нет; будущая LLM-реализация может быть подключена за тем же router-контрактом без изменения application use-cases. Целевой первый LLM provider — Claude; модель должна оставаться env-configurable (без hardcode в коде/документации), вероятный стартовый вариант — Claude Haiku, с возможным переходом на Sonnet как higher-quality option позже.
+Первая LLM-реализация подключена как `ClaudeMessageParser` (Anthropic SDK) за тем же `MessageParser` контрактом, без изменения application use-cases. Model selection остаётся env-configurable (`LLM_MODEL`, без hardcode в router/use-cases): default `claude-haiku-4-5-20251001`, higher-quality option `claude-sonnet-4-6`.
 
 При низкой уверенности система должна запрашивать уточнение, а не выполнять silent action.
 

@@ -493,15 +493,16 @@ Implemented explicit safe preflight entrypoint for VPS/runtime readiness checks:
 
 
 
-## 7.7 Parser mode router foundation status (PR #19)
+## 7.7 Parser mode router + Claude foundation status (PR #20+)
 
 Implemented parser mode routing foundation behind existing `MessageParser` contract:
 
 - added `ParserModeRouter`, which reads `user_preferences` via `get_or_create_for_user(..., default_parser_mode=python)` before parsing;
 - runtime composition now injects parser as `ParserModeRouter(user_preferences_repo, python_parser)` while keeping `ProcessIncomingMessageUseCase` unchanged;
-- current routing behavior is explicit and network-free: `python` routes to Python parser, `auto` routes to Python fallback, `llm` routes to defensive Python fallback (LLM not implemented);
+- current routing behavior is explicit: `python` routes to Python parser only, `llm` routes to Claude parser when configured (else defensive Python fallback), `auto` runs Python first and calls Claude fallback only for ambiguous/low-confidence results when configured;
 - router preserves underlying parser metadata (`source`, `raw_text`, `user_id`, etc.) and appends routing metadata for observability in draft/event-log payload;
 - invalid/stale parser mode values in DB are handled defensively with Python fallback instead of crashing the message flow.
+- LLM integration remains optional at runtime (`LLM_PROVIDER`, `ANTHROPIC_API_KEY`, `LLM_MODEL` etc.); Python mode stays fully functional without LLM configuration.
 
 ## 8. Error model
 

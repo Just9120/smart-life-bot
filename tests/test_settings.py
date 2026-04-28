@@ -62,3 +62,42 @@ def test_load_settings_accepts_service_account_fields_for_service_account_mode(
     assert settings.google_auth_mode.value == "service_account_shared_calendar_mode"
     assert settings.google_service_account_json == "/tmp/service-account.json"
     assert settings.google_shared_calendar_id == "calendar-id@example.com"
+
+
+def test_load_settings_keeps_llm_disabled_when_provider_is_absent(base_env: None) -> None:
+    settings = load_settings()
+    assert settings.llm_provider is None
+    assert settings.anthropic_api_key is None
+
+
+def test_load_settings_requires_anthropic_key_when_provider_is_set(
+    base_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    with pytest.raises(ConfigurationError, match="ANTHROPIC_API_KEY"):
+        load_settings()
+
+
+def test_load_settings_sets_default_model_for_anthropic_provider(
+    base_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+
+    settings = load_settings()
+    assert settings.llm_provider == "anthropic"
+    assert settings.llm_model == "claude-haiku-4-5-20251001"
+
+
+@pytest.mark.parametrize("placeholder", ["<anthropic_api_key>", "your_key_here"])
+def test_load_settings_rejects_placeholder_anthropic_api_key(
+    base_env: None, monkeypatch: pytest.MonkeyPatch, placeholder: str
+) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", placeholder)
+
+    with pytest.raises(ConfigurationError, match="placeholder"):
+        load_settings()
