@@ -20,6 +20,7 @@ from smart_life_bot.bot import (
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
     TelegramTransportRouter,
+    format_preview_message,
 )
 from smart_life_bot.calendar.models import CalendarEventCreateRequest, CalendarEventCreateResult
 from smart_life_bot.domain.enums import EventLogStatus, GoogleAuthMode
@@ -50,6 +51,21 @@ class FakeParser:
             confidence=0.95,
             is_ambiguous=False,
             issues=[],
+        )
+
+
+class MissingStartAtParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=None,
+                timezone="UTC",
+                metadata={"source": "rule-based-parser"},
+            ),
+            confidence=0.30,
+            is_ambiguous=True,
+            issues=["missing_start_at"],
         )
 
 
@@ -254,6 +270,46 @@ def test_edit_command_maps_to_edit_use_case() -> None:
     assert state.draft.title == "Updated title"
 
 
+def test_preview_buttons_hide_confirm_when_start_at_missing() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+
+    response = router.handle_text_message(telegram_user_id=90010, text="Missing start_at")
+
+    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert "Нужно указать start_at перед созданием события." in response.text
+
+
+def test_edit_start_at_restores_confirm_button() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+    router.handle_text_message(telegram_user_id=90011, text="Missing start_at")
+
+    response = router.handle_text_message(telegram_user_id=90011, text="/edit start_at 2026-02-14T11:30:00+00:00")
+
+    assert ("✅ Confirm", CALLBACK_CONFIRM) in response.buttons
+    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+
+
+def test_edit_invalid_start_at_keeps_confirm_hidden() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+    router.handle_text_message(telegram_user_id=90012, text="Missing start_at")
+
+    response = router.handle_text_message(telegram_user_id=90012, text="/edit start_at not-a-datetime")
+
+    assert response.text == "Invalid datetime format for 'start_at'"
+    user = deps.users_repo.get_by_telegram_id(90012)
+    assert user is not None
+    state = deps.state_repo.get(user.id)
+    assert state is not None
+    assert state.draft is not None
+    assert state.draft.start_at is None
+
+
 def test_edit_description_clear_flag_clears_optional_field() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90007, text="Draft for description clear")
@@ -297,7 +353,64 @@ def test_preview_formatting_contains_required_fields_and_disclaimer() -> None:
     assert "timezone:" in response.text
     assert "description:" in response.text
     assert "location:" in response.text
+    assert "Парсинг:" in response.text
     assert "НЕ будет создано" in response.text
+
+
+def test_format_preview_message_shows_python_parser_diagnostics() -> None:
+    draft = EventDraft(
+        title="Parsed title",
+        start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+        timezone="UTC",
+        metadata={
+            "parser_mode": "python",
+            "parser_router": "python",
+            "source": "rule-based-parser",
+            "parser_confidence": "0.95",
+        },
+    )
+
+    preview = format_preview_message(draft)
+
+    assert "Парсинг:" in preview
+    assert "- mode: python" in preview
+    assert "- route: Python" in preview
+    assert "- source: Python" in preview
+    assert "- confidence: 0.95" in preview
+
+
+def test_format_preview_message_shows_claude_diagnostics_and_issues() -> None:
+    draft = EventDraft(
+        title="Parsed title",
+        start_at=None,
+        timezone="UTC",
+        metadata={
+            "parser_mode": "auto",
+            "parser_router": "llm_fallback",
+            "source": "claude-parser",
+            "parser_confidence": "0.00",
+            "parser_issues": "missing_start_at,invalid_timezone",
+        },
+    )
+
+    preview = format_preview_message(draft)
+
+    assert "- mode: auto" in preview
+    assert "- route: Claude fallback" in preview
+    assert "- source: Claude" in preview
+    assert "- confidence: 0.00" in preview
+    assert "- issues: missing_start_at,invalid_timezone" in preview
+
+
+def test_format_preview_message_is_safe_when_parser_metadata_missing() -> None:
+    draft = EventDraft(title="Parsed title")
+
+    preview = format_preview_message(draft)
+
+    assert "- mode: —" in preview
+    assert "- route: —" in preview
+    assert "- source: —" in preview
+    assert "- confidence: —" in preview
 
 
 def test_transport_layer_does_not_require_real_google_or_telegram_network() -> None:
