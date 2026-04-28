@@ -10,6 +10,7 @@ from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory
 from smart_life_bot.domain.models import ConversationStateSnapshot, EventDraft
 from smart_life_bot.storage.interfaces import EventLogEntry, UserPreferencesRecord
 
+from .draft_validation import require_valid_draft
 from .dto import (
     CancelEventDraftInput,
     ConfirmEventDraftInput,
@@ -170,6 +171,46 @@ class ConfirmEventDraftUseCase:
             return UseCaseResult(status="failed", message="Pending state has no draft payload")
 
         draft = snapshot.draft
+        try:
+            log_id = _require_valid_event_log_id(draft)
+        except Exception as error:  # noqa: BLE001
+            log_id = _extract_event_log_id(draft)
+            if log_id is not None:
+                self.deps.events_log_repo.update_status(
+                    entry_id=log_id,
+                    status=EventLogStatus.FAILED,
+                    error_category=EventLogErrorCategory.INTERNAL_ERROR,
+                    error_details=str(error),
+                )
+            self.deps.state_repo.set(
+                ConversationStateSnapshot(
+                    user_id=payload.user_id,
+                    state=ConversationState.WAITING_PREVIEW_CONFIRMATION,
+                    draft=draft,
+                )
+            )
+            self.deps.logger.error("Confirm flow failed", user_id=payload.user_id, error=str(error))
+            return UseCaseResult(status="failed", message="Event creation failed")
+
+        try:
+            require_valid_draft(draft, require_start_at=True)
+        except ValueError as error:
+            if log_id is not None:
+                self.deps.events_log_repo.update_status(
+                    entry_id=log_id,
+                    status=EventLogStatus.FAILED,
+                    error_category=EventLogErrorCategory.VALIDATION_ERROR,
+                    error_details=str(error),
+                )
+            self.deps.state_repo.set(
+                ConversationStateSnapshot(
+                    user_id=payload.user_id,
+                    state=ConversationState.WAITING_PREVIEW_CONFIRMATION,
+                    draft=draft,
+                )
+            )
+            return UseCaseResult(status="failed", message=str(error))
+
         self.deps.state_repo.set(
             ConversationStateSnapshot(
                 user_id=payload.user_id,
@@ -178,30 +219,8 @@ class ConfirmEventDraftUseCase:
             )
         )
         try:
-            log_id = _require_valid_event_log_id(draft)
             if log_id is not None:
                 self.deps.events_log_repo.update_status(entry_id=log_id, status=EventLogStatus.CONFIRMED)
-
-            if draft.start_at is None:
-                if log_id is not None:
-                    self.deps.events_log_repo.update_status(
-                        entry_id=log_id,
-                        status=EventLogStatus.FAILED,
-                        error_category=EventLogErrorCategory.VALIDATION_ERROR,
-                        error_details="Missing required start_at in event draft",
-                    )
-                self.deps.state_repo.set(
-                    ConversationStateSnapshot(
-                        user_id=payload.user_id,
-                        state=ConversationState.WAITING_PREVIEW_CONFIRMATION,
-                        draft=draft,
-                    )
-                )
-                return UseCaseResult(
-                    status="failed",
-                    message="Cannot confirm event: start time is required before saving.",
-                )
-
             auth_context = self.deps.auth_provider.resolve_auth_context(user_id=payload.user_id)
             request = CalendarEventCreateRequest(
                 title=draft.title,
@@ -271,6 +290,7 @@ class EditEventDraftFieldUseCase:
                 field_name=payload.field_name,
                 field_value=payload.field_value,
             )
+            require_valid_draft(updated_draft, require_start_at=False)
         except ValueError as error:
             return UseCaseResult(status="failed", message=str(error))
 

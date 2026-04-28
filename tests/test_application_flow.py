@@ -90,6 +90,22 @@ class FailingCalendarService:
         raise RuntimeError("calendar provider unavailable")
 
 
+class ValueErrorAuthProvider(FakeAuthProvider):
+    def resolve_auth_context(self, user_id: int) -> AuthContext:
+        self.calls += 1
+        raise ValueError("provider auth bad value")
+
+
+class ValueErrorCalendarService(FakeCalendarService):
+    def create_event(
+        self,
+        auth_context: AuthContext,
+        request: CalendarEventCreateRequest,
+    ) -> CalendarEventCreateResult:
+        self.requests.append(request)
+        raise ValueError("calendar runtime bad value")
+
+
 class NoHtmlLinkCalendarService:
     def __init__(self) -> None:
         self.requests: list[CalendarEventCreateRequest] = []
@@ -115,6 +131,68 @@ class MissingStartAtParser:
                 start_at=None,
                 timezone="UTC",
                 metadata={"source": "missing-start-parser"},
+            ),
+            confidence=0.99,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
+class InvalidTimezoneParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 1, 10, 9, 0),
+                timezone="Not/AZone",
+                metadata={"source": "invalid-timezone-parser"},
+            ),
+            confidence=0.99,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
+class NoneTimezoneParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 1, 10, 9, 0),
+                timezone=None,
+                metadata={"source": "none-timezone-parser"},
+            ),
+            confidence=0.99,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
+class InvalidRangeParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 1, 10, 9, 0),
+                end_at=datetime(2026, 1, 10, 8, 30),
+                timezone="UTC",
+                metadata={"source": "invalid-range-parser"},
+            ),
+            confidence=0.99,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
+class MixedAwarenessParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 1, 10, 9, 0, tzinfo=UTC),
+                end_at=datetime(2026, 1, 10, 10, 0),
+                timezone="UTC",
+                metadata={"source": "mixed-awareness-parser"},
             ),
             confidence=0.99,
             is_ambiguous=False,
@@ -308,6 +386,64 @@ def test_confirm_validation_failure_when_start_at_missing() -> None:
     assert state.draft is not None
 
 
+def test_confirm_validation_failure_when_timezone_invalid() -> None:
+    deps, user_id = _build_dependencies()
+    deps.parser = InvalidTimezoneParser()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Bad timezone"))
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert "timezone must be a valid IANA timezone" in result.message
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+    logs = deps.events_log_repo.list_for_user(user_id)
+    assert logs[0].status is EventLogStatus.FAILED
+    assert logs[0].error_code == "validation_error"
+
+
+def test_confirm_validation_failure_when_timezone_is_none() -> None:
+    deps, user_id = _build_dependencies()
+    deps.parser = NoneTimezoneParser()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="None timezone"))
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert "timezone must be a valid IANA timezone" in result.message
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_confirm_validation_failure_when_end_at_not_after_start_at() -> None:
+    deps, user_id = _build_dependencies()
+    deps.parser = InvalidRangeParser()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Invalid range"))
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert "end_at must be later than start_at" in result.message
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_confirm_validation_failure_when_datetime_awareness_is_mixed() -> None:
+    deps, user_id = _build_dependencies()
+    deps.parser = MixedAwarenessParser()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Mixed awareness"))
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert "timezone-aware or both timezone-naive" in result.message
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
+
+
 def test_confirm_failure_when_event_log_id_is_malformed() -> None:
     deps, user_id = _build_dependencies()
 
@@ -496,6 +632,107 @@ def test_edit_does_not_call_auth_provider_or_calendar_service() -> None:
     assert result.status == "preview_ready"
     assert deps.auth_provider.calls == 0
     assert len(deps.calendar_service.requests) == 0
+
+
+def test_edit_rejects_invalid_timezone_without_saving() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Edit timezone"))
+    state_before = deps.state_repo.get(user_id)
+    assert state_before is not None
+    assert state_before.draft is not None
+    original_timezone = state_before.draft.timezone
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="timezone", field_value="Not/AZone")
+    )
+
+    assert result.status == "failed"
+    state_after = deps.state_repo.get(user_id)
+    assert state_after is not None
+    assert state_after.draft is not None
+    assert state_after.draft.timezone == original_timezone
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_edit_rejects_invalid_time_range_without_saving() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Edit range"))
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="end_at", field_value="2026-01-10T08:00:00+00:00")
+    )
+
+    assert result.status == "failed"
+    assert "end_at must be later than start_at" in result.message
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.draft is not None
+    assert state.draft.end_at is None
+
+
+def test_edit_rejects_mixed_awareness_without_saving() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Edit mixed awareness"))
+
+    result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="end_at", field_value="2026-01-10T10:00:00")
+    )
+
+    assert result.status == "failed"
+    assert "timezone-aware or both timezone-naive" in result.message
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.draft is not None
+    assert state.draft.end_at is None
+
+
+def test_edit_allows_clearing_end_at() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Edit clear end_at"))
+    set_result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="end_at", field_value="2026-01-10T11:00:00+00:00")
+    )
+    assert set_result.status == "preview_ready"
+
+    clear_result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="end_at", field_value="")
+    )
+    assert clear_result.status == "preview_ready"
+    state = deps.state_repo.get(user_id)
+    assert state is not None
+    assert state.draft is not None
+    assert state.draft.end_at is None
+
+
+def test_confirm_runtime_value_error_is_not_classified_as_validation_error() -> None:
+    deps, user_id = _build_dependencies()
+    deps.auth_provider = ValueErrorAuthProvider()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Runtime error"))
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert result.message == "Event creation failed"
+    assert "provider auth bad value" not in result.message
+    logs = deps.events_log_repo.list_for_user(user_id)
+    assert logs[0].status is EventLogStatus.FAILED
+    assert logs[0].error_code == "internal_error"
+
+
+def test_confirm_calendar_runtime_value_error_is_not_validation_error() -> None:
+    deps, user_id = _build_dependencies()
+    deps.calendar_service = ValueErrorCalendarService()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Calendar runtime error"))
+    result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert result.status == "failed"
+    assert result.message == "Event creation failed"
+    assert "calendar runtime bad value" not in result.message
+    logs = deps.events_log_repo.list_for_user(user_id)
+    assert logs[0].status is EventLogStatus.FAILED
+    assert logs[0].error_code == "internal_error"
 
 
 def test_incoming_message_persists_parser_diagnostics_without_losing_router_metadata() -> None:
