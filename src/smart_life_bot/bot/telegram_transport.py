@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from smart_life_bot.application.draft_validation import detect_draft_validation_issue
 from smart_life_bot.application.dto import (
     CancelEventDraftInput,
     ConfirmEventDraftInput,
@@ -196,6 +197,7 @@ class TelegramTransportRouter:
 
 
 def format_preview_message(draft: EventDraft) -> str:
+    validation_issue = detect_draft_validation_issue(draft, require_start_at=True)
     lines = [
         "Черновик события:",
         f"- title: {draft.title}",
@@ -208,14 +210,14 @@ def format_preview_message(draft: EventDraft) -> str:
     if draft.location:
         lines.append(f"- location: {draft.location}")
     lines.extend(_format_parser_diagnostics(draft.metadata))
-    if draft.start_at is None:
-        lines.append("Нужно указать start_at перед созданием события. Используйте /edit start_at <ISO-8601 datetime>.")
+    if validation_issue is not None:
+        lines.append(validation_issue.preview_hint)
     lines.append("Событие НЕ будет создано, пока вы явно не нажмёте Confirm.")
     return "\n".join(lines)
 
 
 def _build_draft_buttons(draft: EventDraft) -> tuple[tuple[str, str], ...]:
-    if draft.start_at is None:
+    if detect_draft_validation_issue(draft, require_start_at=True) is not None:
         return (
             ("✏️ Edit", CALLBACK_EDIT),
             ("❌ Cancel", CALLBACK_CANCEL),

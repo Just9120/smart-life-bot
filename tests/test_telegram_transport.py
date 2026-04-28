@@ -69,6 +69,89 @@ class MissingStartAtParser:
         )
 
 
+class InvalidTimezoneParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+                end_at=datetime(2026, 3, 12, 11, 0, tzinfo=UTC),
+                timezone="Not/AZone",
+                metadata={"source": "rule-based-parser"},
+            ),
+            confidence=0.95,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
+class MalformedTimezoneParser:
+    def __init__(self, timezone: str) -> None:
+        self.timezone = timezone
+
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+                end_at=datetime(2026, 3, 12, 11, 0, tzinfo=UTC),
+                timezone=self.timezone,
+                metadata={"source": "rule-based-parser"},
+            ),
+            confidence=0.95,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
+class NoneTimezoneParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+                end_at=datetime(2026, 3, 12, 11, 0, tzinfo=UTC),
+                timezone=None,
+                metadata={"source": "rule-based-parser"},
+            ),
+            confidence=0.95,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
+class InvalidRangeParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+                end_at=datetime(2026, 3, 12, 9, 0, tzinfo=UTC),
+                timezone="UTC",
+                metadata={"source": "rule-based-parser"},
+            ),
+            confidence=0.95,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
+class MixedAwarenessParser:
+    def parse(self, text: str, user_id: int) -> ParsingResult:
+        return ParsingResult(
+            draft=EventDraft(
+                title=f"Parsed: {text}",
+                start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+                end_at=datetime(2026, 3, 12, 11, 0),
+                timezone="UTC",
+                metadata={"source": "rule-based-parser"},
+            ),
+            confidence=0.95,
+            is_ambiguous=False,
+            issues=[],
+        )
+
+
 class FakeAuthProvider:
     def resolve_auth_context(self, user_id: int) -> AuthContext:
         return AuthContext(
@@ -282,6 +365,60 @@ def test_preview_buttons_hide_confirm_when_start_at_missing() -> None:
     assert "Нужно указать start_at перед созданием события." in response.text
 
 
+def test_preview_buttons_hide_confirm_when_timezone_invalid() -> None:
+    parser_cases = (
+        (InvalidTimezoneParser(), "Invalid timezone"),
+        (MalformedTimezoneParser("/UTC"), "Malformed timezone /UTC"),
+        (MalformedTimezoneParser("../UTC"), "Malformed timezone ../UTC"),
+    )
+    for parser, text in parser_cases:
+        router, deps = _build_router()
+        deps.parser = parser
+
+        response = router.handle_text_message(telegram_user_id=90013, text=text)
+
+        assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+        assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
+        assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+        assert "Используйте /edit timezone Europe/Amsterdam." in response.text
+
+
+def test_preview_buttons_hide_confirm_when_timezone_is_none() -> None:
+    router, deps = _build_router()
+    deps.parser = NoneTimezoneParser()
+
+    response = router.handle_text_message(telegram_user_id=90014, text="None timezone")
+
+    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert "Используйте /edit timezone Europe/Amsterdam." in response.text
+
+
+def test_preview_buttons_hide_confirm_when_time_range_invalid() -> None:
+    router, deps = _build_router()
+    deps.parser = InvalidRangeParser()
+
+    response = router.handle_text_message(telegram_user_id=90015, text="Invalid range")
+
+    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert "end_at должен быть позже start_at." in response.text
+
+
+def test_preview_buttons_hide_confirm_when_datetime_awareness_mixed() -> None:
+    router, deps = _build_router()
+    deps.parser = MixedAwarenessParser()
+
+    response = router.handle_text_message(telegram_user_id=90016, text="Mixed awareness")
+
+    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert "в одном формате timezone-awareness" in response.text
+
+
 def test_edit_start_at_restores_confirm_button() -> None:
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()
@@ -411,6 +548,44 @@ def test_format_preview_message_is_safe_when_parser_metadata_missing() -> None:
     assert "- route: —" in preview
     assert "- source: —" in preview
     assert "- confidence: —" in preview
+
+
+def test_format_preview_message_is_safe_for_invalid_timezone() -> None:
+    draft = EventDraft(
+        title="Parsed title",
+        start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+        timezone="Not/AZone",
+    )
+
+    preview = format_preview_message(draft)
+
+    assert "Используйте /edit timezone Europe/Amsterdam." in preview
+
+
+def test_format_preview_message_is_safe_for_malformed_timezone_key() -> None:
+    for timezone_value in ("/UTC", "../UTC"):
+        draft = EventDraft(
+            title="Parsed title",
+            start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+            timezone=timezone_value,
+        )
+
+        preview = format_preview_message(draft)
+
+        assert "Используйте /edit timezone Europe/Amsterdam." in preview
+
+
+def test_format_preview_message_is_safe_for_mixed_awareness_range() -> None:
+    draft = EventDraft(
+        title="Parsed title",
+        start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+        end_at=datetime(2026, 3, 12, 11, 0),
+        timezone="UTC",
+    )
+
+    preview = format_preview_message(draft)
+
+    assert "в одном формате timezone-awareness" in preview
 
 
 def test_transport_layer_does_not_require_real_google_or_telegram_network() -> None:
