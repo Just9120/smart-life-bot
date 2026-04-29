@@ -165,6 +165,24 @@ def test_parses_duration_in_hours() -> None:
     assert result.draft.end_at == datetime(2026, 4, 27, 12, 0, tzinfo=UTC)
 
 
+
+
+def test_free_text_reminder_phrase_is_not_parsed_or_consumed() -> None:
+    result = _parser().parse("Тест завтра в 15:00 уведомить за 10 минут", user_id=42)
+
+    assert result.draft.start_at == datetime(2026, 4, 26, 15, 0, tzinfo=UTC)
+    assert result.draft.reminder_minutes is None
+    assert result.draft.title == "Тест уведомить за 10 минут"
+
+
+def test_free_text_reminder_phrase_does_not_set_reminder_without_time() -> None:
+    result = _parser().parse("уведомить за 10 минут", user_id=42)
+
+    assert result.draft.start_at is None
+    assert result.draft.reminder_minutes is None
+    assert result.draft.title == "уведомить за 10 минут"
+
+
 def test_title_falls_back_to_normalized_input_when_fully_consumed() -> None:
     result = _parser().parse("завтра в 15:00 длительность 30 минут", user_id=42)
 

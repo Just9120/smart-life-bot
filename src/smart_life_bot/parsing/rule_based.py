@@ -91,11 +91,8 @@ class RuleBasedMessageParser:
                     )
 
         duration_minutes, duration_span = _extract_keyword_minutes(normalized, keyword="длительность")
-        reminder_minutes, reminder_span = _extract_keyword_minutes(normalized, keyword="уведомить за")
         if duration_span is not None:
             consumed_spans.append(duration_span)
-        if reminder_span is not None:
-            consumed_spans.append(reminder_span)
 
         title = _extract_title(normalized, consumed_spans)
         if not title:
@@ -116,7 +113,6 @@ class RuleBasedMessageParser:
                     start_at=None,
                     end_at=None,
                     timezone=timezone,
-                    reminder_minutes=(reminder_minutes,) if reminder_minutes is not None else None,
                     metadata=metadata,
                 ),
                 confidence=0.3,
@@ -130,7 +126,6 @@ class RuleBasedMessageParser:
                 start_at=start_at,
                 end_at=end_at,
                 timezone=timezone,
-                reminder_minutes=(reminder_minutes,) if reminder_minutes is not None else None,
                 metadata=metadata,
             ),
             confidence=0.95,
