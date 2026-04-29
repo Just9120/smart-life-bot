@@ -111,3 +111,15 @@ Preflight проверяет конфигурацию, таймзону, SQLite 
 Для smoke-проверки на VPS используйте `.env.example` как безопасный шаблон и следуйте шагам из `docs/VPS_SMOKE_RUNBOOK.md`.
 
 `service_account` JSON и `.env` нельзя коммитить в репозиторий.
+
+## 10. Docker Compose path convention (VPS smoke)
+
+Для `compose.yaml` принят явный baseline:
+- рабочая директория контейнера: `/app`;
+- SQLite volume: `./data:/app/data`;
+- recommended `DATABASE_URL=sqlite:///./data/smart_life_bot.db`;
+- service account mount: `./secrets/service-account.json:/opt/smart-life-bot/secrets/service-account.json:ro`;
+- recommended `GOOGLE_SERVICE_ACCOUNT_JSON=/opt/smart-life-bot/secrets/service-account.json`.
+
+Эта схема сохраняет одинаковый путь service account JSON на хосте и внутри контейнера и упрощает smoke-эксплуатацию.
+
