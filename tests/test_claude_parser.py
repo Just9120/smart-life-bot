@@ -196,3 +196,35 @@ def test_claude_parser_returns_ambiguous_when_end_at_equals_start_at() -> None:
 
     assert result.is_ambiguous is True
     assert "invalid_time_range" in result.issues
+
+
+def test_claude_prompt_forbids_free_text_duration_and_reminder_overrides() -> None:
+    payload = {
+        "title": "Тест",
+        "start_at": "2026-05-01T10:00:00+00:00",
+        "end_at": None,
+        "timezone": "UTC",
+        "description": None,
+        "location": None,
+        "is_ambiguous": False,
+        "confidence": 0.9,
+        "issues": [],
+    }
+    client = _FakeAnthropicClient(json.dumps(payload))
+    parser = ClaudeMessageParser(
+        model="claude-haiku-4-5-20251001",
+        api_key="test",
+        default_timezone="UTC",
+        timeout_seconds=20,
+        max_retries=2,
+        max_tokens=1000,
+        client=client,
+    )
+
+    parser.parse("Тест завтра в 15:00 длительность 20 минут", user_id=1)
+
+    prompt = str(client.messages.calls[0]["messages"][0]["content"])
+    assert "always keep end_at=null even if the text mentions duration" in prompt
+    assert "duration and reminder overrides are controlled by explicit Telegram UI/edit flows" in prompt
+    assert "if duration is absent but start exists use 60 minutes" not in prompt
+    assert "unless duration is explicit and unambiguous in the input" not in prompt

@@ -124,6 +124,13 @@ def _apply_draft_field_edit(draft: EventDraft, field_name: str, field_value: str
             raise ValueError("Cannot set duration when start_at is missing")
         minutes = int(normalized)
         return _clone_draft_with_update(draft, end_at=draft.start_at + timedelta(minutes=minutes))
+    if field_name == "reminder_minutes":
+        normalized = field_value.strip()
+        if not normalized:
+            return _clone_draft_with_update(draft, reminder_minutes=None)
+        if not normalized.isdigit() or int(normalized) <= 0:
+            raise ValueError("Reminder minutes must be a positive integer number of minutes")
+        return _clone_draft_with_update(draft, reminder_minutes=(int(normalized),))
 
     raise ValueError(f"Unsupported editable field '{field_name}'")
 

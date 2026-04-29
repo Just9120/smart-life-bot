@@ -151,8 +151,8 @@
 - **Decision:** Use Anthropic Claude as the first LLM parser provider behind `MessageParser`.
 - **Rationale:** Claude provides strong natural-language parsing ability for Russian/English calendar inputs while preserving existing preview/confirm safety. Model choice remains env-configurable so Haiku can be used for cost-efficient parsing and Sonnet can be used later for higher-quality parsing.
 
-## D-025: Explicit duration semantics + deterministic default reminders (no free-text custom reminders)
+## D-025: Explicit duration/reminder UX via Telegram inline controls + deterministic default reminders
 
 - **Status:** Accepted
-- **Decision:** Parse duration from free text only with keyword `длительность` (or via Telegram preview duration button), keep `end_at` optional when duration is omitted, and keep deterministic Google Calendar reminder defaults as popup overrides (`60` and `30`, no email reminders). Free-text phrases like `уведомить за 10 минут` in ordinary messages are not parsed into custom reminder overrides in MVP.
-- **Rationale:** Prevents accidental silent reminder mutations from arbitrary wording, keeps reminder behavior deterministic and visible, and defers custom reminder selection until an explicit UI flow is introduced.
+- **Decision:** Do not parse duration or reminder overrides from ordinary free text. Duration can be changed only through explicit UI actions (preview button `⏱ Длительность` and existing explicit edit/admin flows). Reminder overrides can be changed only through explicit preview inline reminder options (`🔔 Уведомления`). If user does not select reminder options, keep deterministic Google Calendar popup overrides (`60` and `30`, no email reminders). If duration is not explicitly selected, keep draft-level `end_at` unset; provider-layer technical fallback for required `end_at` may still apply.
+- **Rationale:** Prevents accidental event mutations from incidental wording, keeps draft changes explicit and auditable in preview flow, preserves deterministic reminder behavior by default, and keeps calendar writes strictly confirm-gated.

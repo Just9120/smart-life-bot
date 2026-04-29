@@ -27,6 +27,12 @@ CALLBACK_CONFIRM = "draft:confirm"
 CALLBACK_CANCEL = "draft:cancel"
 CALLBACK_EDIT = "draft:edit"
 CALLBACK_DURATION = "draft:duration"
+CALLBACK_REMINDERS = "draft:reminders"
+CALLBACK_REMINDERS_DEFAULT = "draft:reminders:default"
+CALLBACK_REMINDERS_10 = "draft:reminders:10"
+CALLBACK_REMINDERS_30 = "draft:reminders:30"
+CALLBACK_REMINDERS_60 = "draft:reminders:60"
+CALLBACK_REMINDERS_120 = "draft:reminders:120"
 CALLBACK_SETTINGS_PARSER_PYTHON = "settings:parser:python"
 CALLBACK_SETTINGS_PARSER_AUTO = "settings:parser:auto"
 CALLBACK_SETTINGS_PARSER_LLM = "settings:parser:llm"
@@ -126,6 +132,38 @@ class TelegramTransportRouter:
                 return TelegramTransportResponse(text="Нет черновика для редактирования длительности.")
             self.state_repo.set(snapshot.__class__(user_id=snapshot.user_id, state=snapshot.state, draft=snapshot.draft, editing_field="duration_minutes"))
             return TelegramTransportResponse(text="Введите длительность в минутах, например: 20")
+        if callback_data == CALLBACK_REMINDERS:
+            snapshot = self.state_repo.get(user.id)
+            if snapshot is None or snapshot.draft is None:
+                return TelegramTransportResponse(text="Нет черновика для редактирования уведомлений.")
+            return TelegramTransportResponse(
+                text="Выберите уведомления для события:",
+                buttons=(
+                    ("По умолчанию: 1 час + 30 минут", CALLBACK_REMINDERS_DEFAULT),
+                    ("10 минут", CALLBACK_REMINDERS_10),
+                    ("30 минут", CALLBACK_REMINDERS_30),
+                    ("1 час", CALLBACK_REMINDERS_60),
+                    ("2 часа", CALLBACK_REMINDERS_120),
+                ),
+            )
+        reminder_callback_mapping = {
+            CALLBACK_REMINDERS_DEFAULT: None,
+            CALLBACK_REMINDERS_10: "10",
+            CALLBACK_REMINDERS_30: "30",
+            CALLBACK_REMINDERS_60: "60",
+            CALLBACK_REMINDERS_120: "120",
+        }
+        if callback_data in reminder_callback_mapping:
+            snapshot = self.state_repo.get(user.id)
+            if snapshot is None or snapshot.draft is None:
+                return TelegramTransportResponse(text="Черновик устарел. Отправьте событие заново.")
+            reminder_value = reminder_callback_mapping[callback_data]
+            result = self.edit_draft_field.execute(
+                EditEventDraftFieldInput(user_id=user.id, field_name="reminder_minutes", field_value="" if reminder_value is None else reminder_value)
+            )
+            if result.status != "preview_ready":
+                return TelegramTransportResponse(text="Не удалось обновить уведомления. Попробуйте снова.")
+            return TelegramTransportResponse(text=self._get_pending_draft_text(user.id), buttons=self._build_draft_buttons_from_state(user.id))
         if callback_data == CALLBACK_SETTINGS_PARSER_PYTHON:
             result, _ = self.set_parser_mode.execute(user_id=user.id, parser_mode=ParserMode.PYTHON)
             settings_response = self._build_settings_response(user.id)
@@ -233,6 +271,8 @@ def format_preview_message(draft: EventDraft) -> str:
     if draft.reminder_minutes:
         rendered = ", ".join(f"popup {minutes} min" for minutes in draft.reminder_minutes)
         lines.append(f"- reminders: {rendered}")
+    else:
+        lines.append("- reminders: default popup 60 min, popup 30 min")
     lines.extend(_format_parser_diagnostics(draft.metadata))
     if validation_issue is not None:
         lines.append(validation_issue.preview_hint)
@@ -249,6 +289,7 @@ def _build_draft_buttons(draft: EventDraft) -> tuple[tuple[str, str], ...]:
     return (
         ("✅ Confirm", CALLBACK_CONFIRM),
         ("⏱ Длительность", CALLBACK_DURATION),
+        ("🔔 Уведомления", CALLBACK_REMINDERS),
         ("✏️ Edit", CALLBACK_EDIT),
         ("❌ Cancel", CALLBACK_CANCEL),
     )

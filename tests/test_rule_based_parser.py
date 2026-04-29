@@ -149,20 +149,20 @@ def test_no_default_duration_without_keyword() -> None:
     assert result.draft.end_at is None
 
 
-def test_parses_duration_in_minutes() -> None:
+def test_duration_free_text_is_not_parsed_or_consumed_as_control_instruction() -> None:
     result = _parser().parse("завтра в 15:00 созвон длительность 30 минут", user_id=42)
 
-    assert result.draft.title == "созвон"
+    assert result.draft.title == "созвон длительность 30 минут"
     assert result.draft.start_at == datetime(2026, 4, 26, 15, 0, tzinfo=UTC)
-    assert result.draft.end_at == datetime(2026, 4, 26, 15, 30, tzinfo=UTC)
+    assert result.draft.end_at is None
 
 
-def test_parses_duration_in_hours() -> None:
+def test_duration_free_text_in_hours_is_not_parsed() -> None:
     result = _parser().parse("послезавтра в 10:00 встреча длительность 2 часа", user_id=42)
 
-    assert result.draft.title == "встреча"
+    assert result.draft.title == "встреча длительность 2 часа"
     assert result.draft.start_at == datetime(2026, 4, 27, 10, 0, tzinfo=UTC)
-    assert result.draft.end_at == datetime(2026, 4, 27, 12, 0, tzinfo=UTC)
+    assert result.draft.end_at is None
 
 
 
@@ -186,7 +186,7 @@ def test_free_text_reminder_phrase_does_not_set_reminder_without_time() -> None:
 def test_title_falls_back_to_normalized_input_when_fully_consumed() -> None:
     result = _parser().parse("завтра в 15:00 длительность 30 минут", user_id=42)
 
-    assert result.draft.title == "завтра в 15:00 длительность 30 минут"
+    assert result.draft.title == "длительность 30 минут"
 
 
 @pytest.mark.parametrize(
