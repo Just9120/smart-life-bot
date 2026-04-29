@@ -104,6 +104,9 @@ class TelegramTransportRouter:
         )
 
         if callback_data == CALLBACK_CONFIRM:
+            snapshot = self.state_repo.get(user.id)
+            if snapshot is not None and snapshot.editing_field == "duration_minutes":
+                return TelegramTransportResponse(text="Введите длительность в минутах, например: 20")
             result = self.confirm_draft.execute(ConfirmEventDraftInput(user_id=user.id))
             if result.status == "success" and result.provider_event_html_link:
                 return TelegramTransportResponse(text=f"{result.message}\nGoogle Calendar: {result.provider_event_html_link}")
@@ -227,6 +230,9 @@ def format_preview_message(draft: EventDraft) -> str:
         lines.append(f"- description: {draft.description}")
     if draft.location:
         lines.append(f"- location: {draft.location}")
+    if draft.reminder_minutes:
+        rendered = ", ".join(f"popup {minutes} min" for minutes in draft.reminder_minutes)
+        lines.append(f"- reminders: {rendered}")
     lines.extend(_format_parser_diagnostics(draft.metadata))
     if validation_issue is not None:
         lines.append(validation_issue.preview_hint)

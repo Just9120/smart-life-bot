@@ -112,10 +112,11 @@ def test_create_event_fails_for_wrong_auth_mode() -> None:
 
 
 def test_create_event_allows_missing_end_and_uses_technical_one_minute_end() -> None:
+    fake_service = _FakeService({"id": "google-id-3"})
     service = GoogleCalendarService(
         calendar_id="shared-calendar@example.com",
         service_account_json='{"type":"service_account"}',
-        service_builder=lambda *args, **kwargs: _FakeService({"id":"google-id-3"}),
+        service_builder=lambda *args, **kwargs: fake_service,
         credentials_loader=lambda _: object(),
     )
     request = CalendarEventCreateRequest(
@@ -126,6 +127,14 @@ def test_create_event_allows_missing_end_and_uses_technical_one_minute_end() -> 
     )
 
     service.create_event(auth_context=_service_account_context(), request=request)
+    insert_call = fake_service.events_resource.calls[0]
+    assert insert_call["body"]["end"]["dateTime"] == "2026-04-28T10:01:00+00:00"
+    assert insert_call["body"]["reminders"]["useDefault"] is False
+    assert insert_call["body"]["reminders"]["overrides"] == [
+        {"method": "popup", "minutes": 60},
+        {"method": "popup", "minutes": 30},
+    ]
+    assert all(item["method"] != "email" for item in insert_call["body"]["reminders"]["overrides"])
 
 
 def test_create_event_fails_for_invalid_service_account_json() -> None:
