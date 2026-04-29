@@ -6,20 +6,44 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: smart-life-bot-vps-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
+      - name: Precheck required deploy secrets
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          missing=0
+          for secret_name in VPS_HOST VPS_USER VPS_PORT VPS_SSH_PRIVATE_KEY; do
+            if [ -z "${!secret_name:-}" ]; then
+              echo "::error::Missing required GitHub Secret: ${secret_name}"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
       - name: Deploy main to VPS Docker runtime
         uses: appleboy/ssh-action@v1.2.2
-        env:
-          VPS_PORT: ${{ secrets.VPS_PORT }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-          port: ${{ env.VPS_PORT != '' && env.VPS_PORT || '22' }}
+          port: ${{ secrets.VPS_PORT }}
           script_stop: true
           script: |
             set -euo pipefail
