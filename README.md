@@ -81,6 +81,27 @@ LLM parser foundation реализован через Anthropic Claude (optional
 - default / cost-efficient: `claude-haiku-4-5-20251001`;
 - higher-quality option: `claude-sonnet-4-6`.
 
+
+## Docker runtime (VPS smoke foundation)
+
+Минимальный Docker runtime для VPS smoke (выполняйте команды из директории этого репозитория, например `/opt/smart-life-bot`, чтобы не затронуть другие Docker-проекты на VPS):
+
+```bash
+docker compose build smart-life-bot
+docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
+docker compose up -d smart-life-bot
+docker compose logs -f smart-life-bot
+```
+
+Остановка runtime:
+
+```bash
+docker compose stop smart-life-bot
+# или docker compose down (только из директории Smart Life Ops Bot compose-проекта)
+```
+
+Подробный runbook: `docs/VPS_SMOKE_RUNBOOK.md`.
+
 ## Backlog / Future scope
 
 Telegram voice input добавлен только в backlog и не входит в текущую реализацию.

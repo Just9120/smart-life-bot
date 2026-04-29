@@ -32,6 +32,14 @@
 
 Fallback-режим операционно допустим для быстрого персонального запуска, но не является целевой архитектурой продукта.
 
-## 7. Ограничения текущего этапа
+## 7. Runtime foundation status
+
+Репозиторий содержит минимальный Docker runtime foundation для VPS smoke:
+- `Dockerfile` для runtime-образа бота;
+- `compose.yaml` для запуска preflight/polling в контейнере с persistent SQLite и read-only mount service account JSON.
+
+В scope этого foundation не входят webhook/CD/systemd/reverse proxy/TLS/production monitoring.
+
+## 8. Ограничения текущего этапа
 
 Этот документ — только foundation. Финальный production playbook (rollout, rollback, monitoring, backups, incident steps) намеренно отложен на более поздний этап.

@@ -1,0 +1,12 @@
+services:
+  smart-life-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    command: ["python", "-m", "smart_life_bot.bot.telegram_polling"]
+    volumes:
+      - ./data:/app/data
+      - ./secrets/service-account.json:/opt/smart-life-bot/secrets/service-account.json:ro
+    restart: unless-stopped
