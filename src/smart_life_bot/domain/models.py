@@ -16,6 +16,7 @@ class EventDraft:
     timezone: str | None = None
     description: str | None = None
     location: str | None = None
+    reminder_minutes: tuple[int, ...] | None = None
     metadata: dict[str, str] = field(default_factory=dict)
 
 

@@ -150,3 +150,9 @@
 - **Status:** Accepted
 - **Decision:** Use Anthropic Claude as the first LLM parser provider behind `MessageParser`.
 - **Rationale:** Claude provides strong natural-language parsing ability for Russian/English calendar inputs while preserving existing preview/confirm safety. Model choice remains env-configurable so Haiku can be used for cost-efficient parsing and Sonnet can be used later for higher-quality parsing.
+
+## D-025: Explicit duration/reminder semantics with deterministic calendar reminder overrides
+
+- **Status:** Accepted
+- **Decision:** Parse duration from free text only with keyword `длительность` (or via Telegram preview duration button), keep `end_at` optional when duration is omitted, and map Google Calendar reminders with explicit popup overrides (`60` and `30` by default, no email reminders).
+- **Rationale:** Avoids silent user-visible 60-minute defaults, reduces accidental duration parsing, and ensures deterministic reminder behavior without unexpected email notifications.

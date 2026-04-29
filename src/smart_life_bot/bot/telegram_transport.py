@@ -26,6 +26,7 @@ from smart_life_bot.storage.interfaces import ConversationStateRepository, Users
 CALLBACK_CONFIRM = "draft:confirm"
 CALLBACK_CANCEL = "draft:cancel"
 CALLBACK_EDIT = "draft:edit"
+CALLBACK_DURATION = "draft:duration"
 CALLBACK_SETTINGS_PARSER_PYTHON = "settings:parser:python"
 CALLBACK_SETTINGS_PARSER_AUTO = "settings:parser:auto"
 CALLBACK_SETTINGS_PARSER_LLM = "settings:parser:llm"
@@ -72,6 +73,17 @@ class TelegramTransportRouter:
             return self._handle_edit_command(user_id=user.id, command=text)
         if text.strip() == "/settings":
             return self._build_settings_response(user.id)
+        snapshot = self.state_repo.get(user.id)
+        if snapshot is not None and snapshot.editing_field == "duration_minutes":
+            result = self.edit_draft_field.execute(
+                EditEventDraftFieldInput(user_id=user.id, field_name="duration_minutes", field_value=text.strip())
+            )
+            if result.status != "preview_ready":
+                return TelegramTransportResponse(text="Введите положительное целое число минут, например: 20")
+            updated = self.state_repo.get(user.id)
+            if updated is not None:
+                self.state_repo.set(updated.__class__(user_id=updated.user_id, state=updated.state, draft=updated.draft, editing_field=None))
+            return TelegramTransportResponse(text=self._get_pending_draft_text(user.id), buttons=self._build_draft_buttons_from_state(user.id))
 
         normalized = text.strip()
 
@@ -105,6 +117,12 @@ class TelegramTransportRouter:
             return TelegramTransportResponse(
                 text="Для редактирования используйте: /edit <field> <value>. Например: /edit title Sync update"
             )
+        if callback_data == CALLBACK_DURATION:
+            snapshot = self.state_repo.get(user.id)
+            if snapshot is None or snapshot.draft is None:
+                return TelegramTransportResponse(text="Нет черновика для редактирования длительности.")
+            self.state_repo.set(snapshot.__class__(user_id=snapshot.user_id, state=snapshot.state, draft=snapshot.draft, editing_field="duration_minutes"))
+            return TelegramTransportResponse(text="Введите длительность в минутах, например: 20")
         if callback_data == CALLBACK_SETTINGS_PARSER_PYTHON:
             result, _ = self.set_parser_mode.execute(user_id=user.id, parser_mode=ParserMode.PYTHON)
             settings_response = self._build_settings_response(user.id)
@@ -224,6 +242,7 @@ def _build_draft_buttons(draft: EventDraft) -> tuple[tuple[str, str], ...]:
         )
     return (
         ("✅ Confirm", CALLBACK_CONFIRM),
+        ("⏱ Длительность", CALLBACK_DURATION),
         ("✏️ Edit", CALLBACK_EDIT),
         ("❌ Cancel", CALLBACK_CANCEL),
     )

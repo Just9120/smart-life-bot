@@ -81,6 +81,7 @@ def test_create_event_maps_request_to_google_event_body_and_calendar_id() -> Non
         "location": "Room 101",
         "start": {"dateTime": "2026-04-28T10:00:00+00:00", "timeZone": "UTC"},
         "end": {"dateTime": "2026-04-28T11:00:00+00:00", "timeZone": "UTC"},
+        "reminders": {"useDefault": False, "overrides": [{"method": "popup", "minutes": 60}, {"method": "popup", "minutes": 30}]},
     }
     assert result.event_id == "google-id-1"
     assert result.provider_event_id == "google-id-1"
@@ -91,7 +92,7 @@ def test_create_event_fails_for_wrong_auth_mode() -> None:
     service = GoogleCalendarService(
         calendar_id="shared-calendar@example.com",
         service_account_json='{"type":"service_account"}',
-        service_builder=lambda *args, **kwargs: object(),
+        service_builder=lambda *args, **kwargs: _FakeService({"id":"google-id-3"}),
         credentials_loader=lambda _: object(),
     )
     request = CalendarEventCreateRequest(
@@ -110,11 +111,11 @@ def test_create_event_fails_for_wrong_auth_mode() -> None:
         service.create_event(auth_context=auth_context, request=request)
 
 
-def test_create_event_fails_when_end_is_missing() -> None:
+def test_create_event_allows_missing_end_and_uses_technical_one_minute_end() -> None:
     service = GoogleCalendarService(
         calendar_id="shared-calendar@example.com",
         service_account_json='{"type":"service_account"}',
-        service_builder=lambda *args, **kwargs: object(),
+        service_builder=lambda *args, **kwargs: _FakeService({"id":"google-id-3"}),
         credentials_loader=lambda _: object(),
     )
     request = CalendarEventCreateRequest(
@@ -124,8 +125,7 @@ def test_create_event_fails_when_end_is_missing() -> None:
         timezone="UTC",
     )
 
-    with pytest.raises(ValueError, match="end_at_iso"):
-        service.create_event(auth_context=_service_account_context(), request=request)
+    service.create_event(auth_context=_service_account_context(), request=request)
 
 
 def test_create_event_fails_for_invalid_service_account_json() -> None:

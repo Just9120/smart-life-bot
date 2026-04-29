@@ -21,6 +21,7 @@ from .telegram_transport import (
     CALLBACK_CANCEL,
     CALLBACK_CONFIRM,
     CALLBACK_EDIT,
+    CALLBACK_DURATION,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
@@ -32,12 +33,13 @@ _ALLOWED_CALLBACKS = (
     CALLBACK_CONFIRM,
     CALLBACK_EDIT,
     CALLBACK_CANCEL,
+    CALLBACK_DURATION,
     CALLBACK_SETTINGS_PARSER_PYTHON,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
 )
 _CALLBACK_PATTERN = (
-    r"^(draft:confirm|draft:edit|draft:cancel|"
+    r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|"
     r"settings:parser:python|settings:parser:auto|settings:parser:llm)$"
 )
 

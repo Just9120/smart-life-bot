@@ -13,6 +13,7 @@ from smart_life_bot.bot import (
     CALLBACK_CANCEL,
     CALLBACK_CONFIRM,
     CALLBACK_EDIT,
+    CALLBACK_DURATION,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
@@ -80,12 +81,13 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
         assert len(callback_handlers) == 1
         assert (
             callback_handlers[0].pattern.pattern
-            == r"^(draft:confirm|draft:edit|draft:cancel|settings:parser:python|settings:parser:auto|settings:parser:llm)$"
+            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|settings:parser:python|settings:parser:auto|settings:parser:llm)$"
         )
         assert tuple(application.bot_data["allowed_callback_data"]) == (
             CALLBACK_CONFIRM,
             CALLBACK_EDIT,
             CALLBACK_CANCEL,
+            CALLBACK_DURATION,
             CALLBACK_SETTINGS_PARSER_PYTHON,
             CALLBACK_SETTINGS_PARSER_AUTO,
             CALLBACK_SETTINGS_PARSER_LLM,
@@ -176,7 +178,8 @@ def test_callback_handler_preserves_existing_callback_data_values() -> None:
     runtime.on_callback.return_value = TelegramTransportResponse(text="ok")
     adapter = TelegramSDKAdapter(runtime=runtime)
 
-    for callback_data in (CALLBACK_CONFIRM, CALLBACK_EDIT, CALLBACK_CANCEL):
+    for callback_data in (CALLBACK_CONFIRM, CALLBACK_EDIT,
+    CALLBACK_DURATION, CALLBACK_CANCEL):
         message = FakeMessage()
         callback_query = FakeCallbackQuery(callback_data, user_id=999, message=message, calls=[])
         update = SimpleNamespace(callback_query=callback_query)
@@ -186,6 +189,7 @@ def test_callback_handler_preserves_existing_callback_data_values() -> None:
     assert [call.kwargs["callback_data"] for call in runtime.on_callback.call_args_list] == [
         CALLBACK_CONFIRM,
         CALLBACK_EDIT,
+    CALLBACK_DURATION,
         CALLBACK_CANCEL,
     ]
 

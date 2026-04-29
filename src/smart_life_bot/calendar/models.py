@@ -11,6 +11,7 @@ class CalendarEventCreateRequest:
     timezone: str
     description: str | None = None
     location: str | None = None
+    reminder_minutes: tuple[int, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)

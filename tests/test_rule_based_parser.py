@@ -19,7 +19,7 @@ def test_parses_iso_date_time() -> None:
 
     assert result.draft.title == "Созвон"
     assert result.draft.start_at == datetime(2026, 4, 26, 15, 0, tzinfo=UTC)
-    assert result.draft.end_at == datetime(2026, 4, 26, 16, 0, tzinfo=UTC)
+    assert result.draft.end_at is None
     assert result.draft.timezone == "UTC"
 
 
@@ -28,7 +28,7 @@ def test_parses_russian_date_time() -> None:
 
     assert result.draft.title == "Созвон"
     assert result.draft.start_at == datetime(2026, 4, 26, 15, 0, tzinfo=UTC)
-    assert result.draft.end_at == datetime(2026, 4, 26, 16, 0, tzinfo=UTC)
+    assert result.draft.end_at is None
 
 
 @pytest.mark.parametrize(
@@ -53,7 +53,7 @@ def test_parses_compact_and_month_name_formats(text: str, expected_start_at: dat
     result = _parser().parse(text, user_id=42)
 
     assert result.draft.start_at == expected_start_at
-    assert result.draft.end_at == expected_start_at.replace(hour=16, minute=0)
+    assert result.draft.end_at is None
     assert result.is_ambiguous is False
 
 
@@ -142,15 +142,15 @@ def test_two_digit_year_uses_deterministic_century_mapping() -> None:
     assert ninety_nine.draft.start_at == datetime(1999, 4, 27, 15, 0, tzinfo=UTC)
 
 
-def test_uses_default_60_minute_duration() -> None:
+def test_no_default_duration_without_keyword() -> None:
     result = _parser().parse("в 15:00 созвон", user_id=42)
 
     assert result.draft.start_at == datetime(2026, 4, 25, 15, 0, tzinfo=UTC)
-    assert result.draft.end_at == datetime(2026, 4, 25, 16, 0, tzinfo=UTC)
+    assert result.draft.end_at is None
 
 
 def test_parses_duration_in_minutes() -> None:
-    result = _parser().parse("завтра в 15:00 созвон на 30 минут", user_id=42)
+    result = _parser().parse("завтра в 15:00 созвон длительность 30 минут", user_id=42)
 
     assert result.draft.title == "созвон"
     assert result.draft.start_at == datetime(2026, 4, 26, 15, 0, tzinfo=UTC)
@@ -158,7 +158,7 @@ def test_parses_duration_in_minutes() -> None:
 
 
 def test_parses_duration_in_hours() -> None:
-    result = _parser().parse("послезавтра в 10:00 встреча на 2 часа", user_id=42)
+    result = _parser().parse("послезавтра в 10:00 встреча длительность 2 часа", user_id=42)
 
     assert result.draft.title == "встреча"
     assert result.draft.start_at == datetime(2026, 4, 27, 10, 0, tzinfo=UTC)
@@ -166,9 +166,9 @@ def test_parses_duration_in_hours() -> None:
 
 
 def test_title_falls_back_to_normalized_input_when_fully_consumed() -> None:
-    result = _parser().parse("завтра в 15:00 на 30 минут", user_id=42)
+    result = _parser().parse("завтра в 15:00 длительность 30 минут", user_id=42)
 
-    assert result.draft.title == "завтра в 15:00 на 30 минут"
+    assert result.draft.title == "завтра в 15:00 длительность 30 минут"
 
 
 @pytest.mark.parametrize(
