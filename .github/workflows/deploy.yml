@@ -104,7 +104,7 @@ jobs:
             exit 1
           fi
 
-          HOST_COMMIT="$host_commit" docker compose exec -T smart-life-bot python - <<'PY'
+          docker compose exec -T -e HOST_COMMIT="$host_commit" smart-life-bot python - <<'PY'
           from datetime import datetime
           import os
 
@@ -128,17 +128,18 @@ jobs:
           assert parsed.draft.end_at is None
           assert "длительность 20 минут" in parsed.draft.title.lower()
 
-          preview = format_preview_message(
-              EventDraft(
-                  title="Тест",
-                  start_at=datetime(2026, 1, 1, 15, 0),
-                  timezone="Europe/Amsterdam",
-              ),
-              parser_source="python",
-              parser_confidence=0.99,
-              parser_issues=[],
-              parser_mode="python",
+          draft = EventDraft(
+              title="Тест",
+              start_at=datetime(2026, 1, 1, 15, 0),
+              timezone="Europe/Amsterdam",
+              metadata={
+                  "parser_mode": "python",
+                  "parser_router": "python",
+                  "source": "rule-based-parser",
+                  "parser_confidence": "0.99",
+              },
           )
+          preview = format_preview_message(draft)
           assert "default popup 60 min, popup 30 min" in preview
 
           print("post_deploy_runtime_verification=ok")
