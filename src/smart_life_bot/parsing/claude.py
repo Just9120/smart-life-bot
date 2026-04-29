@@ -160,7 +160,7 @@ def _payload_to_parsing_result(
 
     try:
         ZoneInfo(timezone)
-    except ZoneInfoNotFoundError:
+    except (ZoneInfoNotFoundError, ValueError):
         return _ambiguous_validation_result(
             issue="invalid_timezone",
             title=normalized_text,

@@ -113,6 +113,35 @@ def test_claude_parser_returns_ambiguous_on_invalid_timezone() -> None:
     assert "invalid_timezone" in result.issues
 
 
+def test_claude_parser_returns_ambiguous_on_malformed_timezone_key() -> None:
+    payload = {
+        "title": "Sync",
+        "start_at": "2026-05-01T10:00:00+00:00",
+        "end_at": "2026-05-01T11:00:00+00:00",
+        "timezone": "/UTC",
+        "description": None,
+        "location": None,
+        "is_ambiguous": False,
+        "confidence": 0.9,
+        "issues": [],
+    }
+    parser = ClaudeMessageParser(
+        model="claude-haiku-4-5-20251001",
+        api_key="test",
+        default_timezone="UTC",
+        timeout_seconds=20,
+        max_retries=2,
+        max_tokens=1000,
+        client=_FakeAnthropicClient(json.dumps(payload)),
+    )
+
+    result = parser.parse("Team sync", user_id=10)
+
+    assert result.is_ambiguous is True
+    assert "invalid_timezone" in result.issues
+    assert "llm_parse_failed" not in result.issues
+
+
 def test_claude_parser_returns_ambiguous_when_end_at_is_before_start_at() -> None:
     payload = {
         "title": "Sync",
