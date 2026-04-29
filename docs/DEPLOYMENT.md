@@ -20,6 +20,10 @@
 
 - Secrets должны передаваться только через GitHub Secrets и/или переменные окружения сервера.
 - Secrets не должны коммититься в файлы репозитория, примеры или документацию.
+- Runtime `.env` является статическим host-owned файлом на VPS: CD **не** генерирует, **не** загружает, **не** синхронизирует и **не** перезаписывает `/opt/smart-life-bot/.env`.
+- Runtime секреты приложения (`TELEGRAM_BOT_TOKEN`, Anthropic key, Google service-account JSON и calendar runtime values) остаются на VPS и не переносятся в GitHub Actions Secrets.
+- CD может проверять существование `.env`, но не должен печатать содержимое `.env` или resolved значения окружения из Docker Compose.
+- Если приложению нужны новые env-переменные, PR обновляет `.env.example` и документацию; реальный `/opt/smart-life-bot/.env` оператор обновляет вручную.
 
 ## 5. План по сети и hostname
 
@@ -65,12 +69,17 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 3. `git checkout main`
 4. `git pull --ff-only`
 5. Проверка обязательных файлов: `.env`, `compose.yaml`, `Dockerfile`, `secrets/service-account.json`
-6. `docker compose config`
-7. `docker compose build smart-life-bot`
-8. `docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight`
-9. `docker compose up -d smart-life-bot`
-10. `docker compose ps`
-11. `docker compose logs --tail=100 smart-life-bot`
+6. `docker compose build smart-life-bot`
+7. `docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight`
+8. `docker compose up -d smart-life-bot`
+9. `docker compose ps`
+10. `docker compose logs --tail=100 smart-life-bot`
+
+
+Ограничения по логированию deploy workflow:
+- `docker compose config` не используется в GitHub Actions deploy-логах, потому что команда может выводить resolved env-значения (включая runtime secrets).
+- В deploy-логах запрещено печатать содержимое `.env` и любые resolved runtime secrets.
+- Если потребуется валидация новых env-переменных, сначала обновляйте `.env.example` + docs в PR, затем вручную обновляйте реальный `.env` на VPS.
 
 Ограничения безопасности:
 - не выполняются `docker system prune` и другие global cleanup-команды;

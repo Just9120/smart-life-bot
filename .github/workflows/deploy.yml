@@ -69,7 +69,6 @@ jobs:
           test -f Dockerfile
           test -f secrets/service-account.json
 
-          docker compose config
           docker compose build smart-life-bot
           docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
           docker compose up -d smart-life-bot
