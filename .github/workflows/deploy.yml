@@ -18,15 +18,15 @@ jobs:
     steps:
       - name: Precheck required deploy secrets
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
 
           missing=0
-          for secret_name in VPS_HOST VPS_USER VPS_PORT VPS_SSH_PRIVATE_KEY; do
+          for secret_name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
             if [ -z "${!secret_name:-}" ]; then
               echo "::error::Missing required GitHub Secret: ${secret_name}"
               missing=1
@@ -38,31 +38,41 @@ jobs:
           fi
 
       - name: Deploy main to VPS Docker runtime
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script_stop: true
-          script: |
-            set -euo pipefail
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
 
-            cd /opt/smart-life-bot
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
-            git rev-parse --is-inside-work-tree >/dev/null
-            git fetch --all --prune
-            git checkout main
-            git pull --ff-only
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
 
-            test -f .env
-            test -f compose.yaml
-            test -f Dockerfile
-            test -f secrets/service-account.json
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -p 22 "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' <<'REMOTE_SCRIPT'
+          set -euo pipefail
 
-            docker compose config
-            docker compose build smart-life-bot
-            docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
-            docker compose up -d smart-life-bot
-            docker compose ps
-            docker compose logs --tail=100 smart-life-bot
+          cd /opt/smart-life-bot
+
+          git rev-parse --is-inside-work-tree >/dev/null
+          git fetch --all --prune
+          git checkout main
+          git pull --ff-only
+
+          test -f .env
+          test -f compose.yaml
+          test -f Dockerfile
+          test -f secrets/service-account.json
+
+          docker compose config
+          docker compose build smart-life-bot
+          docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
+          docker compose up -d smart-life-bot
+          docker compose ps
+          docker compose logs --tail=100 smart-life-bot
+          REMOTE_SCRIPT
