@@ -90,13 +90,13 @@ jobs:
           echo "built_service_image_id=${built_image_id:-unknown}"
 
           docker compose exec -T smart-life-bot python - <<'PY'
-from smart_life_bot.bot.telegram_transport import CALLBACK_DURATION
-import smart_life_bot.parsing.rule_based as rb
+          from smart_life_bot.bot.telegram_transport import CALLBACK_DURATION
+          import smart_life_bot.parsing.rule_based as rb
 
-assert CALLBACK_DURATION == "draft:duration"
-assert not hasattr(rb, "_DEFAULT_DURATION_MINUTES")
-print("post_deploy_runtime_verification=ok")
-PY
+          assert CALLBACK_DURATION == "draft:duration"
+          assert not hasattr(rb, "_DEFAULT_DURATION_MINUTES")
+          print("post_deploy_runtime_verification=ok")
+          PY
 
           docker compose logs --tail=100 smart-life-bot
           REMOTE_SCRIPT
