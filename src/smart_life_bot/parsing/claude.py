@@ -112,7 +112,9 @@ def _build_user_prompt(*, text: str, default_timezone: str) -> str:
         '"is_ambiguous":true,"confidence":0.0,"issues":["string"]}. '
         "Rules: use default timezone when missing; do not invent date/time; "
         "if start is unclear set start_at=null,end_at=null,is_ambiguous=true and include missing_start_at; "
-        "never invent duration or reminders from ordinary text; leave end_at=null unless duration is explicit and unambiguous in the input. "
+        "never infer duration, end_at, or reminder overrides from ordinary text; "
+        "for normal message parsing always keep end_at=null even if the text mentions duration; "
+        "duration and reminder overrides are controlled by explicit Telegram UI/edit flows outside this parser. "
         f"Default timezone: {default_timezone}. "
         f"Input: {text}"
     )
