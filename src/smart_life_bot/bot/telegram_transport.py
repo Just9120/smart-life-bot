@@ -28,7 +28,6 @@ CALLBACK_CANCEL = "draft:cancel"
 CALLBACK_EDIT = "draft:edit"
 CALLBACK_DURATION = "draft:duration"
 CALLBACK_REMINDERS = "draft:reminders"
-CALLBACK_REMINDERS_DEFAULT = "draft:reminders:default"
 CALLBACK_REMINDERS_10 = "draft:reminders:10"
 CALLBACK_REMINDERS_30 = "draft:reminders:30"
 CALLBACK_REMINDERS_60 = "draft:reminders:60"
@@ -139,7 +138,6 @@ class TelegramTransportRouter:
             return TelegramTransportResponse(
                 text="Выберите уведомления для события:",
                 buttons=(
-                    ("По умолчанию: 1 час + 30 минут", CALLBACK_REMINDERS_DEFAULT),
                     ("10 минут", CALLBACK_REMINDERS_10),
                     ("30 минут", CALLBACK_REMINDERS_30),
                     ("1 час", CALLBACK_REMINDERS_60),
@@ -147,7 +145,6 @@ class TelegramTransportRouter:
                 ),
             )
         reminder_callback_mapping = {
-            CALLBACK_REMINDERS_DEFAULT: None,
             CALLBACK_REMINDERS_10: "10",
             CALLBACK_REMINDERS_30: "30",
             CALLBACK_REMINDERS_60: "60",
