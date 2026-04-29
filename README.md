@@ -84,7 +84,7 @@ LLM parser foundation реализован через Anthropic Claude (optional
 
 ## Docker runtime (VPS smoke foundation)
 
-Минимальный Docker runtime для VPS smoke:
+Минимальный Docker runtime для VPS smoke (выполняйте команды из директории этого репозитория, например `/opt/smart-life-bot`, чтобы не затронуть другие Docker-проекты на VPS):
 
 ```bash
 docker compose build smart-life-bot
@@ -97,7 +97,7 @@ docker compose logs -f smart-life-bot
 
 ```bash
 docker compose stop smart-life-bot
-# или docker compose down
+# или docker compose down (только из директории Smart Life Ops Bot compose-проекта)
 ```
 
 Подробный runbook: `docs/VPS_SMOKE_RUNBOOK.md`.

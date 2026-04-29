@@ -11,6 +11,8 @@
 Границы runbook:
 - только manual smoke на VPS;
 - runtime через Docker Compose;
+- VPS может параллельно запускать другие Docker workload;
+- команды выполняются только из директории этого репозитория (`/opt/smart-life-bot` или ваш выбранный путь);
 - без webhook;
 - без OAuth callback/server flow;
 - без CD/production automation;
@@ -60,28 +62,36 @@ GOOGLE_SHARED_CALENDAR_ID=<shared_calendar_id>
 - first smoke **не требует** LLM переменных;
 - optional LLM переменные можно добавить позже при необходимости.
 
-### 4.2 Service account secret placement
+### 4.2 Host permissions для non-root container user
 
-1. Создайте директорию для secret на хосте:
+Контейнер запускается от UID/GID `10001:10001`. Для bind mounts подготовьте хост-пути под этот UID/GID:
 
 ```bash
-mkdir -p /opt/smart-life-bot/secrets
+mkdir -p /opt/smart-life-bot/data /opt/smart-life-bot/secrets
+chown -R 10001:10001 /opt/smart-life-bot/data
 chmod 700 /opt/smart-life-bot/secrets
 ```
 
-2. Поместите JSON ключ по пути:
+### 4.3 Service account secret placement
+
+1. Поместите JSON ключ на хосте по пути:
 
 `/opt/smart-life-bot/secrets/service-account.json`
 
-3. Ограничьте права:
+2. Выставьте владельца/права для чтения контейнером и без world-read:
 
 ```bash
+chown 10001:10001 /opt/smart-life-bot/secrets/service-account.json
 chmod 600 /opt/smart-life-bot/secrets/service-account.json
 ```
 
-4. Проверьте, что календарь расшарен на service-account email.
+3. Проверьте, что календарь расшарен на service-account email.
 
-Compose монтирует этот файл в контейнер read-only по тому же пути (`:ro`), чтобы путь в `.env` оставался консистентным.
+Compose использует bind mount:
+- host: `./secrets/service-account.json`
+- container: `/opt/smart-life-bot/secrets/service-account.json` (read-only, `:ro`).
+
+Это container-visible path convention для переменной `GOOGLE_SERVICE_ACCOUNT_JSON`; хостовый путь задаётся через bind mount в `compose.yaml`.
 
 ## 5) Build image
 
@@ -122,7 +132,7 @@ docker compose logs -f smart-life-bot
 docker compose stop smart-life-bot
 # или
 
-docker compose down
+docker compose down  # только из /opt/smart-life-bot: затрагивает только compose-проект этого репозитория
 ```
 
 ## 10) Telegram smoke scenarios
@@ -153,7 +163,13 @@ docker compose down
 ### 10.5 Parser settings checks (`/settings`)
 Проверьте parser modes (python/auto/llm) и безопасный fallback без LLM-конфига.
 
-## 11) Troubleshooting
+## 11) Docker isolation notes
+
+- Не выполняйте глобальные Docker cleanup-команды (`docker system prune`, `docker rm` без фильтра и т.п.) в рамках этого smoke-runbook.
+- Используйте только service-scoped команды (`smart-life-bot`) из директории `/opt/smart-life-bot`.
+- `docker compose down` допустим только в директории этого репозитория и влияет только на compose-проект Smart Life Ops Bot.
+
+## 12) Troubleshooting
 
 - Docker не установлен / сервис не запущен.
 - Compose plugin отсутствует (`docker compose version`).
@@ -164,7 +180,7 @@ docker compose down
 - Polling уже запущен в другом контейнере/сессии.
 - `Event creation failed` после Confirm: проверьте sharing calendar, calendar ID и service account key.
 
-## 12) Smoke result checklist
+## 13) Smoke result checklist
 
 - [ ] image build passed
 - [ ] preflight passed
