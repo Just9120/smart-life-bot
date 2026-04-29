@@ -1,0 +1,44 @@
+name: Deploy VPS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy main to VPS Docker runtime
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ env.VPS_PORT != '' && env.VPS_PORT || '22' }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            cd /opt/smart-life-bot
+
+            git rev-parse --is-inside-work-tree >/dev/null
+            git fetch --all --prune
+            git checkout main
+            git pull --ff-only
+
+            test -f .env
+            test -f compose.yaml
+            test -f Dockerfile
+            test -f secrets/service-account.json
+
+            docker compose config
+            docker compose build smart-life-bot
+            docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
+            docker compose up -d smart-life-bot
+            docker compose ps
+            docker compose logs --tail=100 smart-life-bot

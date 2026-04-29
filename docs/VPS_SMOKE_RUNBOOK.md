@@ -15,7 +15,7 @@
 - команды выполняются только из директории этого репозитория (`/opt/smart-life-bot` или ваш выбранный путь);
 - без webhook;
 - без OAuth callback/server flow;
-- без CD/production automation;
+- без полного production automation platform;
 - без systemd unit.
 
 ## 2) Host prerequisites
@@ -192,3 +192,13 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 - [ ] Cancel path creates no event
 - [ ] non-confirmable draft hides Confirm
 - [ ] polling stopped
+
+## 14) Связь с manual GitHub Actions deploy
+
+После успешного ручного smoke на VPS деплой можно запускать и через GitHub Actions workflow `Deploy VPS` (manual `workflow_dispatch`).
+
+Важно:
+- workflow использует только SSH-доступ к VPS и не хранит runtime secrets приложения в GitHub Actions;
+- runtime secrets остаются на VPS (`/opt/smart-life-bot/.env`, `/opt/smart-life-bot/secrets/service-account.json`);
+- команды деплоя остаются service-scoped к `smart-life-bot` и не должны затрагивать другие Docker workload на хосте.
+
