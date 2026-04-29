@@ -81,7 +81,7 @@ jobs:
           echo "previous_running_image_id=${previous_running_image_id}"
 
           docker compose build --no-cache --build-arg APP_GIT_SHA="$host_commit" smart-life-bot
-          built_image_id="$(docker compose images -q smart-life-bot | head -n 1)"
+          built_image_id="$(docker image inspect smart-life-bot:local --format='{{.Id}}' 2>/dev/null || true)"
           echo "built_service_image_id=${built_image_id:-unknown}"
 
           docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
