@@ -69,32 +69,79 @@ jobs:
           test -f Dockerfile
           test -f secrets/service-account.json
 
-          docker compose build smart-life-bot
-          docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
-          docker compose up -d --force-recreate smart-life-bot
+          previous_container_id="$(docker compose ps -q smart-life-bot || true)"
+          previous_running_image_id="unknown"
+          if [ -n "$previous_container_id" ]; then
+            previous_running_image_id="$(docker inspect --format='{{.Image}}' "$previous_container_id")"
+          fi
 
           host_commit="$(git rev-parse --short HEAD)"
           echo "host_git_commit=${host_commit}"
+          echo "previous_container_id=${previous_container_id:-none}"
+          echo "previous_running_image_id=${previous_running_image_id}"
+
+          docker compose build --no-cache --build-arg APP_GIT_SHA="$host_commit" smart-life-bot
+          built_image_id="$(docker compose images -q smart-life-bot | head -n 1)"
+          echo "built_service_image_id=${built_image_id:-unknown}"
+
+          docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
+          docker compose up -d --force-recreate --no-deps smart-life-bot
 
           docker compose ps smart-life-bot
 
-          container_id="$(docker compose ps -q smart-life-bot)"
-          if [ -z "$container_id" ]; then
+          new_container_id="$(docker compose ps -q smart-life-bot)"
+          if [ -z "$new_container_id" ]; then
             echo "ERROR: smart-life-bot container is not running after deploy" >&2
             exit 1
           fi
 
-          running_image_id="$(docker inspect --format='{{.Image}}' "$container_id")"
-          built_image_id="$(docker compose images -q smart-life-bot | head -n 1)"
-          echo "running_container_image_id=${running_image_id}"
-          echo "built_service_image_id=${built_image_id:-unknown}"
+          new_running_image_id="$(docker inspect --format='{{.Image}}' "$new_container_id")"
+          echo "new_container_id=${new_container_id}"
+          echo "new_running_image_id=${new_running_image_id}"
 
-          docker compose exec -T smart-life-bot python - <<'PY'
-          from smart_life_bot.bot.telegram_transport import CALLBACK_DURATION
-          import smart_life_bot.parsing.rule_based as rb
+          if [ -n "$previous_container_id" ] && [ "$previous_container_id" = "$new_container_id" ]; then
+            echo "ERROR: forced recreate kept the same container id; deploy did not replace runtime container" >&2
+            exit 1
+          fi
+
+          docker compose exec -T -e HOST_COMMIT="$host_commit" smart-life-bot python - <<'PY'
+          from datetime import datetime
+          import os
+
+          from smart_life_bot.bot.telegram_transport import (
+              CALLBACK_DURATION,
+              CALLBACK_REMINDERS,
+              format_preview_message,
+          )
+          from smart_life_bot.domain.models import EventDraft
+          from smart_life_bot.parsing.rule_based import RuleBasedMessageParser
+
+          host_commit = os.environ["HOST_COMMIT"]
+          runtime_build_sha = os.environ.get("SMART_LIFE_BOT_BUILD_SHA", "unknown")
+          assert runtime_build_sha == host_commit, (runtime_build_sha, host_commit)
 
           assert CALLBACK_DURATION == "draft:duration"
-          assert not hasattr(rb, "_DEFAULT_DURATION_MINUTES")
+          assert CALLBACK_REMINDERS == "draft:reminders"
+
+          parser = RuleBasedMessageParser(default_timezone="Europe/Amsterdam")
+          parsed = parser.parse("Тест завтра в 15:00 длительность 20 минут", user_id=1)
+          assert parsed.draft.end_at is None
+          assert "длительность 20 минут" in parsed.draft.title.lower()
+
+          draft = EventDraft(
+              title="Тест",
+              start_at=datetime(2026, 1, 1, 15, 0),
+              timezone="Europe/Amsterdam",
+              metadata={
+                  "parser_mode": "python",
+                  "parser_router": "python",
+                  "source": "rule-based-parser",
+                  "parser_confidence": "0.99",
+              },
+          )
+          preview = format_preview_message(draft)
+          assert "default popup 60 min, popup 30 min" in preview
+
           print("post_deploy_runtime_verification=ok")
           PY
 
