@@ -176,3 +176,55 @@ def test_create_event_supports_service_account_json_file_path(tmp_path) -> None:
     result = service.create_event(auth_context=_service_account_context(), request=request)
 
     assert result.provider_event_id == "google-id-2"
+
+
+def test_create_event_uses_custom_single_popup_reminder_30_minutes_only() -> None:
+    fake_service = _FakeService({"id": "google-id-30"})
+    service = GoogleCalendarService(
+        calendar_id="shared-calendar@example.com",
+        service_account_json='{"type":"service_account"}',
+        service_builder=lambda *args, **kwargs: fake_service,
+        credentials_loader=lambda _: object(),
+    )
+    request = CalendarEventCreateRequest(
+        title="Event",
+        start_at_iso="2026-04-28T10:00:00+00:00",
+        end_at_iso="2026-04-28T11:00:00+00:00",
+        timezone="UTC",
+        reminder_minutes=(30,),
+    )
+
+    service.create_event(auth_context=_service_account_context(), request=request)
+
+    insert_call = fake_service.events_resource.calls[0]
+    assert insert_call["body"]["reminders"] == {
+        "useDefault": False,
+        "overrides": [{"method": "popup", "minutes": 30}],
+    }
+    assert all(item["method"] != "email" for item in insert_call["body"]["reminders"]["overrides"])
+
+
+def test_create_event_uses_custom_single_popup_reminder_10_minutes_only() -> None:
+    fake_service = _FakeService({"id": "google-id-10"})
+    service = GoogleCalendarService(
+        calendar_id="shared-calendar@example.com",
+        service_account_json='{"type":"service_account"}',
+        service_builder=lambda *args, **kwargs: fake_service,
+        credentials_loader=lambda _: object(),
+    )
+    request = CalendarEventCreateRequest(
+        title="Event",
+        start_at_iso="2026-04-28T10:00:00+00:00",
+        end_at_iso="2026-04-28T11:00:00+00:00",
+        timezone="UTC",
+        reminder_minutes=(10,),
+    )
+
+    service.create_event(auth_context=_service_account_context(), request=request)
+
+    insert_call = fake_service.events_resource.calls[0]
+    assert insert_call["body"]["reminders"] == {
+        "useDefault": False,
+        "overrides": [{"method": "popup", "minutes": 10}],
+    }
+    assert all(item["method"] != "email" for item in insert_call["body"]["reminders"]["overrides"])

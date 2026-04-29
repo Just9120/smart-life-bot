@@ -20,6 +20,7 @@ from smart_life_bot.bot import (
     CALLBACK_EDIT,
     CALLBACK_REMINDERS,
     CALLBACK_REMINDERS_10,
+    CALLBACK_REMINDERS_30,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
@@ -313,6 +314,22 @@ def test_reminder_preset_updates_draft_without_calendar_write() -> None:
     response = router.handle_callback(telegram_user_id=90511, callback_data=CALLBACK_REMINDERS_10)
     assert "- reminders: popup 10 min" in response.text
     assert len(deps.calendar_service.requests) == 0
+
+
+
+
+def test_reminder_30_preset_updates_preview_and_confirm_uses_custom_reminder() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90512, text="Team sync")
+
+    reminder_response = router.handle_callback(telegram_user_id=90512, callback_data=CALLBACK_REMINDERS_30)
+    assert "- reminders: popup 30 min" in reminder_response.text
+    assert len(deps.calendar_service.requests) == 0
+
+    confirm_response = router.handle_callback(telegram_user_id=90512, callback_data=CALLBACK_CONFIRM)
+    assert "Event created successfully" in confirm_response.text
+    assert len(deps.calendar_service.requests) == 1
+    assert tuple(deps.calendar_service.requests[0].reminder_minutes or []) == (30,)
 
 
 def test_duration_callback_enters_duration_input_mode() -> None:

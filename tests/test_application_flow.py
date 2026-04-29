@@ -813,3 +813,24 @@ def test_incoming_message_persists_parser_diagnostics_without_losing_router_meta
     assert metadata["parser_confidence"] == "0.92"
     assert metadata["parser_is_ambiguous"] == "false"
     assert metadata["parser_issues"] == "missing_start_at,invalid_timezone"
+
+
+def test_confirm_flow_passes_selected_custom_reminder_minutes_to_calendar_request() -> None:
+    deps, user_id = _build_dependencies()
+
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Reminder selection"))
+    edit_result = EditEventDraftFieldUseCase(deps).execute(
+        EditEventDraftFieldInput(user_id=user_id, field_name="reminder_minutes", field_value="30")
+    )
+    assert edit_result.status == "preview_ready"
+
+    pending = deps.state_repo.get(user_id)
+    assert pending is not None
+    assert pending.draft is not None
+    assert tuple(pending.draft.reminder_minutes or []) == (30,)
+
+    confirm_result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert confirm_result.status == "success"
+    assert len(deps.calendar_service.requests) == 1
+    assert tuple(deps.calendar_service.requests[0].reminder_minutes or []) == (30,)

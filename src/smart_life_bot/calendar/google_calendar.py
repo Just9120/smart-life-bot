@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -14,6 +15,8 @@ from smart_life_bot.domain.enums import GoogleAuthMode
 from .models import CalendarEventCreateRequest, CalendarEventCreateResult
 
 CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events"
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _default_service_builder(*args: object, **kwargs: object) -> object:
@@ -69,6 +72,19 @@ class GoogleCalendarService:
             cache_discovery=False,
         )
         event_body = self._build_event_body(request)
+        reminders = event_body.get("reminders", {})
+        overrides = reminders.get("overrides", []) if isinstance(reminders, dict) else []
+        LOGGER.info(
+            "Google Calendar event reminders payload prepared",
+            extra={
+                "reminders_use_default": reminders.get("useDefault") if isinstance(reminders, dict) else None,
+                "reminders_overrides": [
+                    {"method": item.get("method"), "minutes": item.get("minutes")}
+                    for item in overrides
+                    if isinstance(item, dict)
+                ],
+            },
+        )
         response = self._insert_event(service=service, event_body=event_body)
 
         provider_event_id = str(response.get("id", ""))
