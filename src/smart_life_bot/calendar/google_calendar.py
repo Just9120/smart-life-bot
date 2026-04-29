@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
@@ -60,9 +61,6 @@ class GoogleCalendarService:
             raise ValueError(
                 "GoogleCalendarService supports only service_account_shared_calendar_mode auth context"
             )
-        if not request.end_at_iso:
-            raise ValueError("CalendarEventCreateRequest.end_at_iso is required for Google Calendar writes")
-
         credentials = self.credentials_loader(self.service_account_json)
         service = self.service_builder(
             "calendar",
@@ -91,8 +89,15 @@ class GoogleCalendarService:
                 "timeZone": request.timezone,
             },
             "end": {
-                "dateTime": request.end_at_iso,
+                "dateTime": request.end_at_iso or (datetime.fromisoformat(request.start_at_iso) + timedelta(minutes=1)).isoformat(),
                 "timeZone": request.timezone,
+            },
+            "reminders": {
+                "useDefault": False,
+                "overrides": [
+                    {"method": "popup", "minutes": minutes}
+                    for minutes in (request.reminder_minutes or (60, 30))
+                ],
             },
         }
         if request.description:

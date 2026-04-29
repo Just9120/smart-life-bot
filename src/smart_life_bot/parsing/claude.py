@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -174,8 +174,6 @@ def _payload_to_parsing_result(
 
     start_at = _parse_iso_datetime(payload.get("start_at"), timezone=timezone)
     end_at = _parse_iso_datetime(payload.get("end_at"), timezone=timezone)
-    if start_at is not None and end_at is None:
-        end_at = start_at + timedelta(minutes=60)
     if start_at is not None and end_at is not None and end_at <= start_at:
         return _ambiguous_validation_result(
             issue="invalid_time_range",

@@ -57,7 +57,7 @@ def test_claude_parser_converts_valid_json_response() -> None:
 
     assert result.draft.title == "Командный синк"
     assert result.draft.start_at is not None
-    assert result.draft.end_at is not None
+    assert result.draft.end_at is None
     assert result.draft.metadata["source"] == "claude-parser"
     assert result.draft.metadata["llm_provider"] == "anthropic"
     assert result.draft.metadata["llm_model"] == "claude-haiku-4-5-20251001"

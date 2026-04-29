@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from smart_life_bot.calendar.models import CalendarEventCreateRequest
 from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus, ParserMode
@@ -115,6 +115,15 @@ def _apply_draft_field_edit(draft: EventDraft, field_name: str, field_value: str
         if not normalized:
             return _clone_draft_with_update(draft, location=None)
         return _clone_draft_with_update(draft, location=field_value)
+
+    if field_name == "duration_minutes":
+        normalized = field_value.strip()
+        if not normalized.isdigit() or int(normalized) <= 0:
+            raise ValueError("Duration must be a positive integer number of minutes")
+        if draft.start_at is None:
+            raise ValueError("Cannot set duration when start_at is missing")
+        minutes = int(normalized)
+        return _clone_draft_with_update(draft, end_at=draft.start_at + timedelta(minutes=minutes))
 
     raise ValueError(f"Unsupported editable field '{field_name}'")
 
@@ -229,6 +238,7 @@ class ConfirmEventDraftUseCase:
                 timezone=draft.timezone or "UTC",
                 description=draft.description,
                 location=draft.location,
+                reminder_minutes=draft.reminder_minutes,
             )
             calendar_result = self.deps.calendar_service.create_event(
                 auth_context=auth_context,

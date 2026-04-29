@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import pytest
 
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
@@ -15,6 +16,7 @@ from smart_life_bot.auth.models import AuthContext
 from smart_life_bot.bot import (
     CALLBACK_CANCEL,
     CALLBACK_CONFIRM,
+    CALLBACK_DURATION,
     CALLBACK_EDIT,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
@@ -291,6 +293,62 @@ def test_plain_text_handler_maps_to_process_incoming_use_case() -> None:
     logs = deps.events_log_repo.list_for_user(user.id)
     assert len(logs) == 1
     assert logs[0].status is EventLogStatus.PREVIEW_READY
+    assert ("⏱ Длительность", CALLBACK_DURATION) in response.buttons
+
+
+def test_duration_callback_enters_duration_input_mode() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90501, text="Team sync")
+    response = router.handle_callback(telegram_user_id=90501, callback_data=CALLBACK_DURATION)
+    assert response.text == "Введите длительность в минутах, например: 20"
+    user = deps.users_repo.get_by_telegram_id(90501)
+    snapshot = deps.state_repo.get(user.id) if user else None
+    assert snapshot is not None
+    assert snapshot.editing_field == "duration_minutes"
+
+
+def test_duration_input_updates_end_at_and_clears_editing_field() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90502, text="Team sync")
+    router.handle_callback(telegram_user_id=90502, callback_data=CALLBACK_DURATION)
+    response = router.handle_text_message(telegram_user_id=90502, text="20")
+    assert "end_at: 2026-03-12T10:20:00+00:00" in response.text
+    user = deps.users_repo.get_by_telegram_id(90502)
+    snapshot = deps.state_repo.get(user.id) if user else None
+    assert snapshot is not None
+    assert snapshot.editing_field is None
+
+
+@pytest.mark.parametrize("value", ["0", "-5", "1.5", "abc"])
+def test_duration_input_rejects_invalid_values_and_keeps_state(value: str) -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90503, text="Team sync")
+    router.handle_callback(telegram_user_id=90503, callback_data=CALLBACK_DURATION)
+    response = router.handle_text_message(telegram_user_id=90503, text=value)
+    assert "Введите положительное целое число минут" in response.text
+    user = deps.users_repo.get_by_telegram_id(90503)
+    snapshot = deps.state_repo.get(user.id) if user else None
+    assert snapshot is not None
+    assert snapshot.editing_field == "duration_minutes"
+
+
+def test_plain_number_outside_duration_mode_uses_normal_parse_flow() -> None:
+    router, _ = _build_router()
+    response = router.handle_text_message(telegram_user_id=90504, text="20")
+    assert "Черновик события:" in response.text
+
+
+def test_stale_confirm_is_blocked_while_duration_input_active() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90505, text="Team sync")
+    router.handle_callback(telegram_user_id=90505, callback_data=CALLBACK_DURATION)
+    response = router.handle_callback(telegram_user_id=90505, callback_data=CALLBACK_CONFIRM)
+    assert response.text == "Введите длительность в минутах, например: 20"
+    assert len(deps.calendar_service.requests) == 0
+    user = deps.users_repo.get_by_telegram_id(90505)
+    snapshot = deps.state_repo.get(user.id) if user else None
+    assert snapshot is not None
+    assert snapshot.editing_field == "duration_minutes"
 
 
 def test_confirm_callback_maps_to_confirm_use_case() -> None:
@@ -514,6 +572,18 @@ def test_format_preview_message_shows_python_parser_diagnostics() -> None:
     assert "- route: Python" in preview
     assert "- source: Python" in preview
     assert "- confidence: 0.95" in preview
+
+
+def test_format_preview_message_shows_custom_reminder_when_present() -> None:
+    draft = EventDraft(
+        title="Parsed title",
+        start_at=datetime(2026, 3, 12, 10, 0, tzinfo=UTC),
+        timezone="UTC",
+        reminder_minutes=(10,),
+        metadata={},
+    )
+    preview = format_preview_message(draft)
+    assert "- reminders: popup 10 min" in preview
 
 
 def test_format_preview_message_shows_claude_diagnostics_and_issues() -> None:

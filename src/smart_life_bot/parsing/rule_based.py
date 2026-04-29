@@ -12,8 +12,6 @@ from smart_life_bot.domain.models import EventDraft
 
 from .models import ParsingResult
 
-_DEFAULT_DURATION_MINUTES = 60
-
 # Two-digit year mapping rule is intentionally deterministic:
 # 00..69 -> 2000..2069, 70..99 -> 1970..1999.
 _TWO_DIGIT_YEAR_THRESHOLD = 69
@@ -92,26 +90,18 @@ class RuleBasedMessageParser:
                         tzinfo=ZoneInfo(timezone),
                     )
 
-        duration_minutes = _DEFAULT_DURATION_MINUTES
-        duration_match = re.search(
-            r"\bна\s+(?:(\d+)\s*минут(?:у|ы)?|(\d+)\s*час(?:а|ов)?)\b",
-            normalized,
-            flags=re.IGNORECASE,
-        )
-        if duration_match:
-            consumed_spans.append(duration_match.span())
-            minutes = duration_match.group(1)
-            hours = duration_match.group(2)
-            if minutes is not None:
-                duration_minutes = int(minutes)
-            elif hours is not None:
-                duration_minutes = int(hours) * 60
+        duration_minutes, duration_span = _extract_keyword_minutes(normalized, keyword="длительность")
+        reminder_minutes, reminder_span = _extract_keyword_minutes(normalized, keyword="уведомить за")
+        if duration_span is not None:
+            consumed_spans.append(duration_span)
+        if reminder_span is not None:
+            consumed_spans.append(reminder_span)
 
         title = _extract_title(normalized, consumed_spans)
         if not title:
             title = normalized or "Untitled event"
 
-        end_at = start_at + timedelta(minutes=duration_minutes) if start_at is not None else None
+        end_at = start_at + timedelta(minutes=duration_minutes) if (start_at is not None and duration_minutes is not None) else None
 
         metadata = {
             "source": "rule-based-parser",
@@ -126,6 +116,7 @@ class RuleBasedMessageParser:
                     start_at=None,
                     end_at=None,
                     timezone=timezone,
+                    reminder_minutes=(reminder_minutes,) if reminder_minutes is not None else None,
                     metadata=metadata,
                 ),
                 confidence=0.3,
@@ -139,6 +130,7 @@ class RuleBasedMessageParser:
                 start_at=start_at,
                 end_at=end_at,
                 timezone=timezone,
+                reminder_minutes=(reminder_minutes,) if reminder_minutes is not None else None,
                 metadata=metadata,
             ),
             confidence=0.95,
@@ -270,3 +262,19 @@ def _extract_title(text: str, spans: list[tuple[int, int]]) -> str:
 
     title = " ".join("".join(chunks).split())
     return title.strip(" ,.-")
+
+
+def _extract_keyword_minutes(text: str, keyword: str) -> tuple[int | None, tuple[int, int] | None]:
+    pattern = rf"\b{keyword}\s+((?:\d+\s*час(?:а|ов)?\s*)?(?:\d+\s*минут(?:а|ы|у)?)?)"
+    match = re.search(pattern, text, flags=re.IGNORECASE)
+    if not match:
+        return None, None
+    value = match.group(1)
+    hours_match = re.search(r"(\d+)\s*час(?:а|ов)?", value, flags=re.IGNORECASE)
+    minutes_match = re.search(r"(\d+)\s*минут(?:а|ы|у)?", value, flags=re.IGNORECASE)
+    hours = int(hours_match.group(1)) if hours_match else 0
+    minutes = int(minutes_match.group(1)) if minutes_match else 0
+    total = hours * 60 + minutes
+    if total <= 0:
+        return None, None
+    return total, match.span()
