@@ -1,5 +1,6 @@
 services:
   smart-life-bot:
+    image: smart-life-bot:local
     build:
       context: .
       dockerfile: Dockerfile

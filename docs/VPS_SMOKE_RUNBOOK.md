@@ -101,7 +101,7 @@ host_commit="$(git rev-parse --short HEAD)"
 docker compose build --no-cache --build-arg APP_GIT_SHA="$host_commit" smart-life-bot
 ```
 
-Build embeds safe marker `SMART_LIFE_BOT_BUILD_SHA=$host_commit` inside image so runtime verification can prove container code matches current `main` commit.
+Compose service uses explicit local image tag `smart-life-bot:local`. Build embeds safe marker `SMART_LIFE_BOT_BUILD_SHA=$host_commit` inside image so runtime verification can prove container code matches current `main` commit.
 
 ## 6) Preflight (обязательный шаг перед polling)
 
