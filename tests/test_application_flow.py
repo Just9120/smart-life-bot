@@ -468,7 +468,7 @@ def test_confirm_validation_failure_when_datetime_awareness_is_mixed() -> None:
     assert state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
 
 
-def test_confirm_failure_when_event_log_id_is_malformed() -> None:
+def test_confirm_with_malformed_event_log_id_fails_safely_without_calendar_write() -> None:
     deps, user_id = _build_dependencies()
 
     ProcessIncomingMessageUseCase(deps).execute(
@@ -483,6 +483,7 @@ def test_confirm_failure_when_event_log_id_is_malformed() -> None:
     result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
 
     assert result.status == "failed"
+    assert result.message == "Event creation failed"
 
     assert deps.auth_provider.calls == 0
     assert len(deps.calendar_service.requests) == 0
@@ -491,10 +492,43 @@ def test_confirm_failure_when_event_log_id_is_malformed() -> None:
     assert restored_state is not None
     assert restored_state.state is ConversationState.WAITING_PREVIEW_CONFIRMATION
     assert restored_state.draft is not None
+    assert restored_state.draft.metadata["event_log_id"] == "bad-log-id"
 
     logs = deps.events_log_repo.list_for_user(user_id)
     assert len(logs) == 1
     assert logs[0].status is EventLogStatus.PREVIEW_READY
+
+
+def test_stale_confirm_callback_after_cancel_fails_without_calendar_write() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="Cancelable"))
+
+    cancel_result = CancelEventDraftUseCase(deps).execute(CancelEventDraftInput(user_id=user_id))
+    assert cancel_result.status == "cancelled"
+
+    stale_confirm_result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert stale_confirm_result.status == "failed"
+    assert stale_confirm_result.message == "No pending draft for confirmation"
+    assert deps.auth_provider.calls == 0
+    assert len(deps.calendar_service.requests) == 0
+    assert deps.state_repo.get(user_id) is None
+
+
+def test_stale_confirm_callback_after_success_does_not_write_duplicate_event() -> None:
+    deps, user_id = _build_dependencies()
+    ProcessIncomingMessageUseCase(deps).execute(IncomingMessageInput(user_id=user_id, text="One save only"))
+
+    first_confirm_result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+    assert first_confirm_result.status == "success"
+    assert len(deps.calendar_service.requests) == 1
+
+    stale_confirm_result = ConfirmEventDraftUseCase(deps).execute(ConfirmEventDraftInput(user_id=user_id))
+
+    assert stale_confirm_result.status == "failed"
+    assert stale_confirm_result.message == "No pending draft for confirmation"
+    assert len(deps.calendar_service.requests) == 1
+    assert deps.state_repo.get(user_id) is None
 
 
 def test_edit_title_updates_pending_draft() -> None:
