@@ -94,9 +94,12 @@
 - при отсутствии явного duration draft-level `end_at` остаётся unset (`end_at: —` в preview); provider может применить только технический fallback `end` для API-запроса, без продуктовой семантики default duration;
 - при отсутствии start time парсер возвращает ambiguous draft (`start_at=None`, `end_at=None`, issue `missing_start_at`);
 - runtime composition использует rule-based parser вместо fixed fake parser output;
-- parser mode preference участвует в parsing path через `ParserModeRouter` (за `MessageParser`): `python` → Python parser, `auto` → Python fallback, `llm` → defensive Python fallback (`llm not implemented`);
-- routing metadata (`parser_mode`, `parser_router`, optional `llm_fallback_available=false`) добавляется поверх metadata базового Python parser;
-- реальный LLM parser и внешние LLM provider calls остаются pending; целевой first provider — Claude (model env-configurable, likely start from Haiku; Sonnet as future higher-quality option).
+- parser mode preference участвует в parsing path через `ParserModeRouter` (за `MessageParser`):
+  - `python` → детерминированный Python/rule-based parser;
+  - `llm` → Claude parser, когда LLM configured; иначе defensive Python fallback;
+  - `auto` → Python first, затем Claude fallback только при ambiguous/low-confidence/`missing_start_at`, когда LLM configured; иначе безопасный Python fallback;
+- routing metadata (`parser_mode`, `parser_router`) добавляется в metadata результата parser;
+- LLM model selection env-configurable через `LLM_MODEL` (default: `claude-haiku-4-5-20251001`, higher-quality option: `claude-sonnet-4-6`).
 
 **Не входит:**
 - отправка сообщений пользователю;
