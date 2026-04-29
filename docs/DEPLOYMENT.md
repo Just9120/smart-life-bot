@@ -49,8 +49,9 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 - Required GitHub Secrets:
   - `VPS_HOST`
   - `VPS_USER`
+  - `VPS_PORT` (обязательный; обычно `22`)
   - `VPS_SSH_PRIVATE_KEY`
-  - optional `VPS_PORT` (если не задан, используется `22`).
+- В workflow есть precheck обязательных секретов (`VPS_HOST`, `VPS_USER`, `VPS_PORT`, `VPS_SSH_PRIVATE_KEY`) с fail-fast до SSH шага.
 - Runtime secrets не передаются через GitHub Actions для этого этапа: `TELEGRAM_BOT_TOKEN`, calendar/service account credentials и `.env` остаются на VPS в `/opt/smart-life-bot/.env` и `/opt/smart-life-bot/secrets/service-account.json`.
 
 Сценарий деплоя строго scoped к проекту Smart Life Ops Bot:
@@ -73,6 +74,22 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 - не выполняется удаление чужих images/volumes/networks;
 - не используется `docker compose down` как default deploy strategy;
 - обновляется только сервис `smart-life-bot`.
+
+### SSH deploy key setup (short)
+
+1. На VPS сгенерируйте отдельный deploy key (ed25519), например:
+   - `ssh-keygen -t ed25519 -f ~/.ssh/smart-life-bot-deploy -C "smart-life-bot-deploy"`.
+2. Добавьте публичный ключ в `~/.ssh/authorized_keys` пользователя, под которым идет деплой.
+3. Добавьте приватный ключ (`~/.ssh/smart-life-bot-deploy`) в GitHub Secret `VPS_SSH_PRIVATE_KEY`.
+4. Никогда не коммитьте и не вставляйте приватный ключ в документацию, логи, issues или chat.
+
+### First-run checklist (GitHub Actions)
+
+1. Убедитесь, что в GitHub Secrets заданы `VPS_HOST`, `VPS_USER`, `VPS_PORT` (обычно `22`) и `VPS_SSH_PRIVATE_KEY`.
+2. Откройте GitHub → **Actions** → workflow **Deploy VPS**.
+3. Нажмите **Run workflow** и выберите ветку `main`.
+4. Дождитесь успешного выполнения precheck и deploy шагов.
+5. Проверьте финальный вывод `docker compose ps` и `docker compose logs --tail=100 smart-life-bot`.
 
 ## 9. Ограничения текущего этапа
 
