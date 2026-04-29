@@ -90,15 +90,11 @@ class RuleBasedMessageParser:
                         tzinfo=ZoneInfo(timezone),
                     )
 
-        duration_minutes, duration_span = _extract_keyword_minutes(normalized, keyword="длительность")
-        if duration_span is not None:
-            consumed_spans.append(duration_span)
-
         title = _extract_title(normalized, consumed_spans)
         if not title:
             title = normalized or "Untitled event"
 
-        end_at = start_at + timedelta(minutes=duration_minutes) if (start_at is not None and duration_minutes is not None) else None
+        end_at = None
 
         metadata = {
             "source": "rule-based-parser",

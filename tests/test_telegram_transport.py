@@ -18,6 +18,9 @@ from smart_life_bot.bot import (
     CALLBACK_CONFIRM,
     CALLBACK_DURATION,
     CALLBACK_EDIT,
+    CALLBACK_REMINDERS,
+    CALLBACK_REMINDERS_10,
+    CALLBACK_REMINDERS_DEFAULT,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
@@ -294,6 +297,32 @@ def test_plain_text_handler_maps_to_process_incoming_use_case() -> None:
     assert len(logs) == 1
     assert logs[0].status is EventLogStatus.PREVIEW_READY
     assert ("⏱ Длительность", CALLBACK_DURATION) in response.buttons
+    assert ("🔔 Уведомления", CALLBACK_REMINDERS) in response.buttons
+
+
+def test_reminder_callback_shows_presets() -> None:
+    router, _ = _build_router()
+    router.handle_text_message(telegram_user_id=90510, text="Team sync")
+    response = router.handle_callback(telegram_user_id=90510, callback_data=CALLBACK_REMINDERS)
+    assert response.text == "Выберите уведомления для события:"
+    assert ("По умолчанию: 1 час + 30 минут", CALLBACK_REMINDERS_DEFAULT) in response.buttons
+    assert ("10 минут", CALLBACK_REMINDERS_10) in response.buttons
+
+
+def test_reminder_preset_updates_draft_without_calendar_write() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90511, text="Team sync")
+    response = router.handle_callback(telegram_user_id=90511, callback_data=CALLBACK_REMINDERS_10)
+    assert "- reminders: popup 10 min" in response.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_reminder_default_preset_restores_default_preview_label() -> None:
+    router, _ = _build_router()
+    router.handle_text_message(telegram_user_id=90512, text="Team sync")
+    router.handle_callback(telegram_user_id=90512, callback_data=CALLBACK_REMINDERS_10)
+    response = router.handle_callback(telegram_user_id=90512, callback_data=CALLBACK_REMINDERS_DEFAULT)
+    assert "- reminders: default popup 60 min, popup 30 min" in response.text
 
 
 def test_duration_callback_enters_duration_input_mode() -> None:
@@ -349,6 +378,12 @@ def test_stale_confirm_is_blocked_while_duration_input_active() -> None:
     snapshot = deps.state_repo.get(user.id) if user else None
     assert snapshot is not None
     assert snapshot.editing_field == "duration_minutes"
+
+
+def test_stale_reminder_callback_fails_safely() -> None:
+    router, _ = _build_router()
+    response = router.handle_callback(telegram_user_id=90513, callback_data=CALLBACK_REMINDERS_10)
+    assert response.text == "Черновик устарел. Отправьте событие заново."
 
 
 def test_confirm_callback_maps_to_confirm_use_case() -> None:

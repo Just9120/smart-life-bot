@@ -14,6 +14,12 @@ from smart_life_bot.bot import (
     CALLBACK_CONFIRM,
     CALLBACK_EDIT,
     CALLBACK_DURATION,
+    CALLBACK_REMINDERS,
+    CALLBACK_REMINDERS_DEFAULT,
+    CALLBACK_REMINDERS_10,
+    CALLBACK_REMINDERS_30,
+    CALLBACK_REMINDERS_60,
+    CALLBACK_REMINDERS_120,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
@@ -81,13 +87,19 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
         assert len(callback_handlers) == 1
         assert (
             callback_handlers[0].pattern.pattern
-            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|settings:parser:python|settings:parser:auto|settings:parser:llm)$"
+            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:default|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm)$"
         )
         assert tuple(application.bot_data["allowed_callback_data"]) == (
             CALLBACK_CONFIRM,
             CALLBACK_EDIT,
             CALLBACK_CANCEL,
             CALLBACK_DURATION,
+            CALLBACK_REMINDERS,
+            CALLBACK_REMINDERS_DEFAULT,
+            CALLBACK_REMINDERS_10,
+            CALLBACK_REMINDERS_30,
+            CALLBACK_REMINDERS_60,
+            CALLBACK_REMINDERS_120,
             CALLBACK_SETTINGS_PARSER_PYTHON,
             CALLBACK_SETTINGS_PARSER_AUTO,
             CALLBACK_SETTINGS_PARSER_LLM,

@@ -112,7 +112,7 @@ def _build_user_prompt(*, text: str, default_timezone: str) -> str:
         '"is_ambiguous":true,"confidence":0.0,"issues":["string"]}. '
         "Rules: use default timezone when missing; do not invent date/time; "
         "if start is unclear set start_at=null,end_at=null,is_ambiguous=true and include missing_start_at; "
-        "if duration is absent but start exists use 60 minutes. "
+        "never invent duration or reminders from ordinary text; leave end_at=null unless duration is explicit and unambiguous in the input. "
         f"Default timezone: {default_timezone}. "
         f"Input: {text}"
     )
