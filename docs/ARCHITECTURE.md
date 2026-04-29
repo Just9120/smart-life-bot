@@ -57,7 +57,9 @@
 
 ### 4.2 Application / use case layer
 
-Оркестрация сценариев: parse, preview, confirm/edit/cancel, save event.
+Оркестрация сценариев: parse, preview, explicit duration/reminder controls, confirm/edit/cancel, save event.
+
+Confirm-gate обязателен: запись в календарь допускается только после явного `confirm`.
 
 Содержит use-case уровень и координацию между domain/auth/calendar/storage.
 
@@ -75,8 +77,10 @@
 
 Единая абстракция записи события в календарь.
 
-Google Calendar — первая реальная реализация провайдера для `service_account_shared_calendar_mode`.
-OAuth runtime-адаптер остается pending и пока не реализуется.
+Google Calendar — первая реальная реализация провайдера для `service_account_shared_calendar_mode` (текущий рабочий runtime path).
+OAuth runtime-адаптер остается pending и пока не реализуется (`oauth_user_mode`).
+
+Reminder policy в provider payload: `reminders.useDefault=false` и popup-only `overrides` (без email reminders).
 
 ### 4.6 Storage layer
 

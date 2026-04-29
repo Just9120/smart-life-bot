@@ -142,10 +142,14 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 
 ### 10.1 Happy path (минимум)
 1. Отправьте `/start`.
-2. Отправьте простой текст события с явной датой/временем.
-3. Проверьте preview, parser diagnostics и кнопки Confirm/Edit/Cancel.
-4. Нажмите **Confirm**.
-5. Проверьте success-ответ и появление события в Google Calendar.
+2. Отправьте `Тест завтра в 15:00`.
+3. В preview ожидайте `end_at: —`, строку default popup reminders `60/30` и кнопки `⏱ Длительность`, `🔔 Уведомления`, Confirm/Edit/Cancel.
+4. Отправьте `Тест завтра в 15:00 длительность 20 минут` и проверьте, что `end_at` не заполнился из free-text.
+5. Нажмите `⏱ Длительность` и задайте `20` → `end_at` должен стать `start_at + 20 минут`.
+6. Нажмите `🔔 Уведомления` → `30 минут` и проверьте, что preview показывает popup reminder `30 минут`.
+7. Нажмите **Confirm**.
+8. Проверьте success-ответ и появление события в Google Calendar.
+9. Проверьте, что созданное событие содержит только popup reminders (без email). Если UI Google показывает email reminders, проверьте safe runtime logs и фактический payload (`reminders.useDefault=false`, popup-only overrides).
 
 ### 10.2 Edit path
 1. Создайте preview.
