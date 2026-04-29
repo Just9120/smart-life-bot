@@ -71,15 +71,22 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 5. Проверка обязательных файлов: `.env`, `compose.yaml`, `Dockerfile`, `secrets/service-account.json`
 6. `docker compose build smart-life-bot`
 7. `docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight`
-8. `docker compose up -d smart-life-bot`
-9. `docker compose ps`
-10. `docker compose logs --tail=100 smart-life-bot`
+8. Деплой принудительно пересоздаёт контейнер из свежесобранного образа: `docker compose up -d --force-recreate smart-life-bot`
+9. Post-deploy diagnostics (safe): `git rev-parse --short HEAD`, `docker compose ps smart-life-bot`, image IDs running/built.
+10. Post-deploy runtime verification inside container (`docker compose exec -T smart-life-bot ...`) проверяет ожидаемые кодовые признаки текущей версии.
+11. `docker compose logs --tail=100 smart-life-bot`
 
 
 Ограничения по логированию deploy workflow:
 - `docker compose config` не используется в GitHub Actions deploy-логах, потому что команда может выводить resolved env-значения (включая runtime secrets).
 - В deploy-логах запрещено печатать содержимое `.env` и любые resolved runtime secrets.
 - Если потребуется валидация новых env-переменных, сначала обновляйте `.env.example` + docs в PR, затем вручную обновляйте реальный `.env` на VPS.
+
+Если после деплоя поведение бота выглядит stale, проверьте в логах workflow:
+- host commit (`git rev-parse --short HEAD`);
+- `docker compose ps smart-life-bot` (container state/age);
+- `running_container_image_id` и `built_service_image_id`;
+- `post_deploy_runtime_verification=ok`.
 
 Ограничения безопасности:
 - не выполняются `docker system prune` и другие global cleanup-команды;
