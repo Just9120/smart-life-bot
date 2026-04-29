@@ -69,11 +69,12 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 3. `git checkout main`
 4. `git pull --ff-only`
 5. Проверка обязательных файлов: `.env`, `compose.yaml`, `Dockerfile`, `secrets/service-account.json`
-6. `docker compose build smart-life-bot`
-7. `docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight`
-8. Деплой принудительно пересоздаёт контейнер из свежесобранного образа: `docker compose up -d --force-recreate smart-life-bot`
-9. Post-deploy diagnostics (safe): `git rev-parse --short HEAD`, `docker compose ps smart-life-bot`, image IDs running/built.
-10. Post-deploy runtime verification inside container (`docker compose exec -T smart-life-bot ...`) проверяет ожидаемые кодовые признаки текущей версии.
+6. Capture previous runtime identity (`previous_container_id`, `previous_running_image_id`) before deploy for safe comparison.
+7. `host_commit="$(git rev-parse --short HEAD)"` + no-cache service-scoped rebuild: `docker compose build --no-cache --build-arg APP_GIT_SHA="$host_commit" smart-life-bot`
+8. `docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight` (preflight now always runs against freshly rebuilt image).
+9. Деплой принудительно пересоздаёт только целевой сервис и не трогает зависимости: `docker compose up -d --force-recreate --no-deps smart-life-bot`
+10. Post-deploy diagnostics (safe): `git rev-parse --short HEAD`, `docker compose ps smart-life-bot`, previous/new container ID, previous/new running image ID, built service image ID.
+11. Post-deploy runtime verification inside container (`docker compose exec -T smart-life-bot ...`) проверяет build commit marker (`SMART_LIFE_BOT_BUILD_SHA`) и ожидаемые кодовые признаки текущей версии, включая PR #36 markers (`CALLBACK_REMINDERS`, no free-text duration parsing into `end_at`, reminders preview line).
 11. `docker compose logs --tail=100 smart-life-bot`
 
 
@@ -85,7 +86,8 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 Если после деплоя поведение бота выглядит stale, проверьте в логах workflow:
 - host commit (`git rev-parse --short HEAD`);
 - `docker compose ps smart-life-bot` (container state/age);
-- `running_container_image_id` и `built_service_image_id`;
+- `previous_container_id` / `new_container_id`;
+- `previous_running_image_id` / `new_running_image_id` / `built_service_image_id`;
 - `post_deploy_runtime_verification=ok`.
 
 Ограничения безопасности:

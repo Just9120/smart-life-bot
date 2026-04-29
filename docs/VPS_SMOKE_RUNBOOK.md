@@ -93,12 +93,15 @@ Compose использует bind mount:
 
 Это container-visible path convention для переменной `GOOGLE_SERVICE_ACCOUNT_JSON`; хостовый путь задаётся через bind mount в `compose.yaml`.
 
-## 5) Build image
+## 5) Build image (fresh code marker)
 
 ```bash
 cd /opt/smart-life-bot
-docker compose build smart-life-bot
+host_commit="$(git rev-parse --short HEAD)"
+docker compose build --no-cache --build-arg APP_GIT_SHA="$host_commit" smart-life-bot
 ```
+
+Build embeds safe marker `SMART_LIFE_BOT_BUILD_SHA=$host_commit` inside image so runtime verification can prove container code matches current `main` commit.
 
 ## 6) Preflight (обязательный шаг перед polling)
 
@@ -115,7 +118,7 @@ docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.prefligh
 ## 7) Start polling runtime
 
 ```bash
-docker compose up -d --force-recreate smart-life-bot
+docker compose up -d --force-recreate --no-deps smart-life-bot
 ```
 
 Одновременно должен работать только один polling consumer.
@@ -201,5 +204,5 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 - workflow использует только SSH-доступ к VPS и не хранит runtime secrets приложения в GitHub Actions;
 - runtime secrets остаются на VPS (`/opt/smart-life-bot/.env`, `/opt/smart-life-bot/secrets/service-account.json`);
 - команды деплоя остаются service-scoped к `smart-life-bot` и не должны затрагивать другие Docker workload на хосте;
-- для stale-поведения после deploy проверяйте host commit, `docker compose ps smart-life-bot`, running/built image IDs и маркер `post_deploy_runtime_verification=ok`;
+- для stale-поведения после deploy проверяйте host commit, previous/new container IDs, previous/new running image IDs, built service image ID и маркер `post_deploy_runtime_verification=ok`;
 - не используйте `docker compose config` в shared/GitHub Actions логах, чтобы не раскрывать resolved env/secrets.
