@@ -115,7 +115,7 @@ docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.prefligh
 ## 7) Start polling runtime
 
 ```bash
-docker compose up -d smart-life-bot
+docker compose up -d --force-recreate smart-life-bot
 ```
 
 Одновременно должен работать только один polling consumer.
@@ -200,5 +200,6 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 Важно:
 - workflow использует только SSH-доступ к VPS и не хранит runtime secrets приложения в GitHub Actions;
 - runtime secrets остаются на VPS (`/opt/smart-life-bot/.env`, `/opt/smart-life-bot/secrets/service-account.json`);
-- команды деплоя остаются service-scoped к `smart-life-bot` и не должны затрагивать другие Docker workload на хосте.
-
+- команды деплоя остаются service-scoped к `smart-life-bot` и не должны затрагивать другие Docker workload на хосте;
+- для stale-поведения после deploy проверяйте host commit, `docker compose ps smart-life-bot`, running/built image IDs и маркер `post_deploy_runtime_verification=ok`;
+- не используйте `docker compose config` в shared/GitHub Actions логах, чтобы не раскрывать resolved env/secrets.
