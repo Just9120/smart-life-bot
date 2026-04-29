@@ -23,7 +23,6 @@ from .telegram_transport import (
     CALLBACK_EDIT,
     CALLBACK_DURATION,
     CALLBACK_REMINDERS,
-    CALLBACK_REMINDERS_DEFAULT,
     CALLBACK_REMINDERS_10,
     CALLBACK_REMINDERS_30,
     CALLBACK_REMINDERS_60,
@@ -41,7 +40,6 @@ _ALLOWED_CALLBACKS = (
     CALLBACK_CANCEL,
     CALLBACK_DURATION,
     CALLBACK_REMINDERS,
-    CALLBACK_REMINDERS_DEFAULT,
     CALLBACK_REMINDERS_10,
     CALLBACK_REMINDERS_30,
     CALLBACK_REMINDERS_60,
@@ -52,7 +50,7 @@ _ALLOWED_CALLBACKS = (
 )
 _CALLBACK_PATTERN = (
     r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|"
-    r"draft:reminders:default|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|"
+    r"draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|"
     r"settings:parser:python|settings:parser:auto|settings:parser:llm)$"
 )
 
