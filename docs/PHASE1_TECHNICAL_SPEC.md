@@ -90,7 +90,8 @@
 **Runtime status (PR #12 parser baseline):**
 - реализован детерминированный rule-based parser baseline;
 - поддержаны шаблоны `YYYY-MM-DD HH:MM`, `DD.MM.YYYY HH:MM`, `сегодня/завтра/послезавтра в HH:MM`, `в HH:MM`;
-- default duration = 60 минут, поддержаны `на N минут` и `на N час/часа/часов`;
+- duration из обычного free-text не управляется: парсер не должен интерпретировать `длительность ...` / `на N минут` как control-инструкции изменения draft duration;
+- при отсутствии явного duration draft-level `end_at` остаётся unset (`end_at: —` в preview); provider может применить только технический fallback `end` для API-запроса, без продуктовой семантики default duration;
 - при отсутствии start time парсер возвращает ambiguous draft (`start_at=None`, `end_at=None`, issue `missing_start_at`);
 - runtime composition использует rule-based parser вместо fixed fake parser output;
 - parser mode preference участвует в parsing path через `ParserModeRouter` (за `MessageParser`): `python` → Python parser, `auto` → Python fallback, `llm` → defensive Python fallback (`llm not implemented`);
