@@ -156,3 +156,9 @@
 - **Status:** Accepted
 - **Decision:** Do not parse duration or reminder overrides from ordinary free text. Duration can be changed only through explicit UI actions (preview button `⏱ Длительность` and existing explicit edit/admin flows). Reminder overrides can be changed only through explicit preview inline reminder options (`🔔 Уведомления`). If user does not select reminder options, keep deterministic Google Calendar popup overrides (`60` and `30`, no email reminders). If duration is not explicitly selected, keep draft-level `end_at` unset; provider-layer technical fallback for required `end_at` may still apply.
 - **Rationale:** Prevents accidental event mutations from incidental wording, keeps draft changes explicit and auditable in preview flow, preserves deterministic reminder behavior by default, and keeps calendar writes strictly confirm-gated.
+
+## D-026: Google Calendar reminders are always explicit popup overrides (no email)
+
+- **Status:** Accepted
+- **Decision:** Calendar adapter must always send explicit reminder payload with `useDefault=false` and popup-only `overrides`. Default bot behavior uses popup reminders at 60 and 30 minutes. When user selects a custom reminder via Telegram reminder controls, adapter sends exactly the selected popup minute set (for example `(30,)` or `(10,)`).
+- **Rationale:** Prevents accidental fallback to calendar-level defaults, keeps reminder behavior deterministic across environments, and guarantees the bot never creates email reminders.
