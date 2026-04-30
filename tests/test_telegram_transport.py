@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 import pytest
 
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, QueryCashbackCategoryUseCase
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
@@ -31,6 +32,7 @@ from smart_life_bot.calendar.models import CalendarEventCreateRequest, CalendarE
 from smart_life_bot.domain.enums import EventLogStatus, GoogleAuthMode
 from smart_life_bot.domain.models import EventDraft
 from smart_life_bot.parsing.models import ParsingResult
+from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
 from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
     SQLiteEventsLogRepository,
@@ -228,6 +230,8 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
     connection = create_sqlite_connection("sqlite:///:memory:")
     init_sqlite_schema(connection)
 
+    cashback_repo = SQLiteCashbackCategoriesRepository(connection)
+
     deps = Deps(
         parser=FakeParser(),
         auth_provider=FakeAuthProvider(),
@@ -251,6 +255,8 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         set_parser_mode=SetParserModeUseCase(deps),
         default_timezone="UTC",
         supports_custom_reminders=True,
+        add_cashback_category=AddCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
+        query_cashback_category=QueryCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
     )
     return router, deps
 
@@ -275,6 +281,8 @@ def _build_router_without_reminders() -> tuple[TelegramTransportRouter, Deps]:
 def _build_router_no_html_link() -> tuple[TelegramTransportRouter, Deps]:
     connection = create_sqlite_connection("sqlite:///:memory:")
     init_sqlite_schema(connection)
+
+    cashback_repo = SQLiteCashbackCategoriesRepository(connection)
 
     deps = Deps(
         parser=FakeParser(),
@@ -321,7 +329,7 @@ def test_plain_text_handler_maps_to_process_incoming_use_case() -> None:
 def test_start_includes_footer_calendar_menu() -> None:
     router, _ = _build_router()
     response = router.handle_start()
-    assert ("📅 Календарь",) in response.reply_keyboard
+    assert ("📅 Календарь", "💳 Кэшбек") in response.reply_keyboard
 
 
 def test_footer_calendar_text_returns_mode_choices() -> None:
@@ -828,3 +836,32 @@ def test_settings_llm_selection_keeps_current_mode_unchanged() -> None:
     preferences = deps.user_preferences_repo.get_for_user(user.id)
     assert preferences is not None
     assert preferences.parser_mode.value == "auto"
+
+
+def test_cashback_menu_message_does_not_create_calendar_event() -> None:
+    router, deps = _build_router()
+    response = router.handle_text_message(telegram_user_id=99001, text="💳 Кэшбек")
+    assert "кэшбека" in response.text.lower()
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_cashback_structured_add_and_query_via_transport() -> None:
+    router, deps = _build_router()
+    response_add = router.handle_text_message(telegram_user_id=99002, text="Альфа, Владимир, Супермаркеты, 5%")
+    assert "Добавил кэшбек" in response_add.text
+
+    response_query = router.handle_text_message(telegram_user_id=99002, text="супермаркеты")
+    assert "🏆 Кэшбек" in response_query.text
+    assert "Владимир — Альфа — 5%" in response_query.text
+
+
+def test_calendar_text_still_routes_to_calendar_preview_not_cashback() -> None:
+    router, _ = _build_router()
+    response = router.handle_text_message(telegram_user_id=99003, text="Тест завтра в 15:00")
+    assert "Черновик события" in response.text
+
+
+def test_conflict_message_returns_clarification() -> None:
+    router, _ = _build_router()
+    response = router.handle_text_message(telegram_user_id=99004, text="Напомни завтра выбрать кэшбек на супермаркеты")
+    assert "несколько вариантов" in response.text

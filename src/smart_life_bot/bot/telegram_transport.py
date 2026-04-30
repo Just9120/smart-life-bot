@@ -11,6 +11,7 @@ from smart_life_bot.application.dto import (
     EditEventDraftFieldInput,
     IncomingMessageInput,
 )
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, QueryCashbackCategoryUseCase
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
@@ -37,6 +38,16 @@ CALLBACK_SETTINGS_PARSER_AUTO = "settings:parser:auto"
 CALLBACK_SETTINGS_PARSER_LLM = "settings:parser:llm"
 
 
+def _has_cashback_markers(text: str) -> bool:
+    n = text.lower()
+    return any(x in n for x in ("%", "кэшбек", "cashback", "категория", "карта")) or "," in text
+
+
+def _has_calendar_markers(text: str) -> bool:
+    n = text.lower()
+    return any(x in n for x in ("завтра", "сегодня", "послезавтра", "встреч", "созвон", "напомни")) or ":" in text
+
+
 @dataclass(frozen=True, slots=True)
 class TelegramTransportResponse:
     text: str
@@ -57,6 +68,8 @@ class TelegramTransportRouter:
     default_timezone: str
     llm_available: bool = False
     supports_custom_reminders: bool = True
+    add_cashback_category: AddCashbackCategoryUseCase | None = None
+    query_cashback_category: QueryCashbackCategoryUseCase | None = None
 
     def handle_start(self) -> TelegramTransportResponse:
         return TelegramTransportResponse(
@@ -65,7 +78,7 @@ class TelegramTransportRouter:
                 "Раздел календаря доступен через меню внизу: 📅 Календарь.\n"
                 "Событие не будет создано, пока ты не нажмешь Confirm."
             ),
-            reply_keyboard=(("📅 Календарь",),),
+            reply_keyboard=(("📅 Календарь", "💳 Кэшбек"),),
         )
 
     def handle_text_message(self, telegram_user_id: int, text: str) -> TelegramTransportResponse:
@@ -83,8 +96,20 @@ class TelegramTransportRouter:
             return TelegramTransportResponse(
                 text="Выберите режим календаря:",
                 buttons=(("⚡ Быстрый режим", "calendar:mode:quick"), ("🔐 Личный Google Calendar", "calendar:mode:personal")),
-                reply_keyboard=(("📅 Календарь",),),
+                reply_keyboard=(("📅 Календарь", "💳 Кэшбек"),),
             )
+
+        if normalized == "💳 Кэшбек":
+            return TelegramTransportResponse(text="Раздел кэшбека: отправь строку в формате: банк, владелец, категория, процент")
+
+        if _has_cashback_markers(normalized) and _has_calendar_markers(normalized):
+            return TelegramTransportResponse(text="Похоже, здесь несколько вариантов. Что сделать?")
+
+        if self.add_cashback_category is not None:
+            add_result = self.add_cashback_category.execute(normalized)
+            if add_result is not None:
+                return TelegramTransportResponse(text=add_result.text)
+
 
         if text.startswith("/edit"):
             return self._handle_edit_command(user_id=user.id, command=text)
@@ -101,6 +126,11 @@ class TelegramTransportRouter:
             if updated is not None:
                 self.state_repo.set(updated.__class__(user_id=updated.user_id, state=updated.state, draft=updated.draft, editing_field=None))
             return TelegramTransportResponse(text=self._get_pending_draft_text(user.id), buttons=self._build_draft_buttons_from_state(user.id))
+
+        if self.query_cashback_category is not None and "," not in normalized and normalized and normalized != "/start":
+            cashback = self.query_cashback_category.execute(normalized)
+            if "ничего не найдено" not in cashback.text:
+                return TelegramTransportResponse(text=cashback.text)
 
         result = self.process_incoming_message.execute(IncomingMessageInput(user_id=user.id, text=normalized))
         if result.status != "preview_ready":

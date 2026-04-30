@@ -17,6 +17,7 @@ EXPECTED_SQLITE_TABLES = {
     "conversation_state",
     "events_log",
     "user_preferences",
+    "cashback_categories",
 }
 
 

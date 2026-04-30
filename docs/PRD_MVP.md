@@ -69,3 +69,23 @@ Inline preview buttons остаются только для действий с 
 - **Phase 2 — Reliability, Editing, and Trust**
 - **Phase 3 — Task Layer**
 - **Phase 4 — Smart Routing and Context Layer**
+
+## 8. Cashback MVP module (`💳 Кэшбек`)
+
+- `💳 Кэшбек` — отдельный модуль рядом с `📅 Календарь`.
+- MVP-владельцы карт: `Виктор`, `Владимир`, `Елена`.
+- Банки в MVP не ограничиваются фиксированным whitelist (изменяются помесячно).
+- Базовый формат добавления (Python-first, deterministic):
+  - `банк, владелец, категория, процент`
+  - optional month: `банк, владелец, месяц, категория, процент`
+- Поддерживаемый explicit month в MVP:
+  - русские названия месяцев (`май`, `мая` и т.д.);
+  - `YYYY-MM`.
+- Логика месяца:
+  - без explicit month: текущий месяц;
+  - в переходный период (примерно 25-е число и позже): без explicit month бот не делает silent guess и просит указать месяц явно.
+- Поиск категории без explicit month выполняется по текущему календарному месяцу.
+- Исторические записи не удаляются физически; выборки фильтруются по `target_month`.
+- Future work (out of scope текущего PR):
+  - LLM fallback parsing/matching;
+  - XLSX export (`📤 Выгрузить таблицу`) как визуальный отчёт.
