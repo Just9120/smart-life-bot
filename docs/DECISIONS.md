@@ -179,3 +179,16 @@
 - **Decision:** Add separate `💳 Кэшбек` module with isolated SQLite table `cashback_categories` in the same DB, deterministic structured add format `банк, владелец, категория, процент` (+ optional month), and month-safe transition behavior (no silent auto-next-month in day 25+).
 - **Rationale:** Keeps calendar flow isolated and stable while enabling quick family cashback lookup; deterministic Python-first behavior reduces ambiguity/cost/risk for MVP.
 - **Notes:** Owners whitelist for MVP: `Виктор`, `Владимир`, `Елена`. LLM parsing fallback and XLSX export are explicitly deferred.
+
+## D-029: Calendar missing-date recovery uses inline date picker in MVP; Mini App is deep backlog
+
+- **Status:** Accepted
+- **Decision:** Для черновиков календарных событий с `missing_start_at` (например, отсутствуют дата/время) MVP-путь восстановления выполняется через inline date picker внутри Telegram-чата (inline keyboard + callbacks), без отдельного frontend.
+- **Decision:** Базовый MVP-flow: пользователь видит non-confirmable preview (`start_at: —`) и кнопку `📅 Выбрать дату`; после выбора даты бот запрашивает время текстом в формате `HH:MM`; затем обновляет `start_at` и показывает confirmable preview с `Confirm` / `⏱ Длительность` / `Edit` / `Cancel`.
+- **Decision:** Scope MVP picker-а ограничен: выбирается только дата; время вводится текстом после выбора даты; picker не создаёт событие в Google Calendar; picker не заменяет `Confirm`; full inline time-picker не входит в first pass; Telegram Web App / Mini App не входит в near-term MVP.
+- **Decision:** High-level state/callback concept фиксируется так: `missing_start_at` → click `📅 Выбрать дату` → `editing_field=start_date` (или эквивалент) → `calendar_picker:date:YYYY-MM-DD` callback → pending selected date сохраняется в state/metadata → `editing_field=start_time` → пользователь вводит `HH:MM` → `start_at = selected_date + time + user_timezone` → `editing_field` очищается → preview обновляется.
+- **Decision:** Допустимая callback naming-схема (рабочий пример): `calendar_picker:open`, `calendar_picker:prev:YYYY-MM`, `calendar_picker:next:YYYY-MM`, `calendar_picker:date:YYYY-MM-DD`.
+- **Decision:** Guardrails: picker никогда не пишет в Google Calendar; `Confirm` остаётся единственным write-path; picker работает только при наличии pending draft; stale callbacks завершаются безопасно без записи; `Cancel` очищает draft и picker-state; прямой `/edit` и прямое текстовое создание черновика продолжают работать.
+- **Decision:** Telegram Web App / Mini App calendar UI фиксируется как deep backlog (возможен для richer calendar UI, combined date/time picker, dashboard/расширенного Smart Life UI), но не включается в текущий MVP из-за отдельного frontend, hosting, Telegram init-data validation/security review и отдельного deploy pipeline.
+- **Rationale:** Inline picker в Telegram покрывает ближайшую UX-боль `missing_start_at` с минимальной технической сложностью и без расширения runtime/deploy perimeter. Mini App сохраняется как стратегическое направление, но сознательно не смешивается с near-term MVP.
+

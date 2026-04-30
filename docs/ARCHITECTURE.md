@@ -40,6 +40,34 @@
 7. При `confirm` запускается сохранение события через calendar integration layer.
 8. Результат пишется в `events_log`, пользователь получает success/error ответ.
 
+
+
+## 3.1 Missing `start_at` recovery UX boundary (MVP)
+
+Для случая, когда parser вернул draft с `missing_start_at`, фиксируется near-term UX-подход:
+
+- recovery выполняется в Telegram inline flow (`📅 Выбрать дату`) без отдельного frontend;
+- inline calendar callbacks управляют только выбором даты;
+- после даты время вводится отдельным текстовым сообщением `HH:MM`;
+- итоговый `start_at` собирается как `selected_date + HH:MM + user_timezone`;
+- до этого шага preview остаётся non-confirmable.
+
+Guardrails архитектуры:
+- inline picker не вызывает calendar provider;
+- единственный write-path в Google Calendar остаётся `Confirm` use-case;
+- picker доступен только при наличии pending draft;
+- stale callbacks fail-safe (без записи и без неявной мутации чужого/устаревшего state);
+- `Cancel` очищает как draft state, так и picker-related state;
+- существующие direct flows (`/edit`, обычное текстовое создание draft) сохраняются.
+
+Допустимая callback naming-схема (концептуально):
+- `calendar_picker:open`
+- `calendar_picker:prev:YYYY-MM`
+- `calendar_picker:next:YYYY-MM`
+- `calendar_picker:date:YYYY-MM-DD`
+
+Telegram Web App / Mini App календарный UI зафиксирован как deep backlog и не входит в near-term MVP scope (отдельный frontend/hosting/security/deploy contour).
+
 ## 4. Слои системы
 
 ### 4.1 Bot transport layer
