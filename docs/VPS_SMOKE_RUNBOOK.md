@@ -143,13 +143,12 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 ### 10.1 Happy path (минимум)
 1. Отправьте `/start`.
 2. Отправьте `Тест завтра в 15:00`.
-3. В preview ожидайте `end_at: —`, строку default popup reminders `60/30` и кнопки `⏱ Длительность`, `🔔 Уведомления`, Confirm/Edit/Cancel.
+3. В preview ожидайте `end_at: —` и кнопки draft-level действий (`⏱ Длительность`, Confirm/Edit/Cancel). Если reminder controls скрыты в текущем service-account режиме — это корректно.
 4. Отправьте `Тест завтра в 15:00 длительность 20 минут` и проверьте, что `end_at` не заполнился из free-text.
 5. Нажмите `⏱ Длительность` и задайте `20` → `end_at` должен стать `start_at + 20 минут`.
-6. Нажмите `🔔 Уведомления` → `30 минут` и проверьте, что preview показывает popup reminder `30 минут`.
-7. Нажмите **Confirm**.
-8. Проверьте success-ответ и появление события в Google Calendar.
-9. Проверьте, что созданное событие содержит только popup reminders (без email). Если UI Google показывает email reminders, проверьте safe runtime logs и фактический payload (`reminders.useDefault=false`, popup-only overrides).
+6. Нажмите **Confirm**.
+7. Проверьте success-ответ и появление события в Google Calendar.
+8. Не используйте текущий service-account smoke как проверку user-visible custom reminders: по продуктовой политике это future OAuth-only capability.
 
 ### 10.2 Edit path
 1. Создайте preview.
@@ -198,6 +197,7 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 - [ ] Edit path works
 - [ ] Cancel path creates no event
 - [ ] non-confirmable draft hides Confirm
+- [ ] в service-account режиме reminder controls не обязательны и не проверяются как рабочая user-visible фича
 - [ ] polling stopped
 
 ## 14) Связь с manual GitHub Actions deploy
