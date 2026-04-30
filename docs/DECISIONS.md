@@ -172,3 +172,10 @@
 - **Decision:** Reminder controls должны быть capability-gated по активному calendar mode: в `⚡ Быстрый режим` не обещаем/не показываем кастомные reminders как рабочую user-visible фичу; в `🔐 Личный Google Calendar` reminders включаются только после реализации и верификации OAuth user-authenticated writes.
 - **Decision:** Для future reminder UX в `🔐 Личный Google Calendar` выбор reminder presets должен быть multi-select (один или несколько popup вариантов одновременно, например `10 минут + 1 час`) через checkbox-style inline pattern или эквивалент; email reminders остаются запрещены.
 - **Rationale:** Бот масштабируется за пределы одного draft-flow, поэтому нужна явная модель feature-навигации. Live-тесты в service-account режиме показали, что user-visible reminders в Google Calendar не отражают надежно bot-selected overrides: при включенных Google defaults в UI отображались default reminders (например popup 30 мин + email 10 мин), а после удаления defaults новый event с выбранным в боте `30 мин` показывался в UI без reminders. Следовательно, в текущем MVP reminders — future/OAuth capability, а не гарантированная фича service-account режима.
+
+## D-028: Cashback MVP module with deterministic structured parsing
+
+- **Status:** Accepted
+- **Decision:** Add separate `💳 Кэшбек` module with isolated SQLite table `cashback_categories` in the same DB, deterministic structured add format `банк, владелец, категория, процент` (+ optional month), and month-safe transition behavior (no silent auto-next-month in day 25+).
+- **Rationale:** Keeps calendar flow isolated and stable while enabling quick family cashback lookup; deterministic Python-first behavior reduces ambiguity/cost/risk for MVP.
+- **Notes:** Owners whitelist for MVP: `Виктор`, `Владимир`, `Елена`. LLM parsing fallback and XLSX export are explicitly deferred.

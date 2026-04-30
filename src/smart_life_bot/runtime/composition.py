@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, QueryCashbackCategoryUseCase
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
@@ -23,6 +24,7 @@ from smart_life_bot.parsing.interfaces import MessageParser
 from smart_life_bot.parsing.router import ParserModeRouter
 from smart_life_bot.parsing.rule_based import RuleBasedMessageParser
 from smart_life_bot.parsing.claude import ClaudeMessageParser
+from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
 from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
     SQLiteEventsLogRepository,
@@ -70,6 +72,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
     user_preferences_repo = SQLiteUserPreferencesRepository(connection)
     state_repo = SQLiteConversationStateRepository(connection)
     events_log_repo = SQLiteEventsLogRepository(connection)
+    cashback_repo = SQLiteCashbackCategoriesRepository(connection)
 
     calendar_service: CalendarService = DevFakeCalendarService()
     if (
@@ -124,6 +127,8 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         default_timezone=settings.default_timezone,
         llm_available=llm_parser is not None,
         supports_custom_reminders=settings.google_auth_mode is not GoogleAuthMode.SERVICE_ACCOUNT_SHARED_CALENDAR_MODE,
+        add_cashback_category=AddCashbackCategoryUseCase(cashback_repo),
+        query_cashback_category=QueryCashbackCategoryUseCase(cashback_repo),
     )
 
     return RuntimeContainer(

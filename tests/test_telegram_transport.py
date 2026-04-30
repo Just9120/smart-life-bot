@@ -321,7 +321,7 @@ def test_plain_text_handler_maps_to_process_incoming_use_case() -> None:
 def test_start_includes_footer_calendar_menu() -> None:
     router, _ = _build_router()
     response = router.handle_start()
-    assert ("📅 Календарь",) in response.reply_keyboard
+    assert ("📅 Календарь", "💳 Кэшбек") in response.reply_keyboard
 
 
 def test_footer_calendar_text_returns_mode_choices() -> None:

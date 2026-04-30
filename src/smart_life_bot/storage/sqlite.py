@@ -106,6 +106,21 @@ def init_sqlite_schema(connection: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS cashback_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_name TEXT NOT NULL,
+            bank_name TEXT NOT NULL,
+            category_raw TEXT NOT NULL,
+            category_key TEXT NOT NULL,
+            percent REAL NOT NULL,
+            target_month TEXT NOT NULL,
+            source_text TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            UNIQUE (target_month, owner_name, bank_name, category_key)
+        );
         """
     )
     connection.commit()
