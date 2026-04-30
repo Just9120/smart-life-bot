@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from smart_life_bot.cashback.models import CashbackAddInput, CashbackCategoryRecord
+from smart_life_bot.cashback.parser import normalize_category_key
 from smart_life_bot.storage.sqlite import _parse_iso_datetime, utcnow_iso
 
 
@@ -9,12 +10,12 @@ class SQLiteCashbackCategoriesRepository:
         self._connection = connection
 
     def upsert(self, payload: CashbackAddInput) -> tuple[CashbackCategoryRecord, bool, float | None]:
+        category_key = normalize_category_key(payload.category_raw)
         existing = self._connection.execute(
             """SELECT * FROM cashback_categories WHERE target_month=? AND owner_name=? AND bank_name=? AND category_key=? AND is_deleted=0""",
-            (payload.target_month, payload.owner_name, payload.bank_name, payload.category_raw.strip().lower().replace('ё','е')),
+            (payload.target_month, payload.owner_name, payload.bank_name, category_key),
         ).fetchone()
         now = utcnow_iso()
-        category_key = payload.category_raw.strip().lower().replace('ё', 'е')
         if existing is not None:
             old = float(existing["percent"])
             self._connection.execute("UPDATE cashback_categories SET percent=?, source_text=?, updated_at=? WHERE id=?", (payload.percent, payload.source_text, now, existing["id"]))
