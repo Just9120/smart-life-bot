@@ -123,6 +123,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         set_parser_mode=SetParserModeUseCase(deps=deps, llm_available=llm_parser is not None),
         default_timezone=settings.default_timezone,
         llm_available=llm_parser is not None,
+        supports_custom_reminders=settings.google_auth_mode is not GoogleAuthMode.SERVICE_ACCOUNT_SHARED_CALENDAR_MODE,
     )
 
     return RuntimeContainer(
