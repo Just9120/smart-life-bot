@@ -510,6 +510,21 @@ Implemented parser mode routing foundation behind existing `MessageParser` contr
 - invalid/stale parser mode values in DB are handled defensively with Python fallback instead of crashing the message flow.
 - LLM integration remains optional at runtime (`LLM_PROVIDER`, `ANTHROPIC_API_KEY`, `LLM_MODEL` etc.); Python mode stays fully functional without LLM configuration.
 
+## 7.8 Calendar capability-gating + Telegram navigation direction (docs decision alignment)
+
+Documentation baseline for next UX iteration is fixed as follows:
+
+- Telegram navigation is split into:
+  - native command menu (`/start`, `/settings`, future `/help`) for global bot commands;
+  - footer feature menu (persistent reply keyboard after `/start`) for product sections, with `📅 Календарь` as first section;
+  - preview inline buttons for draft-level actions only (Confirm / Edit / Cancel / `⏱ Длительность`; reminder controls only when capability is supported).
+- Calendar section naming is product-first:
+  - `⚡ Быстрый режим` = current `service_account_shared_calendar_mode`;
+  - `🔐 Личный Google Calendar` = future `oauth_user_mode`.
+- Reminder behavior is capability-gated by calendar auth mode:
+  - current service-account path does not guarantee reliable user-visible custom reminder overrides in Google Calendar UI;
+  - custom reminder UX is treated as future OAuth-only capability until implemented and verified for user-authenticated writes.
+
 ## 8. Error model
 
 Минимальная классификация:

@@ -12,7 +12,7 @@
 
 Событие в Google Calendar создается только после явного **Confirm**.
 
-## 3. Текущий UX MVP (Telegram draft flow)
+## 3. Текущий UX MVP (Telegram draft flow + navigation direction)
 
 1. Пользователь отправляет текст.
 2. Парсер извлекает базовые сущности (например, title/start time), формирует draft и preview.
@@ -23,17 +23,33 @@
 Важно:
 - обычный free-text не должен тихо менять duration/reminders;
 - управление длительностью выполняется через `⏱ Длительность`;
-- управление напоминаниями выполняется через `🔔 Уведомления`;
-- меню напоминаний содержит только кастомные варианты: `10 минут`, `30 минут`, `1 час`, `2 часа`;
-- в меню нет кнопки «default reminders»;
-- если пользователь не выбрал напоминания, применяются неявные popup overrides на `60` и `30` минут (без email).
+- в текущем runtime (`⚡ Быстрый режим`, technical: `service_account_shared_calendar_mode`) кастомные reminders не считаются надежно поддерживаемой user-visible фичей;
+- reminders должны быть capability-gated по calendar mode и включаться как user-visible feature только в будущем `🔐 Личный Google Calendar` (technical: `oauth_user_mode`) после реализации и проверки.
+
+### 3.1 Telegram navigation model (target UX direction)
+
+Telegram UX фиксируется как двухуровневая навигация:
+
+1. **Native Telegram command menu** (кнопка `Menu`) для глобальных команд: `/start`, `/settings`, future `/help`.
+2. **Footer feature menu** (persistent reply keyboard после `/start`) для продуктовых разделов, начиная с `📅 Календарь`.
+
+Inline preview buttons остаются только для действий с текущим draft (Confirm / `⏱ Длительность` / Edit / Cancel + future reminder controls только при поддерживаемом режиме календаря).
+
+### 3.2 Calendar menu split (planned)
+
+В разделе `📅 Календарь` планируется выбор режима:
+
+- `⚡ Быстрый режим` — текущий рабочий путь в shared calendar через service account.
+- `🔐 Личный Google Calendar` — будущий OAuth 2.0 user-authenticated путь.
+- Для будущего OAuth reminder UX используется multi-select popup presets (один или несколько одновременно, например `10 минут + 1 час`) через checkbox-style pattern с действием `Применить`; email reminders не используются.
 
 ## 4. Scope MVP
 
 - Telegram message → draft preview → confirm/cancel flow.
 - Confirm-gated Google Calendar create.
-- Явное редактирование duration/reminders через inline UI.
-- Явная reminder policy: `reminders.useDefault=false`, popup-only overrides, без email reminders.
+- Явное редактирование duration через inline UI.
+- Базовая продуктовая навигационная модель: command menu + footer feature menu (`📅 Календарь` как первый раздел).
+- Capability-gating reminder controls по calendar mode (в current service-account path reminders не заявляются как поддержанная user-visible фича).
 - Базовое логирование ключевых действий и ошибок.
 
 ## 5. Out of scope MVP

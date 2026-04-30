@@ -162,3 +162,13 @@
 - **Status:** Accepted
 - **Decision:** Calendar adapter must always send explicit reminder payload with `useDefault=false` and popup-only `overrides`. Default bot behavior uses popup reminders at 60 and 30 minutes. When user selects a custom reminder via Telegram reminder controls, adapter sends exactly the selected popup minute set (for example `(30,)` or `(10,)`).
 - **Rationale:** Prevents accidental fallback to calendar-level defaults, keeps reminder behavior deterministic across environments, and guarantees the bot never creates email reminders.
+
+## D-027: Telegram navigation uses command menu + footer feature menu; custom reminders are OAuth-only
+
+- **Status:** Accepted
+- **Decision:** Разделить Telegram-навигацию на два уровня: (1) нативное command menu Telegram (кнопка `Menu` / команды вроде `/start`, `/settings`, future `/help`) для глобальных команд, и (2) persistent footer/reply keyboard после `/start` для продуктовой навигации по функциям (первый пункт: `📅 Календарь`).
+- **Decision:** Inline-кнопки под preview остаются только draft-level действиями (`Confirm`, `⏱ Длительность`, `Edit`, `Cancel`) и не заменяют feature-навигацию.
+- **Decision:** Для `📅 Календарь` фиксируется продуктовая модель режимов: `⚡ Быстрый режим` (текущий `service_account_shared_calendar_mode`) и `🔐 Личный Google Calendar` (future `oauth_user_mode`).
+- **Decision:** Reminder controls должны быть capability-gated по активному calendar mode: в `⚡ Быстрый режим` не обещаем/не показываем кастомные reminders как рабочую user-visible фичу; в `🔐 Личный Google Calendar` reminders включаются только после реализации и верификации OAuth user-authenticated writes.
+- **Decision:** Для future reminder UX в `🔐 Личный Google Calendar` выбор reminder presets должен быть multi-select (один или несколько popup вариантов одновременно, например `10 минут + 1 час`) через checkbox-style inline pattern или эквивалент; email reminders остаются запрещены.
+- **Rationale:** Бот масштабируется за пределы одного draft-flow, поэтому нужна явная модель feature-навигации. Live-тесты в service-account режиме показали, что user-visible reminders в Google Calendar не отражают надежно bot-selected overrides: при включенных Google defaults в UI отображались default reminders (например popup 30 мин + email 10 мин), а после удаления defaults новый event с выбранным в боте `30 мин` показывался в UI без reminders. Следовательно, в текущем MVP reminders — future/OAuth capability, а не гарантированная фича service-account режима.

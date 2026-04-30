@@ -48,6 +48,11 @@
 
 На текущем runtime-этапе реализован минимальный transport router (`/start`, plain text, `confirm`, `cancel`, `edit` command routing в application use-cases) и добавлен тонкий SDK adapter foundation на `python-telegram-bot`, который маппит Telegram updates в `TelegramBotRuntime` без переноса бизнес-логики в SDK handlers.
 
+Навигационная модель Telegram фиксируется как разные уровни transport UX:
+- native command menu (`/start`, `/settings`, future `/help`) — глобальные команды;
+- footer reply keyboard после `/start` — feature-навигация (первый раздел: `📅 Календарь`);
+- inline preview buttons — только draft-level действия (confirm/edit/cancel/duration; reminder controls только при поддерживаемом capability).
+
 Не содержит:
 
 - доменную валидацию;
@@ -57,7 +62,7 @@
 
 ### 4.2 Application / use case layer
 
-Оркестрация сценариев: parse, preview, explicit duration/reminder controls, confirm/edit/cancel, save event.
+Оркестрация сценариев: parse, preview, explicit duration controls, confirm/edit/cancel, save event; а также capability-gating UI-элементов по активному calendar mode.
 
 Confirm-gate обязателен: запись в календарь допускается только после явного `confirm`.
 
@@ -80,7 +85,7 @@ Confirm-gate обязателен: запись в календарь допус
 Google Calendar — первая реальная реализация провайдера для `service_account_shared_calendar_mode` (текущий рабочий runtime path).
 OAuth runtime-адаптер остается pending и пока не реализуется (`oauth_user_mode`).
 
-Reminder policy в provider payload: `reminders.useDefault=false` и popup-only `overrides` (без email reminders).
+Reminder controls — capability-gated behavior: в `service_account_shared_calendar_mode` нельзя считать custom reminders надежным user-visible capability; в будущем `oauth_user_mode` можно включать reminders после отдельной верификации.
 
 ### 4.6 Storage layer
 
