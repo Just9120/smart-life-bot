@@ -102,6 +102,7 @@ Inline preview buttons остаются только для действий с 
 - LLM fallback для cashback parsing и XLSX export — future work, вне текущего scope.
 - Границы application/use-case для cashback должны оставаться transport-agnostic (JSON-friendly результаты), Telegram отвечает только за рендер текста.
 - Migration в FastAPI/PWA/Telegram Mini App остаётся глубоким backlog, вне scope текущих PR.
+- Future XLSX export рассматривается как визуальный monthly-report/backup feature (review/share), а не как основной checkout UX; оперативный ответ по категории должен оставаться мгновенно в Telegram-диалоге.
 
 ### 8.1 Cashback offline-first direction (future, non-MVP)
 
@@ -109,3 +110,9 @@ Inline preview buttons остаются только для действий с 
 - Практический browser baseline для структурных данных: IndexedDB (или эквивалент), а не только `localStorage`; PWA app shell caching рассматривается как механизм офлайн-старта.
 - Для будущего sync необходимо планировать стабильный UUID-идентификатор (`record_id`/`public_id`) у syncable cashback сущностей; внутренние integer PK могут сохраняться как internal DB detail.
 - Offline-first не блокирует текущий Telegram MVP и не расширяет текущий implementation scope.
+
+### 8.2 Full app evolution (future, non-MVP)
+
+- Текущий этап остаётся Telegram-first: Telegram — единственный active runtime transport.
+- Будущая эволюция: FastAPI adapter → PWA / Telegram Mini App frontend; APK/native wrapper — deep backlog.
+- No-code конструкторы (Tilda/Webflow и аналоги) подходят для landing/marketing, но не для основного продуктового app-runtime с auth/state/sync/export/calendar flows.

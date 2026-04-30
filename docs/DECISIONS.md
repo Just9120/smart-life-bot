@@ -202,3 +202,29 @@
 - **Decision:** В текущем docs PR schema/runtime изменения не вносятся; conflict-resolution policy (LWW vs manual), per-user/per-device sync metadata, delete/soft-delete sync semantics, local data encryption/security и auth model остаются future work.
 - **Decision:** Offline-first является сильным аргументом в пользу PWA/Telegram Mini App до native APK; при этом Telegram MVP не блокируется и продолжает развиваться отдельно.
 - **Rationale:** Checkout-use-case для cashback критичен к latency/availability. Offline-first снижает зависимость от сети и повышает практическую полезность продукта, не расширяя текущий MVP runtime scope.
+
+## D-031: Cashback XLSX export is a future visual monthly report, not primary checkout UX
+
+- **Status:** Accepted
+- **Decision:** XLSX export для cashback фиксируется как future work / nice-to-have reporting feature, не как основной operational checkout UX.
+- **Decision:** Основной рабочий cashback UX остаётся внутри Telegram bot в real-time lookup режиме: пользователь отправляет категорию (например, `Супермаркеты`) и сразу получает лучшие варианты карт/банков/% за текущий месяц.
+- **Decision:** Назначение future XLSX export: визуальный monthly overview, review/check внесённых категорий, family sharing/manual inspection и lightweight backup/reporting view.
+- **Decision:** Future UX path (концептуально): `💳 Кэшбек` → `📤 Выгрузить таблицу` → выбор месяца → bot отправляет форматированный `.xlsx`; при отсутствии данных возвращается явный ответ вида `За май 2026 кэшбек-категорий пока нет.`
+- **Decision:** Рекомендуемая структура файла: sheet `Кэшбек — <месяц YYYY>`, колонки `Категория | Владелец | Банк | Кэшбек % | Месяц | Обновлено`, сортировка `Категория → Кэшбек % (desc) → Владелец → Банк`.
+- **Decision:** Рекомендуемые formatting requirements: title/header по выбранному месяцу, bold headers, frozen header row, autofilter, readable column widths, numeric/percentage formatting for cashback percent where practical, и базовые визуальные разделители/группировка категорий при простой реализации.
+- **Decision:** Архитектурно это future read-only use-case `ExportCashbackCategoriesUseCase` с потоком `SQLite query by target_month → build formatted .xlsx → Telegram sends document`.
+- **Decision:** Guardrails: export read-only, не мутирует cashback records, использует существующие structured repositories/use-cases, не требует LLM и не требует внешних spreadsheet сервисов.
+- **Rationale:** XLSX полезен как отчет/архив/совместный просмотр, но решение “какой картой платить сейчас” должно оставаться мгновенным и простым внутри Telegram-текста.
+
+## D-032: Smart Life Ops remains Telegram-first now; backend stays transport-agnostic for future FastAPI/PWA/Mini App
+
+- **Status:** Accepted
+- **Decision:** Текущая продуктовая стратегия остаётся Telegram-first: Telegram — единственный active runtime transport в MVP.
+- **Decision:** Архитектурный guardrail: Telegram остаётся transport adapter, а не владельцем бизнес-логики; domain/application/storage слои сохраняются transport-independent и JSON-friendly где практически применимо.
+- **Decision:** Future evolution path фиксируется как: `Telegram bot MVP → FastAPI REST adapter later → PWA / Telegram Mini App frontend later → APK/native wrapper deep backlog`.
+- **Decision:** Python backend может оставаться основным продуктовым backend при сохранении чистых слоёв; будущий FastAPI adapter должен вызывать те же use-cases, что и Telegram transport.
+- **Decision:** PWA/Telegram Mini App рассматриваются как более рациональный first frontend target относительно APK/native, т.к. один web frontend может работать и в Telegram-контуре, и в обычном mobile browser.
+- **Decision:** Native APK/wrapper/React Native/Flutter остаются deep backlog из-за дополнительной Android build/signing/distribution overhead.
+- **Decision:** No-code builders (например, Tilda/Webflow и аналоги) допустимы для landing/marketing страниц, но не рассматриваются как платформа для основного динамического приложения (auth, state, cashback data, calendar/OAuth flows, exports, offline sync).
+- **Decision:** D-030 задаёт offline-first направление для будущих клиентов; текущий D-032 фиксирует более широкую backend/frontend/transport стратегию и не меняет текущий MVP scope.
+- **Rationale:** Такой порядок эволюции снижает delivery/ops-риск, переиспользует существующий Python use-case слой и не блокирует текущую Telegram-ценность продукта.
