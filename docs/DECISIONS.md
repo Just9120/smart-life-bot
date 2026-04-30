@@ -192,3 +192,13 @@
 - **Decision:** Telegram Web App / Mini App calendar UI фиксируется как deep backlog (возможен для richer calendar UI, combined date/time picker, dashboard/расширенного Smart Life UI), но не включается в текущий MVP из-за отдельного frontend, hosting, Telegram init-data validation/security review и отдельного deploy pipeline.
 - **Rationale:** Inline picker в Telegram покрывает ближайшую UX-боль `missing_start_at` с минимальной технической сложностью и без расширения runtime/deploy perimeter. Mini App сохраняется как стратегическое направление, но сознательно не смешивается с near-term MVP.
 
+## D-030: Offline-first direction for cashback syncable clients (PWA/Mini App), without blocking Telegram MVP
+
+- **Status:** Accepted
+- **Decision:** Зафиксировать offline-first как важное future product direction для cashback-сценариев (особенно для checkout-контекста с нестабильным/подавленным интернетом): будущий клиент (PWA / Telegram Mini App / web client) должен уметь работать с локальным кэшем/БД на устройстве, выполнять lookup офлайн, складывать локальные изменения в очередь (`pending_sync`) и синхронизировать их после восстановления сети.
+- **Decision:** Для браузерного офлайн-хранилища целевой практический baseline — IndexedDB (или эквивалентная локальная БД), а не только `localStorage`; PWA app shell caching рассматривается как целевой механизм офлайн-запуска.
+- **Decision:** Для будущей sync-модели необходимо планировать стабильный публичный UUID-идентификатор (`record_id`/`public_id`) для syncable сущностей (например, cashback records), сохраняя внутренние DB primary keys при необходимости. Офлайн-клиент должен иметь возможность генерировать UUID локально до первого контакта с сервером.
+- **Decision:** Будущая синхронизация должна опираться на UUID + `updated_at`/version metadata, а не на одни лишь server-assigned sequential integer IDs как внешнюю identity-опору.
+- **Decision:** В текущем docs PR schema/runtime изменения не вносятся; conflict-resolution policy (LWW vs manual), per-user/per-device sync metadata, delete/soft-delete sync semantics, local data encryption/security и auth model остаются future work.
+- **Decision:** Offline-first является сильным аргументом в пользу PWA/Telegram Mini App до native APK; при этом Telegram MVP не блокируется и продолжает развиваться отдельно.
+- **Rationale:** Checkout-use-case для cashback критичен к latency/availability. Offline-first снижает зависимость от сети и повышает практическую полезность продукта, не расширяя текущий MVP runtime scope.
