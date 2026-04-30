@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
+from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardMarkup, Update
 from telegram.ext import (
     Application,
     CallbackContext,
@@ -47,11 +47,14 @@ _ALLOWED_CALLBACKS = (
     CALLBACK_SETTINGS_PARSER_PYTHON,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
+    "calendar:mode:quick",
+    "calendar:mode:personal",
 )
 _CALLBACK_PATTERN = (
     r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|"
     r"draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|"
-    r"settings:parser:python|settings:parser:auto|settings:parser:llm)$"
+    r"settings:parser:python|settings:parser:auto|settings:parser:llm|"
+    r"calendar:mode:quick|calendar:mode:personal)$"
 )
 
 
@@ -116,15 +119,32 @@ def transport_buttons_to_inline_markup(buttons: tuple[tuple[str, str], ...]) -> 
 
 
 async def _reply_from_transport(message: Message, response: TelegramTransportResponse) -> None:
+    reply_markup = transport_buttons_to_inline_markup(response.buttons)
+    if reply_markup is None:
+        reply_markup = transport_reply_keyboard_to_markup(response.reply_keyboard)
     await message.reply_text(
         text=response.text,
-        reply_markup=transport_buttons_to_inline_markup(response.buttons),
+        reply_markup=reply_markup,
+    )
+
+def transport_reply_keyboard_to_markup(reply_keyboard: tuple[tuple[str, ...], ...]) -> ReplyKeyboardMarkup | None:
+    if not reply_keyboard:
+        return None
+    return ReplyKeyboardMarkup([list(row) for row in reply_keyboard], resize_keyboard=True, is_persistent=True)
+
+
+async def _post_init_set_commands(application: Application) -> None:
+    await application.bot.set_my_commands(
+        [
+            BotCommand(command="start", description="start/open main menu"),
+            BotCommand(command="settings", description="parser/settings"),
+        ]
     )
 
 
 def build_telegram_application(settings: Settings, runtime: TelegramBotRuntime) -> Application:
     """Build telegram.ext.Application and register deterministic handlers."""
-    application = Application.builder().token(settings.telegram_bot_token).build()
+    application = Application.builder().token(settings.telegram_bot_token).post_init(_post_init_set_commands).build()
 
     adapter = TelegramSDKAdapter(runtime=runtime)
     application.add_handler(CommandHandler("start", adapter.handle_start))
@@ -136,4 +156,10 @@ def build_telegram_application(settings: Settings, runtime: TelegramBotRuntime) 
     return application
 
 
-__all__ = ["TelegramSDKAdapter", "build_telegram_application", "transport_buttons_to_inline_markup"]
+__all__ = [
+    "TelegramSDKAdapter",
+    "build_telegram_application",
+    "transport_buttons_to_inline_markup",
+    "transport_reply_keyboard_to_markup",
+    "_post_init_set_commands",
+]

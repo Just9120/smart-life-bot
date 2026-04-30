@@ -188,6 +188,7 @@ def test_runtime_uses_real_google_calendar_service_for_service_account_mode() ->
             container.runtime.router.confirm_draft.deps.calendar_service,
             GoogleCalendarService,
         )
+        assert container.runtime.router.supports_custom_reminders is False
     finally:
         container.connection.close()
 

@@ -250,6 +250,24 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         get_user_settings=GetUserSettingsUseCase(deps),
         set_parser_mode=SetParserModeUseCase(deps),
         default_timezone="UTC",
+        supports_custom_reminders=True,
+    )
+    return router, deps
+
+
+def _build_router_without_reminders() -> tuple[TelegramTransportRouter, Deps]:
+    router, deps = _build_router()
+    router = TelegramTransportRouter(
+        users_repo=deps.users_repo,
+        state_repo=deps.state_repo,
+        process_incoming_message=ProcessIncomingMessageUseCase(deps),
+        confirm_draft=ConfirmEventDraftUseCase(deps),
+        cancel_draft=CancelEventDraftUseCase(deps),
+        edit_draft_field=EditEventDraftFieldUseCase(deps),
+        get_user_settings=GetUserSettingsUseCase(deps),
+        set_parser_mode=SetParserModeUseCase(deps),
+        default_timezone="UTC",
+        supports_custom_reminders=False,
     )
     return router, deps
 
@@ -300,6 +318,28 @@ def test_plain_text_handler_maps_to_process_incoming_use_case() -> None:
     assert ("🔔 Уведомления", CALLBACK_REMINDERS) in response.buttons
 
 
+def test_start_includes_footer_calendar_menu() -> None:
+    router, _ = _build_router()
+    response = router.handle_start()
+    assert ("📅 Календарь",) in response.reply_keyboard
+
+
+def test_footer_calendar_text_returns_mode_choices() -> None:
+    router, _ = _build_router()
+    response = router.handle_text_message(telegram_user_id=90500, text="📅 Календарь")
+    assert ("⚡ Быстрый режим", "calendar:mode:quick") in response.buttons
+    assert ("🔐 Личный Google Calendar", "calendar:mode:personal") in response.buttons
+
+
+def test_calendar_mode_callbacks_are_informational_only() -> None:
+    router, deps = _build_router()
+    quick = router.handle_callback(telegram_user_id=90501, callback_data="calendar:mode:quick")
+    personal = router.handle_callback(telegram_user_id=90501, callback_data="calendar:mode:personal")
+    assert "Быстрый режим" in quick.text
+    assert "пока недоступен" in personal.text
+    assert len(deps.calendar_service.requests) == 0
+
+
 def test_reminder_callback_shows_presets() -> None:
     router, _ = _build_router()
     router.handle_text_message(telegram_user_id=90510, text="Team sync")
@@ -313,6 +353,24 @@ def test_reminder_preset_updates_draft_without_calendar_write() -> None:
     router.handle_text_message(telegram_user_id=90511, text="Team sync")
     response = router.handle_callback(telegram_user_id=90511, callback_data=CALLBACK_REMINDERS_10)
     assert "- reminders: popup 10 min" in response.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_service_account_mode_hides_reminders_and_keeps_duration() -> None:
+    router, _ = _build_router_without_reminders()
+    response = router.handle_text_message(telegram_user_id=90512, text="Team sync")
+    assert ("✅ Confirm", CALLBACK_CONFIRM) in response.buttons
+    assert ("⏱ Длительность", CALLBACK_DURATION) in response.buttons
+    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert ("🔔 Уведомления", CALLBACK_REMINDERS) not in response.buttons
+
+
+def test_stale_reminder_callbacks_return_unavailable_when_capability_disabled() -> None:
+    router, deps = _build_router_without_reminders()
+    router.handle_text_message(telegram_user_id=90513, text="Team sync")
+    response = router.handle_callback(telegram_user_id=90513, callback_data=CALLBACK_REMINDERS_30)
+    assert "пока недоступна в быстром режиме календаря" in response.text
     assert len(deps.calendar_service.requests) == 0
 
 

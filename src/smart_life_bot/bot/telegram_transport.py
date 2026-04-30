@@ -41,6 +41,7 @@ CALLBACK_SETTINGS_PARSER_LLM = "settings:parser:llm"
 class TelegramTransportResponse:
     text: str
     buttons: tuple[tuple[str, str], ...] = ()
+    reply_keyboard: tuple[tuple[str, ...], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,14 +56,16 @@ class TelegramTransportRouter:
     set_parser_mode: SetParserModeUseCase
     default_timezone: str
     llm_available: bool = False
+    supports_custom_reminders: bool = True
 
     def handle_start(self) -> TelegramTransportResponse:
         return TelegramTransportResponse(
             text=(
-                "Привет! Отправь текст события, и я подготовлю черновик для подтверждения.\n"
-                "Команды: /start, /edit <field> <value>.\n"
+                "Привет! Можно сразу отправить текст события (например: Тест завтра в 15:00), и я покажу черновик.\n"
+                "Раздел календаря доступен через меню внизу: 📅 Календарь.\n"
                 "Событие не будет создано, пока ты не нажмешь Confirm."
-            )
+            ),
+            reply_keyboard=(("📅 Календарь",),),
         )
 
     def handle_text_message(self, telegram_user_id: int, text: str) -> TelegramTransportResponse:
@@ -73,6 +76,15 @@ class TelegramTransportRouter:
             telegram_user_id=telegram_user_id,
             timezone=self.default_timezone,
         )
+
+        normalized = text.strip()
+
+        if normalized == "📅 Календарь":
+            return TelegramTransportResponse(
+                text="Выберите режим календаря:",
+                buttons=(("⚡ Быстрый режим", "calendar:mode:quick"), ("🔐 Личный Google Calendar", "calendar:mode:personal")),
+                reply_keyboard=(("📅 Календарь",),),
+            )
 
         if text.startswith("/edit"):
             return self._handle_edit_command(user_id=user.id, command=text)
@@ -89,8 +101,6 @@ class TelegramTransportRouter:
             if updated is not None:
                 self.state_repo.set(updated.__class__(user_id=updated.user_id, state=updated.state, draft=updated.draft, editing_field=None))
             return TelegramTransportResponse(text=self._get_pending_draft_text(user.id), buttons=self._build_draft_buttons_from_state(user.id))
-
-        normalized = text.strip()
 
         result = self.process_incoming_message.execute(IncomingMessageInput(user_id=user.id, text=normalized))
         if result.status != "preview_ready":
@@ -125,12 +135,19 @@ class TelegramTransportRouter:
             return TelegramTransportResponse(
                 text="Для редактирования используйте: /edit <field> <value>. Например: /edit title Sync update"
             )
+        if callback_data == "calendar:mode:quick":
+            return TelegramTransportResponse(text="⚡ Быстрый режим: события создаются в подключенном общем календаре. Просто отправьте текст события. Уведомления в этом режиме настраиваются в Google Calendar; кастомные уведомления через бота пока недоступны.")
+        if callback_data == "calendar:mode:personal":
+            return TelegramTransportResponse(text="🔐 Личный Google Calendar (OAuth) пока недоступен. Мы планируем добавить подключение личного календаря позже; после реализации и проверки это даст более гибкое персональное управление, включая кастомные уведомления.")
+
         if callback_data == CALLBACK_DURATION:
             snapshot = self.state_repo.get(user.id)
             if snapshot is None or snapshot.draft is None:
                 return TelegramTransportResponse(text="Нет черновика для редактирования длительности.")
             self.state_repo.set(snapshot.__class__(user_id=snapshot.user_id, state=snapshot.state, draft=snapshot.draft, editing_field="duration_minutes"))
             return TelegramTransportResponse(text="Введите длительность в минутах, например: 20")
+        if callback_data == CALLBACK_REMINDERS and not self.supports_custom_reminders:
+            return TelegramTransportResponse(text="Настройка уведомлений пока недоступна в быстром режиме календаря. Уведомления можно настроить в Google Calendar.")
         if callback_data == CALLBACK_REMINDERS:
             snapshot = self.state_repo.get(user.id)
             if snapshot is None or snapshot.draft is None:
@@ -150,6 +167,8 @@ class TelegramTransportRouter:
             CALLBACK_REMINDERS_60: "60",
             CALLBACK_REMINDERS_120: "120",
         }
+        if callback_data in reminder_callback_mapping and not self.supports_custom_reminders:
+            return TelegramTransportResponse(text="Настройка уведомлений пока недоступна в быстром режиме календаря. Уведомления можно настроить в Google Calendar.")
         if callback_data in reminder_callback_mapping:
             snapshot = self.state_repo.get(user.id)
             if snapshot is None or snapshot.draft is None:
@@ -208,7 +227,7 @@ class TelegramTransportRouter:
         snapshot = self.state_repo.get(user_id)
         if snapshot is None or snapshot.draft is None:
             return ()
-        return _build_draft_buttons(snapshot.draft)
+        return _build_draft_buttons(snapshot.draft, supports_custom_reminders=self.supports_custom_reminders)
 
     def _build_settings_response(self, user_id: int) -> TelegramTransportResponse:
         settings = self.get_user_settings.execute(user_id=user_id)
@@ -277,19 +296,17 @@ def format_preview_message(draft: EventDraft) -> str:
     return "\n".join(lines)
 
 
-def _build_draft_buttons(draft: EventDraft) -> tuple[tuple[str, str], ...]:
+def _build_draft_buttons(draft: EventDraft, *, supports_custom_reminders: bool = True) -> tuple[tuple[str, str], ...]:
     if detect_draft_validation_issue(draft, require_start_at=True) is not None:
         return (
             ("✏️ Edit", CALLBACK_EDIT),
             ("❌ Cancel", CALLBACK_CANCEL),
         )
-    return (
-        ("✅ Confirm", CALLBACK_CONFIRM),
-        ("⏱ Длительность", CALLBACK_DURATION),
-        ("🔔 Уведомления", CALLBACK_REMINDERS),
-        ("✏️ Edit", CALLBACK_EDIT),
-        ("❌ Cancel", CALLBACK_CANCEL),
-    )
+    buttons = [("✅ Confirm", CALLBACK_CONFIRM), ("⏱ Длительность", CALLBACK_DURATION)]
+    if supports_custom_reminders:
+        buttons.append(("🔔 Уведомления", CALLBACK_REMINDERS))
+    buttons.extend([("✏️ Edit", CALLBACK_EDIT), ("❌ Cancel", CALLBACK_CANCEL)])
+    return tuple(buttons)
 
 
 def _format_parser_diagnostics(metadata: dict[str, str]) -> list[str]:

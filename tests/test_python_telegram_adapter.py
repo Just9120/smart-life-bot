@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 pytest.importorskip("telegram")
@@ -25,9 +25,11 @@ from smart_life_bot.bot import (
     TelegramTransportResponse,
 )
 from smart_life_bot.bot.python_telegram_adapter import (
+    _post_init_set_commands,
     TelegramSDKAdapter,
     build_telegram_application,
     transport_buttons_to_inline_markup,
+    transport_reply_keyboard_to_markup,
 )
 from smart_life_bot.config.settings import Settings
 from smart_life_bot.domain.enums import GoogleAuthMode
@@ -86,7 +88,7 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
         assert len(callback_handlers) == 1
         assert (
             callback_handlers[0].pattern.pattern
-            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm)$"
+            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal)$"
         )
         assert tuple(application.bot_data["allowed_callback_data"]) == (
             CALLBACK_CONFIRM,
@@ -101,6 +103,8 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
             CALLBACK_SETTINGS_PARSER_PYTHON,
             CALLBACK_SETTINGS_PARSER_AUTO,
             CALLBACK_SETTINGS_PARSER_LLM,
+            "calendar:mode:quick",
+            "calendar:mode:personal",
         )
     finally:
         container.connection.close()
@@ -139,6 +143,18 @@ def test_start_handler_delegates_to_runtime_on_start() -> None:
 
     runtime.on_start.assert_called_once_with()
     assert message.reply_calls[0]["text"] == "Welcome"
+
+
+def test_reply_keyboard_is_mapped_separately_from_inline_markup() -> None:
+    markup = transport_reply_keyboard_to_markup((("📅 Календарь",),))
+    assert markup is not None
+    assert [[button.text for button in row] for row in markup.keyboard] == [["📅 Календарь"]]
+
+
+def test_post_init_registers_bot_commands() -> None:
+    app = SimpleNamespace(bot=SimpleNamespace(set_my_commands=AsyncMock()))
+    asyncio.run(_post_init_set_commands(app))
+    app.bot.set_my_commands.assert_called_once()
 
 
 def test_text_handler_delegates_to_runtime_on_text() -> None:
