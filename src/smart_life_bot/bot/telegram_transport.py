@@ -81,6 +81,8 @@ class TelegramTransportRouter:
         )
 
         normalized = text.strip()
+        if self._is_transport_conflict(normalized):
+            return TelegramTransportResponse(text="Похоже, здесь несколько вариантов. Что сделать?")
 
         if normalized == "📅 Календарь":
             return TelegramTransportResponse(
@@ -128,6 +130,12 @@ class TelegramTransportRouter:
             text=draft,
             buttons=self._build_draft_buttons_from_state(user.id),
         )
+
+    def _is_transport_conflict(self, text: str) -> bool:
+        lower = text.lower()
+        has_calendar_marker = any(marker in lower for marker in ("завтра", "напомни", "в "))
+        has_cashback_marker = ("кэшбек" in lower) or ("," in text and len([p for p in text.split(",") if p.strip()]) >= 4)
+        return has_calendar_marker and has_cashback_marker
 
     def handle_callback(self, telegram_user_id: int, callback_data: str) -> TelegramTransportResponse:
         user = self.users_repo.get_or_create_by_telegram_id(

@@ -12,6 +12,7 @@ from smart_life_bot.application.use_cases import (
     ProcessIncomingMessageUseCase,
     SetParserModeUseCase,
 )
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, QueryCashbackCategoryUseCase
 from smart_life_bot.auth.models import AuthContext
 from smart_life_bot.bot import (
     CALLBACK_CANCEL,
@@ -40,6 +41,7 @@ from smart_life_bot.storage.sqlite import (
     create_sqlite_connection,
     init_sqlite_schema,
 )
+from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
 
 
 class FakeParser:
@@ -240,6 +242,7 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         logger=SilentLogger(),
     )
 
+    cashback_repo = SQLiteCashbackCategoriesRepository(connection)
     router = TelegramTransportRouter(
         users_repo=deps.users_repo,
         state_repo=deps.state_repo,
@@ -251,6 +254,8 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         set_parser_mode=SetParserModeUseCase(deps),
         default_timezone="UTC",
         supports_custom_reminders=True,
+        add_cashback_category=AddCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
+        query_cashback_category=QueryCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
     )
     return router, deps
 
@@ -322,6 +327,40 @@ def test_start_includes_footer_calendar_menu() -> None:
     router, _ = _build_router()
     response = router.handle_start()
     assert ("📅 Календарь", "💳 Кэшбек") in response.reply_keyboard
+
+
+def test_cashback_menu_text_does_not_create_calendar_event() -> None:
+    router, deps = _build_router()
+    response = router.handle_text_message(telegram_user_id=90600, text="💳 Кэшбек")
+    assert "Раздел кэшбека" in response.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_telegram_cashback_add_and_query_flow() -> None:
+    router, _ = _build_router()
+    add = router.handle_text_message(telegram_user_id=90601, text="Альфа, Владимир, Супер   маркеты, 5%")
+    assert "Добавил кэшбек" in add.text
+    query = router.handle_text_message(telegram_user_id=90601, text="супер маркеты")
+    assert "🏆 Кэшбек" in query.text
+    assert "Владимир — Альфа — 5%" in query.text
+
+
+def test_calendar_text_flow_regression_still_returns_preview() -> None:
+    router, _ = _build_router()
+    response = router.handle_text_message(telegram_user_id=90602, text="Тест завтра в 15:00")
+    assert "Черновик события" in response.text
+
+
+def test_conflict_message_prevents_calendar_and_cashback_mutation() -> None:
+    router, deps = _build_router()
+    response = router.handle_text_message(telegram_user_id=90603, text="Напомни завтра выбрать кэшбек на супермаркеты")
+    assert "несколько вариантов" in response.text
+    user = deps.users_repo.get_by_telegram_id(90603)
+    assert user is not None
+    assert deps.state_repo.get(user.id) is None
+    response2 = router.handle_text_message(telegram_user_id=90603, text="Альфа, Владимир, Супермаркеты, 5% завтра")
+    assert "несколько вариантов" in response2.text
+    assert deps.state_repo.get(user.id) is None
 
 
 def test_footer_calendar_text_returns_mode_choices() -> None:

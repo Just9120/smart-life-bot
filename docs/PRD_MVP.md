@@ -69,3 +69,18 @@ Inline preview buttons остаются только для действий с 
 - **Phase 2 — Reliability, Editing, and Trust**
 - **Phase 3 — Task Layer**
 - **Phase 4 — Smart Routing and Context Layer**
+
+## 8. Cashback MVP module (`💳 Кэшбек`)
+
+- `💳 Кэшбек` — отдельный feature-модуль, изолированный от calendar use-cases.
+- Владельцы карт (MVP whitelist): `Виктор`, `Владимир`, `Елена`.
+- Формат структурного добавления: `банк, владелец, категория, процент`.
+  - В переходный период конца месяца требуется явный месяц: `банк, владелец, месяц, категория, процент`.
+  - Поддерживаемые month tokens в MVP: русские названия месяцев и `YYYY-MM`.
+  - Формат `MM.YYYY` (например, `05.2026`) в MVP не поддерживается.
+- Банки в MVP не ограничены whitelist'ом.
+- Поиск выполняется по текущему месяцу, хранение историчное по `target_month`.
+- Старые строки не удаляются физически; актуальность определяется фильтром `target_month` + `is_deleted=0`.
+- LLM fallback для cashback parsing и XLSX export — future work, вне текущего scope.
+- Границы application/use-case для cashback должны оставаться transport-agnostic (JSON-friendly результаты), Telegram отвечает только за рендер текста.
+- Migration в FastAPI/PWA/Telegram Mini App остаётся глубоким backlog, вне scope текущих PR.
