@@ -648,6 +648,38 @@ def test_successful_edit_start_at_clears_pending_recovery_and_random_hhmm_does_n
     assert "Черновик события:" in plain.text
 
 
+def test_invalid_edit_command_interrupts_recovery_and_hhmm_is_not_consumed() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+    router.handle_text_message(telegram_user_id=91006, text="Missing start_at")
+    started = router.handle_callback(telegram_user_id=91006, callback_data=CALLBACK_CALENDAR_DATE_START)
+    token = started.button_rows[0][0][1].split(":")[3]
+    router.handle_callback(telegram_user_id=91006, callback_data=f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}{token}:2026-06-15")
+
+    invalid_edit = router.handle_text_message(telegram_user_id=91006, text="/edit title")
+    assert "Формат: /edit <field> <value>" in invalid_edit.text
+    after = router.handle_text_message(telegram_user_id=91006, text="09:30")
+    assert "Черновик события:" in after.text
+    assert "2026-06-15T09:30:00+00:00" not in after.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_edit_validation_failure_interrupts_recovery_and_hhmm_is_not_consumed() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+    router.handle_text_message(telegram_user_id=91007, text="Missing start_at")
+    started = router.handle_callback(telegram_user_id=91007, callback_data=CALLBACK_CALENDAR_DATE_START)
+    token = started.button_rows[0][0][1].split(":")[3]
+    router.handle_callback(telegram_user_id=91007, callback_data=f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}{token}:2026-06-15")
+
+    invalid_start_at = router.handle_text_message(telegram_user_id=91007, text="/edit start_at tomorrow")
+    assert "Invalid datetime format for 'start_at'" in invalid_start_at.text
+    after = router.handle_text_message(telegram_user_id=91007, text="09:30")
+    assert "Черновик события:" in after.text
+    assert "2026-06-15T09:30:00+00:00" not in after.text
+    assert len(deps.calendar_service.requests) == 0
+
+
 def test_calendar_blank_placeholder_is_noop_not_cancel() -> None:
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()

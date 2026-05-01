@@ -190,7 +190,8 @@ class TelegramTransportRouter:
                 return TelegramTransportResponse(text=add_result.text)
 
 
-        if text.startswith("/edit"):
+        if normalized.startswith("/edit"):
+            self.pending_calendar_recovery.pop(user.id, None)
             return self._handle_edit_command(user_id=user.id, command=text)
         if text.strip() == "/settings":
             return self._build_settings_response(user.id)
@@ -498,7 +499,6 @@ class TelegramTransportRouter:
         )
         if result.status != "preview_ready":
             return TelegramTransportResponse(text=result.message)
-        self.pending_calendar_recovery.pop(user_id, None)
 
         return TelegramTransportResponse(
             text=self._get_pending_draft_text(user_id),
