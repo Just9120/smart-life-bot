@@ -1235,3 +1235,22 @@ def test_cashback_transition_invalid_month_does_not_mutate_storage() -> None:
     assert cashback_repo.list_active("2026-05") == []
     assert cashback_repo.list_active("2026-06") == []
 
+
+def test_cashback_transition_legacy_callback_is_stale_and_does_not_mutate_storage() -> None:
+    router, deps = _build_router()
+    cashback_repo = SQLiteCashbackCategoriesRepository(deps.users_repo._connection)  # type: ignore[attr-defined]
+    object.__setattr__(
+        router,
+        "add_cashback_category",
+        AddCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 26, tzinfo=UTC).date()),
+    )
+    object.__setattr__(router, "complete_transition_cashback_category", CompleteTransitionCashbackCategoryUseCase(cashback_repo))
+
+    prompt = router.handle_text_message(telegram_user_id=90614, text="Альфа, Владимир, Супермаркеты, 5%")
+    assert any(button[1].startswith(CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX) for button in prompt.buttons)
+
+    legacy = router.handle_callback(telegram_user_id=90614, callback_data=f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-05")
+    assert "устарела" in legacy.text
+    assert cashback_repo.list_active("2026-05") == []
+    assert cashback_repo.list_active("2026-06") == []
+
