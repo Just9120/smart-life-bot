@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 from typing import Literal
 
 from smart_life_bot.cashback.models import ALLOWED_OWNERS, CashbackAddInput
-from smart_life_bot.cashback.parser import in_transition_period, normalize_category_key, parse_structured_add, validate_owner
+from smart_life_bot.cashback.parser import in_transition_period, looks_like_cashback_add_attempt, normalize_category_key, parse_structured_add, validate_owner
 
 RU_MONTH_LABELS = {
     1: "январь", 2: "февраль", 3: "март", 4: "апрель", 5: "май", 6: "июнь",
@@ -51,7 +51,7 @@ def current_year_month(today: date) -> str:
 
 @dataclass(frozen=True, slots=True)
 class CashbackResult:
-    status: Literal["added", "updated", "invalid_owner", "transition_month_required", "not_cashback_add", "query_found", "query_not_found", "invalid_month", "list_found", "list_empty", "delete_confirmation", "delete_cancelled", "deleted", "delete_not_found", "delete_invalid_callback"]
+    status: Literal["added", "updated", "invalid_owner", "transition_month_required", "not_cashback_add", "query_found", "query_not_found", "invalid_month", "list_found", "list_empty", "delete_confirmation", "delete_cancelled", "deleted", "delete_not_found", "delete_invalid_callback", "invalid_format"]
     text: str
     target_month: str | None = None
     created: bool = False
@@ -116,6 +116,16 @@ class AddCashbackCategoryUseCase:
         today = self.now_provider()
         parsed = parse_structured_add(text, today)
         if parsed is None:
+            if looks_like_cashback_add_attempt(text):
+                return CashbackResult(
+                    status="invalid_format",
+                    text=(
+                        "Не понял формат кэшбека.\n"
+                        "Используй: банк, владелец, категория, процент\n"
+                        "Например: Т-Банк, Владимир, Аптеки, 5%"
+                    ),
+                    error_code="invalid_format",
+                )
             return None
         if len([p.strip() for p in text.split(",") if p.strip()]) == 5 and parsed.month is None:
             return CashbackResult(status="invalid_month", text="Некорректный месяц.\nИспользуй русское название месяца или YYYY-MM, например: май или 2026-05.", error_code="invalid_month")
