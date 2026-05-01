@@ -190,21 +190,22 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 ### 10.5 Parser settings checks (`/settings`)
 Проверьте parser modes (python/auto/llm) и безопасный fallback без LLM-конфига.
 
-### 10.6 Navigation + cashback smoke
-1. Отправьте `/start` и проверьте наличие footer menu с `📅 Календарь` и `💳 Кэшбек`.
-2. Нажмите `📅 Календарь` и проверьте, что открывается корректный календарный navigation path/режимы.
-3. Нажмите `💳 Кэшбек` и проверьте, что показываются меню/подсказки cashback-раздела.
-4. Добавьте категорию с явным месяцем (например, формат `банк, владелец, 2026-05, категория, процент`).
-5. Выполните query категории и проверьте корректный structured ответ.
-6. Отправьте конфликтный/неполный cashback текст и проверьте clarification without silent mutation.
-7. Нажмите `📋 Активные категории` и проверьте month-navigation кнопки (`⬅️ Предыдущий`, `Текущий`, `Следующий ➡️`).
-8. Проверьте owner-filter кнопки (`Виктор`, `Владимир`, `Елена`, `Все владельцы`): выбранный владелец фильтрует список только для текущего/выбранного месяца; `Все владельцы` сбрасывает фильтр.
-9. Для любой активной строки нажмите `Удалить #...` и проверьте экран подтверждения с деталями (owner/bank/category/percent/month).
-10. Нажмите `↩️ Отмена` и проверьте, что запись не изменилась.
-11. Повторите удаление и нажмите `✅ Подтвердить удаление`; проверьте, что запись исчезла из активного списка и query по категории.
-12. Отправьте прямой календарный текст и проверьте preview (без записи до Confirm).
-13. Нажмите Confirm только в календарном preview и проверьте, что запись создается только после explicit confirm.
-14. (Transition-period UX) На дате конца месяца (например, 26-е число) отправьте валидный 4-part cashback add `банк, владелец, категория, процент` и проверьте inline-кнопки выбора месяца (`текущий/следующий`) без требования повторно вводить всю строку.
+### 10.6 Focused Telegram UX smoke (calendar + cashback)
+1. Отправьте `/start` и проверьте явный выбор режима: `Выбери режим: 📅 Календарь или 💳 Кэшбек.`
+2. Нажмите `📅 Календарь` и проверьте ответ с текущим режимом: `Текущий режим: 📅 Календарь`.
+3. Отправьте календарный free-text и проверьте новый preview draft-copy.
+4. Для текста без даты/времени проверьте non-confirmable preview + кнопку `📅 Выбрать дату`.
+5. Пройдите `📅 Выбрать дату` → введите `HH:MM` → убедитесь, что событие не создаётся до явного Confirm.
+6. Нажмите `💳 Кэшбек` и проверьте ответ с текущим режимом: `Текущий режим: 💳 Кэшбек`.
+7. Проверьте явные действия в меню cashback: `📋 Активные категории`, `➕ Добавить категорию`, `🔎 Найти категорию`.
+8. Нажмите `➕ Добавить категорию` и проверьте, что callback-действие работает в реальном Telegram (не только transport tests).
+9. Нажмите `🔎 Найти категорию` и проверьте, что callback-действие работает в реальном Telegram (не только transport tests).
+10. В режиме `💳 Кэшбек` отправьте plain text категории и проверьте default query/search routing.
+11. Нажмите `📋 Активные категории` и проверьте видимую нумерацию строк `1.`, `2.` (без `#1`, `#2`).
+12. Проверьте, что кнопки Edit/Delete применяются к тем же видимым номерам строк.
+13. Проверьте owner reset: `Все` / `✅ Все` корректно снимает фильтр владельца.
+14. Переключите режимы `📅 Календарь` ↔ `💳 Кэшбек` и проверьте, что несовместимые pending-состояния очищаются.
+15. Data caution (production): Telegram smoke в `💳 Кэшбек` пишет в реальную persisted SQLite DB. Используйте реалистичные записи и удаляйте тестовые через UI (Edit/Delete); не выполняйте destructive DB cleanup в рамках smoke.
 
 ## 12) Docker isolation notes
 
@@ -283,17 +284,21 @@ Do not stop/remove unrelated containers or processes during diagnostics.
 - [ ] preflight passed
 - [ ] polling started
 - [ ] `/start` works and footer menu shows `📅 Календарь` + `💳 Кэшбек`
-- [ ] `📅 Календарь` navigation path works
-- [ ] `💳 Кэшбек` menu/help works
-- [ ] cashback add with explicit month works
-- [ ] cashback query works
-- [ ] cashback month navigation in `📋 Активные категории` works
-- [ ] cashback owner filter (`Виктор`/`Владимир`/`Елена`/`Все владельцы`) works for current and selected month
-- [ ] cashback delete confirmation/cancel/confirm works (cancel does not mutate)
-- [ ] deleted cashback record disappears from active list and category query
-- [ ] cashback conflict returns clarification
-- [ ] preview works for direct calendar text
-- [ ] Confirm creates Google Calendar event only after explicit press
+- [ ] `/start` показывает явный выбор режима (`📅 Календарь` / `💳 Кэшбек`)
+- [ ] `📅 Календарь` устанавливает active mode и показывает `Текущий режим: 📅 Календарь`
+- [ ] calendar free-text показывает актуальный draft preview copy
+- [ ] missing-date preview non-confirmable и содержит `📅 Выбрать дату`
+- [ ] calendar event не создаётся до явного Confirm
+- [ ] `💳 Кэшбек` устанавливает active mode и показывает `Текущий режим: 💳 Кэшбек`
+- [ ] меню cashback содержит `📋 Активные категории` / `➕ Добавить категорию` / `🔎 Найти категорию`
+- [ ] `➕ Добавить категорию` callback работает в реальном Telegram
+- [ ] `🔎 Найти категорию` callback работает в реальном Telegram
+- [ ] plain text в режиме cashback идёт в query/search path по умолчанию
+- [ ] `📋 Активные категории` показывает нумерацию `1.`, `2.` (без `#1`, `#2`)
+- [ ] кнопки edit/delete соответствуют видимым номерам строк
+- [ ] owner reset `Все` / `✅ Все` снимает фильтр владельца
+- [ ] переключение режимов очищает несовместимые pending-состояния
+- [ ] тестовые cashback-записи удалены через UI (без destructive DB cleanup)
 - [ ] Edit path works
 - [ ] Cancel path creates no event
 - [ ] non-confirmable draft hides Confirm
