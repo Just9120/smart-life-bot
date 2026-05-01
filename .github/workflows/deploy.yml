@@ -95,7 +95,7 @@ jobs:
           echo "previous_container_id=${previous_container_id:-none}"
           echo "previous_running_image_id=${previous_running_image_id}"
 
-          docker compose build --no-cache --build-arg APP_GIT_SHA="$host_commit" smart-life-bot
+          docker compose build --no-cache --pull --build-arg APP_GIT_SHA="$host_commit" smart-life-bot
           built_image_id="$(docker image inspect smart-life-bot:local --format='{{.Id}}' 2>/dev/null || true)"
           echo "built_service_image_id=${built_image_id:-unknown}"
           if [ -z "$built_image_id" ]; then
@@ -104,7 +104,11 @@ jobs:
           fi
 
           docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
-          docker compose up -d --force-recreate --no-deps smart-life-bot
+
+          docker compose stop smart-life-bot || true
+          docker compose rm -f smart-life-bot || true
+
+          docker compose up -d --force-recreate --no-deps --no-build smart-life-bot
 
           docker compose ps smart-life-bot
 

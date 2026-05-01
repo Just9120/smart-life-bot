@@ -70,19 +70,20 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 4. `git pull --ff-only`
 5. Проверка обязательных файлов: `.env`, `compose.yaml`, `Dockerfile`, `secrets/service-account.json`
 6. Capture previous runtime identity (`previous_container_id`, `previous_running_image_id`) before deploy for safe comparison.
-7. `host_commit="$(git rev-parse --short HEAD)"` + no-cache service-scoped rebuild: `docker compose build --no-cache --build-arg APP_GIT_SHA="$host_commit" smart-life-bot` (compose service uses explicit local tag `smart-life-bot:local`).
+7. `host_commit="$(git rev-parse --short HEAD)"` + no-cache service-scoped rebuild: `docker compose build --no-cache --pull --build-arg APP_GIT_SHA="$host_commit" smart-life-bot` (compose service uses explicit local tag `smart-life-bot:local`).
 8. `built_service_image_id` diagnostics are read from the explicit local tag: `docker image inspect smart-life-bot:local --format='{{.Id}}'` (safe even when previous container references a stale/removed image).
 9. `docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight` (preflight now always runs against freshly rebuilt image).
-10. Деплой принудительно пересоздаёт только целевой сервис и не трогает зависимости: `docker compose up -d --force-recreate --no-deps smart-life-bot`
-11. Post-deploy diagnostics (safe): workflow `GITHUB_REF`/`GITHUB_SHA`, remote `pwd`, remote branch, full/short remote HEAD, `docker compose version`, `docker compose ps smart-life-bot`, previous/new container ID, previous/new running image ID, built service image ID, new container created time/status.
-12. Stale-runtime guardrails (fail-fast):
+10. Перед запуском сервиса workflow явно останавливает и удаляет только целевой контейнер: `docker compose stop smart-life-bot || true` и `docker compose rm -f smart-life-bot || true` (без затрагивания других контейнеров).
+11. Деплой поднимает только целевой сервис без rebuild: `docker compose up -d --force-recreate --no-deps --no-build smart-life-bot`
+12. Post-deploy diagnostics (safe): workflow `GITHUB_REF`/`GITHUB_SHA`, remote `pwd`, remote branch, full/short remote HEAD, `docker compose version`, `docker compose ps smart-life-bot`, previous/new container ID, previous/new running image ID, built service image ID, new container created time/status.
+13. Stale-runtime guardrails (fail-fast):
    - deploy fails if `docker compose ps -q smart-life-bot` is empty after recreate;
    - deploy fails if `new_container_id == previous_container_id` (when previous exists);
    - deploy fails if `new_running_image_id != built_service_image_id`;
    - deploy fails if container env marker `SMART_LIFE_BOT_BUILD_SHA` does not match remote host commit.
-13. Post-deploy runtime verification inside container (`docker compose exec -T smart-life-bot ...`) проверяет build commit marker и ожидаемые кодовые признаки текущей версии, включая cashback month/delete/owner-filter callback markers (`CALLBACK_CASHBACK_LIST_MONTH_PREFIX`, `CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX`, `CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX`, `CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX`, `CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX`, `CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX`).
-14. Duplicate polling diagnostics (safe, read-only): `docker compose ls`, filtered `docker ps -a`, filtered `ps aux` for `smart_life_bot`/`telegram_polling`/`smart-life-bot`.
-15. `docker compose logs --tail=100 smart-life-bot`
+14. Post-deploy runtime verification inside container (`docker compose exec -T smart-life-bot ...`) проверяет build commit marker и ожидаемые кодовые признаки текущей версии, включая cashback month/delete/owner-filter callback markers (`CALLBACK_CASHBACK_LIST_MONTH_PREFIX`, `CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX`, `CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX`, `CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX`, `CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX`, `CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX`).
+15. Duplicate polling diagnostics (safe, read-only): `docker compose ls`, filtered `docker ps -a`, filtered `ps aux` for `smart_life_bot`/`telegram_polling`/`smart-life-bot`.
+16. `docker compose logs --tail=100 smart-life-bot`
 
 
 Ограничения по логированию deploy workflow:
@@ -95,6 +96,8 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 - `docker compose ps smart-life-bot` (container state/age) + `new_container_created_at`/`new_container_status`;
 - `previous_container_id` / `new_container_id` (должны отличаться при наличии предыдущего контейнера);
 - `previous_running_image_id` / `new_running_image_id` / `built_service_image_id` (`new_running_image_id` должен совпадать с built image);
+- на хосте может существовать старый образ/тег `smart-life-bot-smart-life-bot:latest`; это не критерий свежести runtime;
+- валидный критерий freshness: `new_running_image_id` контейнера должен совпадать с image ID `smart-life-bot:local`;
 - `SMART_LIFE_BOT_BUILD_SHA == host_git_commit`;
 - `post_deploy_runtime_verification=ok` (включая cashback month/delete/owner-filter callback markers);
 - duplicate polling diagnostics: `docker compose ls`, filtered `docker ps -a`, filtered `ps aux`.
