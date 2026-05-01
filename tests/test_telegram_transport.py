@@ -886,7 +886,7 @@ def test_cashback_active_categories_text_route_no_calendar_call() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90601, text="Альфа, Владимир, май, Супермаркеты, 5%")
     response = router.handle_text_message(telegram_user_id=90601, text="📋 Активные категории")
-    assert "📋 Активные категории кэшбека — май 2026" in response.text
+    assert "Активные категории — май 2026" in response.text
     assert ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}all:month:2026-04") in response.buttons
     assert ("Текущий", CALLBACK_CASHBACK_LIST_CURRENT) in response.buttons
     assert ("Следующий ➡️", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}all:month:2026-06") in response.buttons
@@ -910,7 +910,7 @@ def test_cashback_active_categories_selected_month_callback() -> None:
         telegram_user_id=90603,
         callback_data=f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}2026-06",
     )
-    assert "📋 Активные категории кэшбека — июнь 2026" in response.text
+    assert "Активные категории — июнь 2026" in response.text
     assert "АЗС" in response.text
     assert len(deps.calendar_service.requests) == 0
 
@@ -965,8 +965,8 @@ def test_cashback_delete_buttons_are_unambiguous_with_global_list_numbering() ->
     router.handle_text_message(telegram_user_id=90607, text="Альфа, Владимир, май, АЗС, 2%")
     router.handle_text_message(telegram_user_id=90607, text="Т-Банк, Елена, май, Супермаркеты, 7%")
     listed = router.handle_text_message(telegram_user_id=90607, text="📋 Активные категории")
-    assert "1. Владимир — Альфа — 2%" in listed.text
-    assert "2. Елена — Т-Банк — 7%" in listed.text
+    assert "#1 Владимир — Альфа — 2%" in listed.text
+    assert "#2 Елена — Т-Банк — 7%" in listed.text
     delete_buttons = [button for button in listed.buttons if button[0].startswith("Удалить #")]
     assert ("Удалить #1", "cashback:delete:request:1") in delete_buttons
     assert ("Удалить #2", "cashback:delete:request:2") in delete_buttons
@@ -988,13 +988,13 @@ def test_cashback_owner_filter_month_navigation_and_reset() -> None:
     router.handle_text_message(telegram_user_id=90608, text="Альфа, Владимир, июнь, АЗС, 5%")
 
     filtered = router.handle_callback(telegram_user_id=90608, callback_data=f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-05")
-    assert "— май 2026 — Владимир" in filtered.text
+    assert "Фильтр: Владимир" in filtered.text
     assert "Елена" not in filtered.text
     assert ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-04") in filtered.buttons
     june = router.handle_callback(telegram_user_id=90608, callback_data=f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-06")
-    assert "— июнь 2026 — Владимир" in june.text
+    assert "Фильтр: Владимир" in june.text
     reset = router.handle_callback(telegram_user_id=90608, callback_data=f"{CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX}all")
-    assert "📋 Активные категории кэшбека — май 2026" in reset.text
+    assert "Активные категории — май 2026" in reset.text
     assert len(deps.calendar_service.requests) == 0
 
 

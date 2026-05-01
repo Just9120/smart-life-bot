@@ -101,7 +101,7 @@ def test_regression_cashback_add_query_never_calls_calendar() -> None:
     assert "Что можно сделать" in menu.text
     assert "Добавил кэшбек" in add.text
     listed = router.handle_text_message(telegram_user_id=92006, text="📋 Активные категории")
-    assert "📋 Активные категории кэшбека — май 2026" in listed.text
+    assert "Активные категории — май 2026" in listed.text
     assert "🏆 Кэшбек" in query.text
     assert "Владимир — Альфа — 5%" in query.text
     assert len(deps.calendar_service.requests) == 0

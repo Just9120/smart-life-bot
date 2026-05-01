@@ -239,10 +239,11 @@ class ListActiveCashbackCategoriesUseCase:
                 text=f"На {month_label} для владельца {owner_name} кэшбек-категорий пока нет.",
             )
 
-        header = f"📋 Активные категории кэшбека — {month_label}"
+        lines = [f"Активные категории — {month_label}"]
         if owner_name is not None:
-            header = f"{header} — {owner_name}"
-        lines = [header, ""]
+            lines.extend([f"Фильтр: {owner_name}", ""])
+        else:
+            lines.append("")
         current = None
         global_index = 0
         for row in rows:
@@ -251,8 +252,11 @@ class ListActiveCashbackCategoriesUseCase:
                     lines.append("")
                 current = row.category_raw
                 lines.append(current)
-                lines.append("")
             global_index += 1
-            lines.append(f"{global_index}. {row.owner_name} — {row.bank_name} — {row.percent:g}%")
+            if owner_name is None:
+                row_text = f"#{global_index} {row.owner_name} — {row.bank_name} — {row.percent:g}%"
+            else:
+                row_text = f"#{global_index} {row.bank_name} — {row.percent:g}%"
+            lines.append(row_text)
 
         return CashbackResult(status="list_found", target_month=target_month, owner_filter=owner_name, records=rows, text="\n".join(lines))
