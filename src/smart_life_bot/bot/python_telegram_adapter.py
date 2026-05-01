@@ -27,6 +27,11 @@ from .telegram_transport import (
     CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
     CALLBACK_CASHBACK_TRANSITION_CANCEL,
     CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
+    CALLBACK_CALENDAR_DATE_CANCEL,
+    CALLBACK_CALENDAR_DATE_MONTH_PREFIX,
+    CALLBACK_CALENDAR_DATE_SELECT_PREFIX,
+    CALLBACK_CALENDAR_DATE_START,
+    CALLBACK_CALENDAR_DATE_NOOP_PREFIX,
     CALLBACK_CANCEL,
     CALLBACK_CONFIRM,
     CALLBACK_EDIT,
@@ -60,6 +65,8 @@ _ALLOWED_CALLBACKS = (
     "calendar:mode:personal",
     CALLBACK_CASHBACK_LIST_CURRENT,
     CALLBACK_CASHBACK_TRANSITION_CANCEL,
+    CALLBACK_CALENDAR_DATE_START,
+    CALLBACK_CALENDAR_DATE_CANCEL,
 )
 _ALLOWED_CALLBACK_PREFIXES = (
     CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
@@ -69,12 +76,16 @@ _ALLOWED_CALLBACK_PREFIXES = (
     CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
     CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
     CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
+    CALLBACK_CALENDAR_DATE_MONTH_PREFIX,
+    CALLBACK_CALENDAR_DATE_SELECT_PREFIX,
+    CALLBACK_CALENDAR_DATE_NOOP_PREFIX,
 )
 _CALLBACK_PATTERN = (
     r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|"
     r"draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|"
     r"settings:parser:python|settings:parser:auto|settings:parser:llm|"
     r"calendar:mode:quick|calendar:mode:personal|"
+    r"calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|"
     r"cashback:list:current|cashback:list:month:\d{4}-\d{2}|"
     r"cashback:list:owner:\d+:month:\d{4}-\d{2}|cashback:list:owner-current:\d+|"
     r"cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|"
@@ -142,8 +153,20 @@ def transport_buttons_to_inline_markup(buttons: tuple[tuple[str, str], ...]) -> 
     return InlineKeyboardMarkup(keyboard)
 
 
+def transport_button_rows_to_inline_markup(button_rows: tuple[tuple[tuple[str, str], ...], ...]) -> InlineKeyboardMarkup | None:
+    if not button_rows:
+        return None
+    keyboard = [
+        [InlineKeyboardButton(text=label, callback_data=callback_data) for label, callback_data in row]
+        for row in button_rows
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
 async def _reply_from_transport(message: Message, response: TelegramTransportResponse) -> None:
-    reply_markup = transport_buttons_to_inline_markup(response.buttons)
+    reply_markup = transport_button_rows_to_inline_markup(response.button_rows)
+    if reply_markup is None:
+        reply_markup = transport_buttons_to_inline_markup(response.buttons)
     if reply_markup is None:
         reply_markup = transport_reply_keyboard_to_markup(response.reply_keyboard)
     await message.reply_text(

@@ -19,6 +19,11 @@ from smart_life_bot.bot import (
     CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
     CALLBACK_CASHBACK_TRANSITION_CANCEL,
     CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
+    CALLBACK_CALENDAR_DATE_CANCEL,
+    CALLBACK_CALENDAR_DATE_MONTH_PREFIX,
+    CALLBACK_CALENDAR_DATE_SELECT_PREFIX,
+    CALLBACK_CALENDAR_DATE_START,
+    CALLBACK_CALENDAR_DATE_NOOP_PREFIX,
     CALLBACK_CANCEL,
     CALLBACK_CONFIRM,
     CALLBACK_DURATION,
@@ -37,6 +42,7 @@ from smart_life_bot.bot.python_telegram_adapter import (
     _post_init_set_commands,
     TelegramSDKAdapter,
     build_telegram_application,
+    transport_button_rows_to_inline_markup,
     transport_buttons_to_inline_markup,
     transport_reply_keyboard_to_markup,
 )
@@ -97,7 +103,7 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
         assert len(callback_handlers) == 1
         assert (
             callback_handlers[0].pattern.pattern
-            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal|cashback:list:current|cashback:list:month:\d{4}-\d{2}|cashback:list:owner:\d+:month:\d{4}-\d{2}|cashback:list:owner-current:\d+|cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:transition:select:\d{4}-\d{2}|cashback:transition:cancel)$"
+            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal|calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|cashback:list:current|cashback:list:month:\d{4}-\d{2}|cashback:list:owner:\d+:month:\d{4}-\d{2}|cashback:list:owner-current:\d+|cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:transition:select:\d{4}-\d{2}|cashback:transition:cancel)$"
         )
         assert tuple(application.bot_data["allowed_callback_data"]) == (
             CALLBACK_CONFIRM,
@@ -116,6 +122,8 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
             "calendar:mode:personal",
             CALLBACK_CASHBACK_LIST_CURRENT,
             CALLBACK_CASHBACK_TRANSITION_CANCEL,
+            CALLBACK_CALENDAR_DATE_START,
+            CALLBACK_CALENDAR_DATE_CANCEL,
         )
         assert tuple(application.bot_data["allowed_callback_prefixes"]) == (
             CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
@@ -125,6 +133,9 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
             CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
             CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
             CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
+            CALLBACK_CALENDAR_DATE_MONTH_PREFIX,
+            CALLBACK_CALENDAR_DATE_SELECT_PREFIX,
+            CALLBACK_CALENDAR_DATE_NOOP_PREFIX,
         )
     finally:
         container.connection.close()
@@ -150,6 +161,19 @@ def test_transport_response_buttons_convert_to_inline_keyboard_markup() -> None:
         [CALLBACK_EDIT],
         [CALLBACK_CANCEL],
     ]
+
+
+def test_transport_button_rows_render_as_real_inline_rows() -> None:
+    markup = transport_button_rows_to_inline_markup(
+        (
+            (("⬅️", "calendar:date:month:abc123:2026-05"), ("2026-06", "calendar:date:month:abc123:2026-06"), ("➡️", "calendar:date:month:abc123:2026-07")),
+            (("1", "calendar:date:select:abc123:2026-06-01"), ("2", "calendar:date:select:abc123:2026-06-02")),
+            (("↩️ Отмена", "calendar:date:cancel"),),
+        )
+    )
+    assert markup is not None
+    assert len(markup.inline_keyboard) == 3
+    assert [button.text for button in markup.inline_keyboard[0]] == ["⬅️", "2026-06", "➡️"]
 
 
 def test_start_handler_delegates_to_runtime_on_start() -> None:
