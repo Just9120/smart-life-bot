@@ -227,6 +227,13 @@ class SilentLogger:
         return None
 
 
+def _flatten_buttons(response: object) -> list[tuple[str, str]]:
+    button_rows = getattr(response, "button_rows", ())
+    if button_rows:
+        return [button for row in button_rows for button in row]
+    return list(getattr(response, "buttons", ()))
+
+
 @dataclass
 class Deps:
     parser: FakeParser
@@ -1268,7 +1275,7 @@ def test_edit_percent_flow_valid_invalid_cancel_and_no_calendar_calls() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90702, text='Альфа, Владимир, Аптеки, 5%')
     listing = router.handle_text_message(telegram_user_id=90702, text='📋 Активные категории')
-    edit_cb = next(cb for label, cb in listing.buttons if label.startswith('Изменить % #1'))
+    edit_cb = next(cb for label, cb in _flatten_buttons(listing) if label.startswith('Изменить % #1'))
     prompt = router.handle_callback(telegram_user_id=90702, callback_data=edit_cb)
     assert 'Введи новый процент' in prompt.text
     invalid = router.handle_text_message(telegram_user_id=90702, text='abc')
@@ -1286,7 +1293,7 @@ def test_edit_percent_flow_valid_invalid_cancel_and_no_calendar_calls() -> None:
 
     listing2 = router.handle_text_message(telegram_user_id=90702, text='📋 Активные категории')
     assert '7%' in listing2.text
-    edit_cb2 = next(cb for label, cb in listing2.buttons if label.startswith('Изменить % #1'))
+    edit_cb2 = next(cb for label, cb in _flatten_buttons(listing2) if label.startswith('Изменить % #1'))
     router.handle_callback(telegram_user_id=90702, callback_data=edit_cb2)
     cancel = router.handle_text_message(telegram_user_id=90702, text='cancel')
     assert 'отменено' in cancel.text.lower()
@@ -1304,7 +1311,7 @@ def test_pending_edit_percent_blocks_add_query_and_calendar_routing() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90704, text='Альфа, Владимир, Аптеки, 5%')
     listing = router.handle_text_message(telegram_user_id=90704, text='📋 Активные категории')
-    edit_cb = next(cb for label, cb in listing.buttons if label.startswith('Изменить % #1'))
+    edit_cb = next(cb for label, cb in _flatten_buttons(listing) if label.startswith('Изменить % #1'))
     router.handle_callback(telegram_user_id=90704, callback_data=edit_cb)
     user = deps.users_repo.get_by_telegram_id(90704)
     assert user is not None
@@ -1327,7 +1334,7 @@ def test_pending_edit_percent_clears_on_calendar_navigation() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90705, text='Альфа, Владимир, Аптеки, 5%')
     listing = router.handle_text_message(telegram_user_id=90705, text='📋 Активные категории')
-    edit_cb = next(cb for label, cb in listing.buttons if label.startswith('Изменить % #1'))
+    edit_cb = next(cb for label, cb in _flatten_buttons(listing) if label.startswith('Изменить % #1'))
     router.handle_callback(telegram_user_id=90705, callback_data=edit_cb)
     user = deps.users_repo.get_by_telegram_id(90705)
     assert user is not None

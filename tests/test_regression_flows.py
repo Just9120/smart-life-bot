@@ -20,6 +20,13 @@ from test_telegram_transport import (
 )
 
 
+def _flatten_buttons(response: object) -> list[tuple[str, str]]:
+    button_rows = getattr(response, "button_rows", ())
+    if button_rows:
+        return [button for row in button_rows for button in row]
+    return list(getattr(response, "buttons", ()))
+
+
 def test_regression_calendar_preview_confirm_gate_before_write() -> None:
     router, deps = _build_router()
 
@@ -176,7 +183,7 @@ def test_regression_switch_to_calendar_clears_pending_cashback_percent_edit() ->
     router.handle_text_message(telegram_user_id=92015, text="💳 Кэшбек")
     router.handle_text_message(telegram_user_id=92015, text="Альфа, Владимир, май, Супермаркеты, 5%")
     listing = router.handle_text_message(telegram_user_id=92015, text="📋 Активные категории")
-    edit_button = next(button for button in listing.buttons if button[1].startswith("cashback:edit-percent:request:"))
+    edit_button = next(button for button in _flatten_buttons(listing) if button[1].startswith("cashback:edit-percent:request:"))
     router.handle_callback(telegram_user_id=92015, callback_data=edit_button[1])
     user = deps.users_repo.get_by_telegram_id(92015)
     assert user is not None
