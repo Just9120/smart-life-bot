@@ -54,28 +54,43 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
+          echo "workflow_git_ref=${GITHUB_REF}"
+          echo "workflow_git_sha=${GITHUB_SHA}"
+
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -p 22 "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' <<'REMOTE_SCRIPT'
           set -euo pipefail
 
           cd /opt/smart-life-bot
+          echo "remote_pwd=$(pwd)"
 
           git rev-parse --is-inside-work-tree >/dev/null
           git fetch --all --prune
           git checkout main
           git pull --ff-only
 
+          remote_branch="$(git branch --show-current)"
+          remote_head_full="$(git rev-parse HEAD)"
+          remote_head_short="$(git rev-parse --short HEAD)"
+          echo "remote_git_branch=${remote_branch}"
+          echo "remote_git_head=${remote_head_full}"
+          echo "remote_git_head_short=${remote_head_short}"
+
           test -f .env
           test -f compose.yaml
           test -f Dockerfile
           test -f secrets/service-account.json
 
+          docker compose version
+          echo "compose_project=${COMPOSE_PROJECT_NAME:-smart-life-bot-default}"
+          docker compose ps smart-life-bot
+
           previous_container_id="$(docker compose ps -q smart-life-bot || true)"
-          previous_running_image_id="unknown"
+          previous_running_image_id="none"
           if [ -n "$previous_container_id" ]; then
             previous_running_image_id="$(docker inspect --format='{{.Image}}' "$previous_container_id")"
           fi
 
-          host_commit="$(git rev-parse --short HEAD)"
+          host_commit="$remote_head_short"
           echo "host_git_commit=${host_commit}"
           echo "previous_container_id=${previous_container_id:-none}"
           echo "previous_running_image_id=${previous_running_image_id}"
@@ -83,32 +98,57 @@ jobs:
           docker compose build --no-cache --build-arg APP_GIT_SHA="$host_commit" smart-life-bot
           built_image_id="$(docker image inspect smart-life-bot:local --format='{{.Id}}' 2>/dev/null || true)"
           echo "built_service_image_id=${built_image_id:-unknown}"
+          if [ -z "$built_image_id" ]; then
+            echo "ERROR: failed to resolve built image id for smart-life-bot:local" >&2
+            exit 1
+          fi
 
           docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
           docker compose up -d --force-recreate --no-deps smart-life-bot
 
           docker compose ps smart-life-bot
 
-          new_container_id="$(docker compose ps -q smart-life-bot)"
+          new_container_id="$(docker compose ps -q smart-life-bot || true)"
           if [ -z "$new_container_id" ]; then
             echo "ERROR: smart-life-bot container is not running after deploy" >&2
             exit 1
           fi
 
           new_running_image_id="$(docker inspect --format='{{.Image}}' "$new_container_id")"
+          new_container_created_at="$(docker inspect --format='{{.Created}}' "$new_container_id")"
+          new_container_status="$(docker inspect --format='{{.State.Status}}' "$new_container_id")"
           echo "new_container_id=${new_container_id}"
           echo "new_running_image_id=${new_running_image_id}"
+          echo "new_container_created_at=${new_container_created_at}"
+          echo "new_container_status=${new_container_status}"
 
           if [ -n "$previous_container_id" ] && [ "$previous_container_id" = "$new_container_id" ]; then
             echo "ERROR: forced recreate kept the same container id; deploy did not replace runtime container" >&2
             exit 1
           fi
 
+          if [ "$new_running_image_id" != "$built_image_id" ]; then
+            echo "ERROR: running image id does not match freshly built image id" >&2
+            exit 1
+          fi
+
+          echo "duplicate_polling_diagnostics=docker_compose_ls"
+          docker compose ls
+          echo "duplicate_polling_diagnostics=docker_ps_smart_life"
+          docker ps -a --format '{{.ID}}	{{.Image}}	{{.Names}}	{{.Status}}' | awk 'tolower($0) ~ /smart-life|smart_life|telegram|bot/' || true
+          echo "duplicate_polling_diagnostics=host_processes"
+          ps aux | awk 'tolower($0) ~ /smart_life_bot|telegram_polling|smart-life-bot/' || true
+
           docker compose exec -T -e HOST_COMMIT="$host_commit" smart-life-bot python - <<'PY'
           from datetime import datetime
           import os
 
+          from smart_life_bot.bot import telegram_transport as transport
           from smart_life_bot.bot.telegram_transport import (
+              CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
+              CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
+              CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX,
+              CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
               CALLBACK_DURATION,
               CALLBACK_REMINDERS,
               format_preview_message,
@@ -122,6 +162,12 @@ jobs:
 
           assert CALLBACK_DURATION == "draft:duration"
           assert CALLBACK_REMINDERS == "draft:reminders"
+          assert CALLBACK_CASHBACK_LIST_MONTH_PREFIX == "cashback:list:month:"
+          assert CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX == "cashback:delete:request:"
+          assert CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX == "cashback:delete:confirm:"
+          assert CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX == "cashback:delete:cancel:"
+          assert getattr(transport, "CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX") == "cashback:list:owner:"
+          assert getattr(transport, "CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX") == "cashback:list:owner-current:"
 
           parser = RuleBasedMessageParser(default_timezone="Europe/Amsterdam")
           parsed = parser.parse("Тест завтра в 15:00 длительность 20 минут", user_id=1)

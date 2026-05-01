@@ -146,7 +146,9 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 1. Убедитесь, что деплой выполнен из актуального `main` (`git rev-parse --short HEAD`).
 2. Сравните previous/new container ID и previous/new running image ID в deploy logs.
 3. Убедитесь, что контейнер пересоздан (`docker compose ps smart-life-bot`) и запущен после последнего rebuild.
-4. При необходимости проверьте build marker внутри runtime (`SMART_LIFE_BOT_BUILD_SHA`).
+4. Проверьте build marker внутри runtime (`SMART_LIFE_BOT_BUILD_SHA`) и его равенство текущему host commit.
+5. Проверьте, что runtime импортирует актуальные cashback callback markers (`cashback:list:month:`, `cashback:delete:request:`, `cashback:delete:confirm:`, `cashback:delete:cancel:`, `cashback:list:owner:`, `cashback:list:owner-current:`).
+6. Только после этих проверок переходите к Telegram smoke-сценариям.
 
 ### 10.1 Happy path (минимум)
 1. Отправьте `/start`.
@@ -206,8 +208,57 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 - `.env` не загружен: проверьте наличие файла и переменных.
 - Mismatch пути `GOOGLE_SERVICE_ACCOUNT_JSON` и mounted file.
 - Нет прав на `./data` для SQLite.
-- Polling уже запущен в другом контейнере/сессии.
+- Polling уже запущен в другом контейнере/сессии (duplicate consumer).
 - `Event creation failed` после Confirm: проверьте sharing calendar, calendar ID и service account key.
+
+
+### 12.1 Stale runtime diagnostics (manual commands, safe)
+
+```bash
+cd /opt/smart-life-bot
+git branch --show-current
+git rev-parse HEAD
+git rev-parse --short HEAD
+docker compose version
+docker compose ps smart-life-bot
+container_id="$(docker compose ps -q smart-life-bot)"
+docker inspect --format='{{.Id}} {{.Image}} {{.Created}} {{.State.Status}}' "$container_id"
+docker image inspect smart-life-bot:local --format='{{.Id}}'
+docker compose exec -T smart-life-bot python - <<'PY'
+import os
+from smart_life_bot.bot.telegram_transport import (
+    CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
+    CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX,
+    CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
+    CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
+    CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
+    CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX,
+)
+print('SMART_LIFE_BOT_BUILD_SHA=', os.environ.get('SMART_LIFE_BOT_BUILD_SHA', 'unknown'))
+print('CALLBACK_CASHBACK_LIST_MONTH_PREFIX=', CALLBACK_CASHBACK_LIST_MONTH_PREFIX)
+print('CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX=', CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX)
+print('CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX=', CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX)
+print('CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX=', CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX)
+print('CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX=', CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX)
+print('CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX=', CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX)
+PY
+```
+
+Interpretation:
+- running container image ID must equal `docker image inspect smart-life-bot:local` ID;
+- `SMART_LIFE_BOT_BUILD_SHA` must equal `git rev-parse --short HEAD`;
+- cashback callback markers must match expected latest literals;
+- if any mismatch exists, Telegram smoke is stale and invalid until redeploy is fixed.
+
+### 12.2 Duplicate polling consumer diagnostics (read-only)
+
+```bash
+docker compose ls
+docker ps -a --format '{{.ID}}	{{.Image}}	{{.Names}}	{{.Status}}' | awk 'tolower($0) ~ /smart-life|smart_life|telegram|bot/'
+ps aux | awk 'tolower($0) ~ /smart_life_bot|telegram_polling|smart-life-bot/'
+```
+
+Do not stop/remove unrelated containers or processes during diagnostics.
 
 ## 13) Smoke result checklist
 
