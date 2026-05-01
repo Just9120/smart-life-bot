@@ -342,7 +342,7 @@ class TelegramTransportRouter:
             result = self.soft_delete_cashback_category.execute(record_id)
             if result.target_month and self.list_active_cashback_categories is not None:
                 listing = self.list_active_cashback_categories.execute(month=result.target_month)
-                return TelegramTransportResponse(text=f"{result.text}\n\n{listing.text}", buttons=self._build_cashback_action_buttons(listing))
+                return TelegramTransportResponse(text=f"Удалил запись.\n\n{listing.text}", buttons=self._build_cashback_action_buttons(listing))
             return TelegramTransportResponse(text=result.text)
         if callback_data == CALLBACK_CASHBACK_TRANSITION_CANCEL:
             self.pending_cashback_transitions.pop(user.id, None)

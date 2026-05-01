@@ -944,7 +944,8 @@ def test_cashback_delete_request_cancel_confirm_flow() -> None:
         telegram_user_id=90605,
         callback_data=f"{CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX}1",
     )
-    assert "Деактивировано" in confirm.text
+    assert "Удалил запись." in confirm.text
+    assert "На май 2026 кэшбек-категорий пока нет." in confirm.text
     listed_after = router.handle_callback(telegram_user_id=90605, callback_data=CALLBACK_CASHBACK_LIST_CURRENT)
     assert "кэшбек-категорий пока нет" in listed_after.text
     assert len(deps.calendar_service.requests) == 0
@@ -973,7 +974,13 @@ def test_cashback_delete_buttons_are_unambiguous_with_global_list_numbering() ->
 
     request_second = router.handle_callback(telegram_user_id=90607, callback_data="cashback:delete:request:2")
     assert "Елена — Т-Банк — Супермаркеты — 7%" in request_second.text
-    router.handle_callback(telegram_user_id=90607, callback_data="cashback:delete:confirm:2")
+    confirm = router.handle_callback(telegram_user_id=90607, callback_data="cashback:delete:confirm:2")
+    assert "Удалил запись." in confirm.text
+    assert "Активные категории — май 2026" in confirm.text
+    assert "#1 Владимир — Альфа — 2%" in confirm.text
+    assert "#2" not in confirm.text
+    confirm_delete_buttons = [button for button in confirm.buttons if button[0].startswith("Удалить #")]
+    assert confirm_delete_buttons == [("Удалить #1", "cashback:delete:request:1")]
     query_azs = router.handle_text_message(telegram_user_id=90607, text="АЗС")
     listed_after = router.handle_callback(telegram_user_id=90607, callback_data=CALLBACK_CASHBACK_LIST_CURRENT)
     assert "🏆 Кэшбек" in query_azs.text
