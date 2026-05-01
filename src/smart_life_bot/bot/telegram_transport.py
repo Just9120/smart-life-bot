@@ -287,7 +287,10 @@ class TelegramTransportRouter:
             if cashback.status in {"query_found", "query_not_found"}:
                 return TelegramTransportResponse(text=cashback.text)
 
-        if self.active_feature_context.get(user.id) not in {"calendar", "cashback"} and self._looks_like_cashback_query(normalized):
+        if (
+            self.active_feature_context.get(user.id) not in {"calendar", "cashback"}
+            and self._is_ambiguous_plain_text_when_mode_unset(normalized)
+        ):
             return TelegramTransportResponse(
                 text="Выбери режим: 📅 Календарь или 💳 Кэшбек.",
                 reply_keyboard=(("📅 Календарь", "💳 Кэшбек"),),
@@ -330,6 +333,16 @@ class TelegramTransportRouter:
         if self.active_feature_context.get(user_id) != "cashback":
             return False
         return self._looks_like_cashback_query(text)
+
+    def _is_ambiguous_plain_text_when_mode_unset(self, text: str) -> bool:
+        normalized = text.strip()
+        if not normalized or normalized.startswith("/"):
+            return False
+        if normalized in {"📅 Календарь", "💳 Кэшбек", "📋 Активные категории"}:
+            return False
+        if "," in normalized:
+            return False
+        return re.fullmatch(r"[А-Яа-яЁё\-\s]+", normalized) is not None
 
     def handle_callback(self, telegram_user_id: int, callback_data: str) -> TelegramTransportResponse:
         user = self.users_repo.get_or_create_by_telegram_id(

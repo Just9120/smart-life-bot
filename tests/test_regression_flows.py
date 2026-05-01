@@ -151,6 +151,26 @@ def test_regression_unset_mode_ambiguous_text_requests_explicit_mode_choice() ->
     assert deps.state_repo.get(user.id) is None
 
 
+def test_regression_unset_mode_test_bez_daty_requests_mode_and_no_draft() -> None:
+    router, deps = _build_router()
+    response = router.handle_text_message(telegram_user_id=92017, text="Тест без даты")
+    assert response.text == "Выбери режим: 📅 Календарь или 💳 Кэшбек."
+    user = deps.users_repo.get_by_telegram_id(92017)
+    assert user is not None
+    assert deps.state_repo.get(user.id) is None
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_unset_mode_kupit_hleb_requests_mode_and_no_draft() -> None:
+    router, deps = _build_router()
+    response = router.handle_text_message(telegram_user_id=92018, text="Купить хлеб")
+    assert response.text == "Выбери режим: 📅 Календарь или 💳 Кэшбек."
+    user = deps.users_repo.get_by_telegram_id(92018)
+    assert user is not None
+    assert deps.state_repo.get(user.id) is None
+    assert len(deps.calendar_service.requests) == 0
+
+
 def test_regression_switch_to_calendar_clears_pending_cashback_percent_edit() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=92015, text="💳 Кэшбек")
@@ -170,6 +190,7 @@ def test_regression_switch_to_calendar_clears_pending_cashback_percent_edit() ->
 def test_regression_missing_date_phrase_reaches_calendar_preview() -> None:
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()
+    router.handle_text_message(telegram_user_id=92011, text="📅 Календарь")
 
     response = router.handle_text_message(telegram_user_id=92011, text="Тест без даты")
 
@@ -182,6 +203,7 @@ def test_regression_missing_date_phrase_reaches_calendar_preview() -> None:
 def test_regression_simple_russian_phrase_not_swallowed_by_cashback_query() -> None:
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()
+    router.handle_text_message(telegram_user_id=92012, text="📅 Календарь")
 
     response = router.handle_text_message(telegram_user_id=92012, text="Купить хлеб")
 
