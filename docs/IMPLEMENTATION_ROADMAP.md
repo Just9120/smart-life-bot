@@ -60,7 +60,7 @@
 - Расширить управление и поддержку жизненного цикла cashback-записей.
 
 **Scope candidates**
-- Списки категорий по выбранному месяцу.
+- Списки категорий по выбранному месяцу. _(first slice delivered: Telegram inline month navigation for `📋 Активные категории`)_
 - Списки/фильтрация по owner/bank/category (если подтверждена продуктовая ценность).
 - Soft-delete / edit записей.
 - Опциональные explicit month buttons в transition period.

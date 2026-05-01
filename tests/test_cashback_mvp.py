@@ -94,6 +94,20 @@ def test_list_active_categories_found_and_empty():
     assert empty.target_month == "2026-06"
 
 
+def test_list_active_categories_selected_month_only():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    add.execute("Альфа, Владимир, май, Супермаркеты, 5%")
+    add.execute("Т-Банк, Елена, июнь, Аптеки, 7%")
+    may = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute(month="2026-05")
+    june = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute(month="2026-06")
+    assert may.status == "list_found"
+    assert "Супермаркеты" in may.text
+    assert "Аптеки" not in may.text
+    assert june.status == "list_found"
+    assert "Аптеки" in june.text
+
+
 def test_month_label_and_readable_month_in_messages():
     repo = _repo()
     assert format_month_label("2026-05") == "май 2026"

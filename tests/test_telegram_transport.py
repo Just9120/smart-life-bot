@@ -23,6 +23,7 @@ from smart_life_bot.bot import (
     CALLBACK_REMINDERS_10,
     CALLBACK_REMINDERS_30,
     CALLBACK_CASHBACK_LIST_CURRENT,
+    CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
@@ -876,6 +877,9 @@ def test_cashback_active_categories_text_route_no_calendar_call() -> None:
     router.handle_text_message(telegram_user_id=90601, text="Альфа, Владимир, май, Супермаркеты, 5%")
     response = router.handle_text_message(telegram_user_id=90601, text="📋 Активные категории")
     assert "📋 Активные категории кэшбека — май 2026" in response.text
+    assert ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}2026-04") in response.buttons
+    assert ("Текущий", CALLBACK_CASHBACK_LIST_CURRENT) in response.buttons
+    assert ("Следующий ➡️", f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}2026-06") in response.buttons
     assert "Супермаркеты" in response.text
     assert len(deps.calendar_service.requests) == 0
 
@@ -884,4 +888,26 @@ def test_cashback_active_categories_callback_empty() -> None:
     router, deps = _build_router()
     response = router.handle_callback(telegram_user_id=90602, callback_data=CALLBACK_CASHBACK_LIST_CURRENT)
     assert "На май 2026 кэшбек-категорий пока нет." in response.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_cashback_active_categories_selected_month_callback() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90603, text="Альфа, Владимир, июнь, АЗС, 10%")
+    response = router.handle_callback(
+        telegram_user_id=90603,
+        callback_data=f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}2026-06",
+    )
+    assert "📋 Активные категории кэшбека — июнь 2026" in response.text
+    assert "АЗС" in response.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_cashback_active_categories_invalid_month_callback_fails_safe() -> None:
+    router, deps = _build_router()
+    response = router.handle_callback(
+        telegram_user_id=90604,
+        callback_data=f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}2026-13",
+    )
+    assert "Не удалось открыть месяц" in response.text
     assert len(deps.calendar_service.requests) == 0

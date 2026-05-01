@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Literal
 
 from smart_life_bot.cashback.models import ALLOWED_OWNERS, CashbackAddInput
@@ -14,8 +14,39 @@ RU_MONTH_LABELS = {
 
 
 def format_month_label(target_month: str) -> str:
-    year_raw, month_raw = target_month.split("-", maxsplit=1)
-    return f"{RU_MONTH_LABELS.get(int(month_raw), month_raw)} {year_raw}"
+    parsed = parse_year_month(target_month)
+    if parsed is None:
+        return target_month
+    year, month = parsed
+    return f"{RU_MONTH_LABELS.get(month, f'{month:02d}')} {year}"
+
+
+def parse_year_month(value: str) -> tuple[int, int] | None:
+    try:
+        year_raw, month_raw = value.split("-", maxsplit=1)
+        year = int(year_raw)
+        month = int(month_raw)
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if not (1 <= month <= 12):
+        return None
+    if not (1900 <= year <= 2100):
+        return None
+    return year, month
+
+
+def shift_year_month(value: str, *, delta: int) -> str | None:
+    parsed = parse_year_month(value)
+    if parsed is None:
+        return None
+    year, month = parsed
+    absolute = year * 12 + (month - 1) + delta
+    next_year, month_index = divmod(absolute, 12)
+    return f"{next_year:04d}-{month_index + 1:02d}"
+
+
+def current_year_month(today: date) -> str:
+    return f"{today.year:04d}-{today.month:02d}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,7 +80,7 @@ class AddCashbackCategoryUseCase:
         if parsed.month is None:
             if in_transition_period(today):
                 return CashbackResult(status="transition_month_required", text="Сейчас переходный период между месяцами.\nУкажи месяц явно, например:\nАльфа, Владимир, май, Супермаркеты, 5%", error_code="transition_month_required")
-            month = f"{today.year:04d}-{today.month:02d}"
+            month = current_year_month(today)
         else:
             month = parsed.month
         record, updated, old = self.repo.upsert(CashbackAddInput(parsed.bank, parsed.owner, parsed.category, parsed.percent, month, text))
@@ -66,7 +97,7 @@ class QueryCashbackCategoryUseCase:
 
     def execute(self, text: str) -> CashbackResult:
         today = self.now_provider()
-        month = f"{today.year:04d}-{today.month:02d}"
+        month = current_year_month(today)
         month_label = format_month_label(month)
         key = normalize_category_key(text)
         rows = self.repo.query(key, month)
@@ -85,7 +116,7 @@ class ListActiveCashbackCategoriesUseCase:
 
     def execute(self, month: str | None = None) -> CashbackResult:
         today = self.now_provider()
-        target_month = month or f"{today.year:04d}-{today.month:02d}"
+        target_month = month or current_year_month(today)
         month_label = format_month_label(target_month)
         rows = tuple(self.repo.list_active(target_month))
         if not rows:
