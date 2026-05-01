@@ -358,7 +358,8 @@ def test_start_includes_footer_calendar_menu() -> None:
 def test_cashback_menu_text_does_not_create_calendar_event() -> None:
     router, deps = _build_router()
     response = router.handle_text_message(telegram_user_id=90600, text="💳 Кэшбек")
-    assert "Что можно сделать" in response.text
+    assert "Текущий режим: 💳 Кэшбек" in response.text
+    assert "Напиши категорию, например: Аптеки." in response.text
     assert ("📋 Активные категории", CALLBACK_CASHBACK_LIST_CURRENT) in response.buttons
     assert len(deps.calendar_service.requests) == 0
 
