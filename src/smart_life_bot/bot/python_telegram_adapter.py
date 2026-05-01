@@ -89,7 +89,7 @@ _CALLBACK_PATTERN = (
     r"cashback:list:current|cashback:list:month:\d{4}-\d{2}|"
     r"cashback:list:owner:\d+:month:\d{4}-\d{2}|cashback:list:owner-current:\d+|"
     r"cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|"
-    r"cashback:transition:select:\d{4}-\d{2}|cashback:transition:cancel)$"
+    r"cashback:transition:select:[a-f0-9]{6}:\d{4}-\d{2}|cashback:transition:cancel)$"
 )
 
 
