@@ -21,6 +21,7 @@ from smart_life_bot.application.cashback_use_cases import (
     ListActiveCashbackCategoriesUseCase,
     QueryCashbackCategoryUseCase,
     RequestDeleteCashbackCategoryUseCase,
+    RequestEditCashbackCategoryPercentUseCase,
     SoftDeleteCashbackCategoryUseCase,
     CompleteTransitionCashbackCategoryUseCase,
     UpdateCashbackCategoryPercentUseCase,
@@ -115,6 +116,7 @@ class TelegramTransportRouter:
     query_cashback_category: QueryCashbackCategoryUseCase | None = None
     list_active_cashback_categories: ListActiveCashbackCategoriesUseCase | None = None
     request_delete_cashback_category: RequestDeleteCashbackCategoryUseCase | None = None
+    request_edit_cashback_category_percent: RequestEditCashbackCategoryPercentUseCase | None = None
     soft_delete_cashback_category: SoftDeleteCashbackCategoryUseCase | None = None
     complete_transition_cashback_category: CompleteTransitionCashbackCategoryUseCase | None = None
     update_cashback_category_percent: UpdateCashbackCategoryPercentUseCase | None = None
@@ -164,6 +166,7 @@ class TelegramTransportRouter:
             return TelegramTransportResponse(text="Похоже, здесь несколько вариантов. Что сделать?")
 
         if normalized == "📅 Календарь":
+            self.pending_cashback_percent_edit.pop(user.id, None)
             self.active_feature_context[user.id] = "calendar"
             return TelegramTransportResponse(
                 text="Выберите режим календаря:",
@@ -190,6 +193,20 @@ class TelegramTransportRouter:
             result = self.list_active_cashback_categories.execute()
             return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_action_buttons(result))
 
+        pending_edit = self.pending_cashback_percent_edit.get(user.id)
+        if pending_edit is not None and self.update_cashback_category_percent is not None:
+            if normalized.lower() == "cancel":
+                self.pending_cashback_percent_edit.pop(user.id, None)
+                return TelegramTransportResponse(text="Изменение процента отменено. Запись не изменена.")
+            result = self.update_cashback_category_percent.execute(str(pending_edit.record_id), normalized)
+            if result.status == "edit_percent_invalid":
+                return TelegramTransportResponse(text=result.text)
+            self.pending_cashback_percent_edit.pop(user.id, None)
+            if result.target_month and self.list_active_cashback_categories is not None:
+                listing = self.list_active_cashback_categories.execute(month=result.target_month)
+                return TelegramTransportResponse(text=f"{result.text}\n\n{listing.text}", buttons=self._build_cashback_action_buttons(listing))
+            return TelegramTransportResponse(text=result.text)
+
         if self.add_cashback_category is not None:
             add_result = self.add_cashback_category.execute(normalized)
             if add_result is not None:
@@ -208,21 +225,6 @@ class TelegramTransportRouter:
                     return TelegramTransportResponse(text=add_result.text, buttons=buttons)
                 self.active_feature_context[user.id] = "cashback"
                 return TelegramTransportResponse(text=add_result.text)
-
-        pending_edit = self.pending_cashback_percent_edit.get(user.id)
-        if pending_edit is not None and self.update_cashback_category_percent is not None:
-            if normalized.lower() == "cancel":
-                self.pending_cashback_percent_edit.pop(user.id, None)
-                return TelegramTransportResponse(text="Изменение процента отменено. Запись не изменена.")
-            result = self.update_cashback_category_percent.execute(str(pending_edit.record_id), normalized)
-            if result.status == "edit_percent_invalid":
-                return TelegramTransportResponse(text=result.text)
-            if result.target_month and self.list_active_cashback_categories is not None:
-                self.pending_cashback_percent_edit.pop(user.id, None)
-                listing = self.list_active_cashback_categories.execute(month=result.target_month)
-                return TelegramTransportResponse(text=f"{result.text}\n\n{listing.text}", buttons=self._build_cashback_action_buttons(listing))
-            self.pending_cashback_percent_edit.pop(user.id, None)
-            return TelegramTransportResponse(text=result.text)
 
 
         if normalized.startswith("/edit"):
@@ -510,11 +512,11 @@ class TelegramTransportRouter:
                     ("↩️ Отмена", f"{CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX}{record_id}"),
                 ),
             )
-        if callback_data.startswith(CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX) and self.request_delete_cashback_category is not None:
+        if callback_data.startswith(CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX) and self.request_edit_cashback_category_percent is not None:
             record_id = callback_data.removeprefix(CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX)
-            result = self.request_delete_cashback_category.execute(record_id)
-            if result.status != "delete_confirmation" or not result.records:
-                return TelegramTransportResponse(text="Запись не найдена или устарела. Обнови «📋 Активные категории».")
+            result = self.request_edit_cashback_category_percent.execute(record_id)
+            if not result.records:
+                return TelegramTransportResponse(text=result.text)
             record = result.records[0]
             self.pending_cashback_percent_edit[user.id] = PendingCashbackPercentEdit(record_id=record.id, target_month=record.target_month)
             return TelegramTransportResponse(text=f"Введи новый процент для «{record.category_raw}» ({record.owner_name} — {record.bank_name}).\nФормат: 7, 7%, 7,5% или 7.5%.\n\nДля отмены отправь: cancel")

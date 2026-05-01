@@ -109,6 +109,27 @@ class SoftDeleteCashbackCategoryUseCase:
         )
 
 
+class RequestEditCashbackCategoryPercentUseCase:
+    def __init__(self, repo) -> None:
+        self.repo = repo
+
+    def execute(self, record_id_raw: str) -> CashbackResult:
+        if not record_id_raw.isdigit():
+            return CashbackResult(status="edit_percent_not_found", text="Не удалось разобрать запись. Открой «📋 Активные категории» заново.")
+        record = self.repo.get_by_id(int(record_id_raw))
+        if record is None or record.is_deleted:
+            return CashbackResult(status="edit_percent_not_found", text="Запись не найдена или уже неактуальна. Обнови «📋 Активные категории».")
+        month_label = format_month_label(record.target_month)
+        return CashbackResult(
+            status="edit_percent_no_change",
+            text=f"Изменение процента:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — сейчас {record.percent:g}% — {month_label}",
+            target_month=record.target_month,
+            records=(record,),
+            old_percent=record.percent,
+            new_percent=record.percent,
+        )
+
+
 class UpdateCashbackCategoryPercentUseCase:
     def __init__(self, repo) -> None:
         self.repo = repo
