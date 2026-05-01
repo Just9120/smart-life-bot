@@ -1174,17 +1174,83 @@ def test_cashback_transition_period_shows_month_buttons_and_completes() -> None:
 
     prompt = router.handle_text_message(telegram_user_id=90610, text="Альфа, Владимир, Супермаркеты, 5%")
     assert "переходный период" in prompt.text
-    assert ("май 2026", f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-05") in prompt.buttons
-    assert ("июнь 2026", f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-06") in prompt.buttons
-    completed = router.handle_callback(telegram_user_id=90610, callback_data=f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-06")
+    select_buttons = [button for button in prompt.buttons if button[1].startswith(CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX)]
+    assert len(select_buttons) == 2
+    token = select_buttons[0][1].removeprefix(CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX).split(":", maxsplit=1)[0]
+    assert ("май 2026", f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}{token}:2026-05") in prompt.buttons
+    assert ("июнь 2026", f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}{token}:2026-06") in prompt.buttons
+    completed = router.handle_callback(telegram_user_id=90610, callback_data=f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}{token}:2026-06")
     assert "июнь 2026" in completed.text
     assert len(deps.calendar_service.requests) == 0
 
 
 def test_cashback_transition_callback_malformed_or_stale_fails_safe() -> None:
     router, deps = _build_router()
-    stale = router.handle_callback(telegram_user_id=90611, callback_data=f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-05")
+    stale = router.handle_callback(telegram_user_id=90611, callback_data=f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}abcdef:2026-05")
     assert "устарела" in stale.text
     cancel = router.handle_callback(telegram_user_id=90611, callback_data=CALLBACK_CASHBACK_TRANSITION_CANCEL)
     assert "отменено" in cancel.text
     assert len(deps.calendar_service.requests) == 0
+
+def test_cashback_transition_stale_token_does_not_mutate_storage() -> None:
+    router, deps = _build_router()
+    cashback_repo = SQLiteCashbackCategoriesRepository(deps.users_repo._connection)  # type: ignore[attr-defined]
+    object.__setattr__(
+        router,
+        "add_cashback_category",
+        AddCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 26, tzinfo=UTC).date()),
+    )
+    object.__setattr__(router, "complete_transition_cashback_category", CompleteTransitionCashbackCategoryUseCase(cashback_repo))
+
+    first = router.handle_text_message(telegram_user_id=90612, text="Альфа, Владимир, Супермаркеты, 5%")
+    first_token = [b for b in first.buttons if b[1].startswith(CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX)][0][1].split(":")[-2]
+
+    second = router.handle_text_message(telegram_user_id=90612, text="Т-Банк, Владимир, Аптеки, 7%")
+    second_button = [b for b in second.buttons if b[1].startswith(CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX)][0][1]
+    second_token = second_button.split(":")[-2]
+    assert first_token != second_token
+
+    stale = router.handle_callback(telegram_user_id=90612, callback_data=f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}{first_token}:2026-05")
+    assert "устарела" in stale.text
+
+    rows = cashback_repo.list_active("2026-05")
+    assert rows == []
+
+
+def test_cashback_transition_invalid_month_does_not_mutate_storage() -> None:
+    router, deps = _build_router()
+    cashback_repo = SQLiteCashbackCategoriesRepository(deps.users_repo._connection)  # type: ignore[attr-defined]
+    object.__setattr__(
+        router,
+        "add_cashback_category",
+        AddCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 26, tzinfo=UTC).date()),
+    )
+    object.__setattr__(router, "complete_transition_cashback_category", CompleteTransitionCashbackCategoryUseCase(cashback_repo))
+
+    prompt = router.handle_text_message(telegram_user_id=90613, text="Альфа, Владимир, Супермаркеты, 5%")
+    token = [b for b in prompt.buttons if b[1].startswith(CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX)][0][1].split(":")[-2]
+
+    invalid = router.handle_callback(telegram_user_id=90613, callback_data=f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}{token}:2026-07")
+    assert "Некорректный месяц" in invalid.text
+    assert cashback_repo.list_active("2026-05") == []
+    assert cashback_repo.list_active("2026-06") == []
+
+
+def test_cashback_transition_legacy_callback_is_stale_and_does_not_mutate_storage() -> None:
+    router, deps = _build_router()
+    cashback_repo = SQLiteCashbackCategoriesRepository(deps.users_repo._connection)  # type: ignore[attr-defined]
+    object.__setattr__(
+        router,
+        "add_cashback_category",
+        AddCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 26, tzinfo=UTC).date()),
+    )
+    object.__setattr__(router, "complete_transition_cashback_category", CompleteTransitionCashbackCategoryUseCase(cashback_repo))
+
+    prompt = router.handle_text_message(telegram_user_id=90614, text="Альфа, Владимир, Супермаркеты, 5%")
+    assert any(button[1].startswith(CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX) for button in prompt.buttons)
+
+    legacy = router.handle_callback(telegram_user_id=90614, callback_data=f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-05")
+    assert "устарела" in legacy.text
+    assert cashback_repo.list_active("2026-05") == []
+    assert cashback_repo.list_active("2026-06") == []
+

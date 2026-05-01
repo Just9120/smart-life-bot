@@ -103,7 +103,7 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
         assert len(callback_handlers) == 1
         assert (
             callback_handlers[0].pattern.pattern
-            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal|calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|cashback:list:current|cashback:list:month:\d{4}-\d{2}|cashback:list:owner:\d+:month:\d{4}-\d{2}|cashback:list:owner-current:\d+|cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:transition:select:\d{4}-\d{2}|cashback:transition:cancel)$"
+            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal|calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|cashback:list:current|cashback:list:month:\d{4}-\d{2}|cashback:list:owner:\d+:month:\d{4}-\d{2}|cashback:list:owner-current:\d+|cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:transition:select:(?:[a-f0-9]{6}:)?\d{4}-\d{2}|cashback:transition:cancel)$"
         )
         assert tuple(application.bot_data["allowed_callback_data"]) == (
             CALLBACK_CONFIRM,
@@ -281,6 +281,7 @@ def test_callback_pattern_accepts_supported_cashback_callbacks() -> None:
             f"{CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX}123",
             f"{CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX}123",
             f"{CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX}123",
+            f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}abcdef:2026-05",
             f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-05",
             CALLBACK_CASHBACK_TRANSITION_CANCEL,
         ):
@@ -302,7 +303,7 @@ def test_callback_pattern_rejects_unrelated_callback_data() -> None:
             "cashback:list:month:2026-5",
             "cashback:list:owner:abc:month:2026-05",
             "cashback:delete:request:abc",
-            "cashback:transition:select:26-05",
+            "cashback:transition:select:abcdef:26-05",
             "unknown:callback:data",
         ):
             assert pattern.match(callback_data) is None
