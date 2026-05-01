@@ -18,6 +18,15 @@ from smart_life_bot.config.settings import Settings
 
 from .runner import TelegramBotRuntime
 from .telegram_transport import (
+    CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
+    CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
+    CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX,
+    CALLBACK_CASHBACK_LIST_CURRENT,
+    CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
+    CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX,
+    CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
+    CALLBACK_CASHBACK_TRANSITION_CANCEL,
+    CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
     CALLBACK_CANCEL,
     CALLBACK_CONFIRM,
     CALLBACK_EDIT,
@@ -49,12 +58,27 @@ _ALLOWED_CALLBACKS = (
     CALLBACK_SETTINGS_PARSER_LLM,
     "calendar:mode:quick",
     "calendar:mode:personal",
+    CALLBACK_CASHBACK_LIST_CURRENT,
+    CALLBACK_CASHBACK_TRANSITION_CANCEL,
+)
+_ALLOWED_CALLBACK_PREFIXES = (
+    CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
+    CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
+    CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX,
+    CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX,
+    CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
+    CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
+    CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
 )
 _CALLBACK_PATTERN = (
     r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|"
     r"draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|"
     r"settings:parser:python|settings:parser:auto|settings:parser:llm|"
-    r"calendar:mode:quick|calendar:mode:personal)$"
+    r"calendar:mode:quick|calendar:mode:personal|"
+    r"cashback:list:current|cashback:list:month:\d{4}-\d{2}|"
+    r"cashback:list:owner:\d+:month:\d{4}-\d{2}|cashback:list:owner-current:\d+|"
+    r"cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|"
+    r"cashback:transition:select:\d{4}-\d{2}|cashback:transition:cancel)$"
 )
 
 
@@ -153,6 +177,7 @@ def build_telegram_application(settings: Settings, runtime: TelegramBotRuntime) 
     application.add_handler(CallbackQueryHandler(adapter.handle_callback_query, pattern=_CALLBACK_PATTERN))
 
     application.bot_data["allowed_callback_data"] = _ALLOWED_CALLBACKS
+    application.bot_data["allowed_callback_prefixes"] = _ALLOWED_CALLBACK_PREFIXES
     return application
 
 
