@@ -627,16 +627,16 @@ def test_missing_date_recovery_flow_keeps_confirm_gated_until_valid_time() -> No
     preview = router.handle_text_message(telegram_user_id=91001, text="Missing start_at")
     assert ("✅ Confirm", CALLBACK_CONFIRM) not in preview.buttons
     month = router.handle_callback(telegram_user_id=91001, callback_data=CALLBACK_CALENDAR_DATE_START)
-    assert "Выберите дату" in month.text
+    assert "Выбери дату" in month.text
     assert month.button_rows
     flattened = [button for row in month.button_rows for button in row]
     assert any(cb.startswith(CALLBACK_CALENDAR_DATE_SELECT_PREFIX) for _, cb in flattened)
     assert len(deps.calendar_service.requests) == 0
     token = flattened[0][1].split(":")[3]
     ask_time = router.handle_callback(telegram_user_id=91001, callback_data=f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}{token}:2026-06-15")
-    assert "Введите время" in ask_time.text
+    assert "напиши время" in ask_time.text
     bad_time = router.handle_text_message(telegram_user_id=91001, text="9pm")
-    assert "Неверный формат времени" in bad_time.text
+    assert "Не получилось распознать время" in bad_time.text
     ok_time = router.handle_text_message(telegram_user_id=91001, text="09:45")
     assert ("✅ Confirm", CALLBACK_CONFIRM) in ok_time.buttons
     assert "2026-06-15T09:45:00+00:00" in ok_time.text
@@ -653,9 +653,9 @@ def test_calendar_date_recovery_cancel_and_malformed_callbacks_fail_safely() -> 
     started = router.handle_callback(telegram_user_id=91002, callback_data=CALLBACK_CALENDAR_DATE_START)
     token = started.button_rows[0][0][1].split(":")[3]
     malformed = router.handle_callback(telegram_user_id=91002, callback_data=f"{CALLBACK_CALENDAR_DATE_MONTH_PREFIX}{token}:2026-99")
-    assert "Некорректный месяц" in malformed.text
+    assert "Кнопка устарела" in malformed.text
     malformed_date = router.handle_callback(telegram_user_id=91002, callback_data=f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}{token}:2026-02-31")
-    assert "Некорректная дата" in malformed_date.text
+    assert "Кнопка устарела" in malformed_date.text
     router.handle_callback(telegram_user_id=91002, callback_data=f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}{token}:2026-06-15")
     cancelled = router.handle_callback(telegram_user_id=91002, callback_data=CALLBACK_CANCEL)
     assert "Draft cancelled" in cancelled.text
@@ -730,9 +730,9 @@ def test_calendar_blank_placeholder_is_noop_not_cancel() -> None:
     noop_cb = noop_buttons[0]
     assert noop_cb.startswith(CALLBACK_CALENDAR_DATE_NOOP_PREFIX)
     response = router.handle_callback(telegram_user_id=91005, callback_data=noop_cb)
-    assert "Выберите дату" in response.text
+    assert "Выбери дату" in response.text
     ask_time = router.handle_callback(telegram_user_id=91005, callback_data=f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}{noop_cb.split(':')[3]}:2026-06-15")
-    assert "Введите время" in ask_time.text
+    assert "напиши время" in ask_time.text
     assert len(deps.calendar_service.requests) == 0
 
 

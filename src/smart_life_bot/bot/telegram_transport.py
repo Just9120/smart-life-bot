@@ -287,20 +287,20 @@ class TelegramTransportRouter:
         if pending_calendar is not None:
             if normalized.lower() == "cancel":
                 self.pending_calendar_recovery.pop(user.id, None)
-                return TelegramTransportResponse(text="Выбор даты/времени отменён. Черновик не изменён.")
+                return TelegramTransportResponse(text="Ок, выбор даты и времени отменён.")
             minutes = _parse_hh_mm_to_minutes(normalized)
             if minutes is None:
-                return TelegramTransportResponse(text="Неверный формат времени. Введите время как HH:MM, например 09:30.")
+                return TelegramTransportResponse(text="Не получилось распознать время.\nНапиши в формате HH:MM, например: 09:30.")
             snapshot = self.state_repo.get(user.id)
             if snapshot is None or snapshot.draft is None:
                 self.pending_calendar_recovery.pop(user.id, None)
-                return TelegramTransportResponse(text="Черновик устарел. Отправьте событие заново.")
+                return TelegramTransportResponse(text="Черновик уже изменился. Нажми «📅 Выбрать дату» ещё раз.")
             if not _recovery_draft_matches(snapshot.draft, pending_calendar.draft_fingerprint):
                 self.pending_calendar_recovery.pop(user.id, None)
-                return TelegramTransportResponse(text="Кнопка устарела: черновик изменился. Нажмите «📅 Выбрать дату» снова.")
+                return TelegramTransportResponse(text="Черновик изменился. Нажми «📅 Выбрать дату» ещё раз.")
             if snapshot.draft.start_at is not None:
                 self.pending_calendar_recovery.pop(user.id, None)
-                return TelegramTransportResponse(text="В черновике уже указано start_at. Если нужно, начните выбор даты заново.")
+                return TelegramTransportResponse(text="Дата и время уже выбраны. Если хочешь изменить, нажми «📅 Выбрать дату» ещё раз.")
             draft = snapshot.draft
             draft_tz = _resolve_draft_timezone(draft.timezone)
             if draft_tz is None:
@@ -308,7 +308,7 @@ class TelegramTransportRouter:
                 return TelegramTransportResponse(text="Не удалось применить timezone черновика. Используйте /edit timezone Europe/Amsterdam.")
             start_at = _combine_date_and_minutes(pending_calendar.selected_date, minutes, draft_tz)
             if start_at is None:
-                return TelegramTransportResponse(text="Не удалось распознать дату из кнопки. Нажмите «📅 Выбрать дату» снова.")
+                return TelegramTransportResponse(text="Не удалось прочитать дату с кнопки. Нажми «📅 Выбрать дату» ещё раз.")
             result = self.edit_draft_field.execute(
                 EditEventDraftFieldInput(user_id=user.id, field_name="start_at", field_value=start_at.isoformat())
             )
@@ -439,7 +439,7 @@ class TelegramTransportRouter:
                 selected_date="",
             )
             return TelegramTransportResponse(
-                text="Выберите дату:",
+                text="Выбери дату для события.",
                 button_rows=_build_month_grid_rows(_resolve_month_for_picker(snapshot.draft), token),
             )
         if callback_data.startswith(CALLBACK_CALENDAR_DATE_MONTH_PREFIX):
@@ -447,52 +447,58 @@ class TelegramTransportRouter:
             token, _, month_raw = payload.partition(":")
             pending = self.pending_calendar_recovery.get(user.id)
             if pending is None or not token or token != pending.session_token:
-                return TelegramTransportResponse(text="Кнопка устарела. Нажмите «📅 Выбрать дату» снова.")
+                return TelegramTransportResponse(text="Кнопка устарела. Нажми «📅 Выбрать дату» ещё раз.")
             parsed_month = _parse_year_month(month_raw)
             if parsed_month is None:
-                return TelegramTransportResponse(text="Некорректный месяц в кнопке. Нажмите «📅 Выбрать дату» снова.")
+                return TelegramTransportResponse(text="Кнопка устарела. Нажми «📅 Выбрать дату» ещё раз.")
             snapshot = self.state_repo.get(user.id)
             if snapshot is None or snapshot.draft is None or not _recovery_draft_matches(snapshot.draft, pending.draft_fingerprint):
                 self.pending_calendar_recovery.pop(user.id, None)
-                return TelegramTransportResponse(text="Кнопка устарела: черновик изменился. Нажмите «📅 Выбрать дату» снова.")
-            return TelegramTransportResponse(text="Выберите дату:", button_rows=_build_month_grid_rows(parsed_month, pending.session_token))
+                return TelegramTransportResponse(text="Черновик изменился. Нажми «📅 Выбрать дату» ещё раз.")
+            return TelegramTransportResponse(text="Выбери дату для события.", button_rows=_build_month_grid_rows(parsed_month, pending.session_token))
         if callback_data.startswith(CALLBACK_CALENDAR_DATE_SELECT_PREFIX):
             payload = callback_data.removeprefix(CALLBACK_CALENDAR_DATE_SELECT_PREFIX)
             token, _, selected_date = payload.partition(":")
             pending = self.pending_calendar_recovery.get(user.id)
             if pending is None or not token or token != pending.session_token:
-                return TelegramTransportResponse(text="Кнопка устарела. Нажмите «📅 Выбрать дату» снова.")
+                return TelegramTransportResponse(text="Кнопка устарела. Нажми «📅 Выбрать дату» ещё раз.")
             if _parse_iso_date(selected_date) is None:
-                return TelegramTransportResponse(text="Некорректная дата в кнопке. Нажмите «📅 Выбрать дату» снова.")
+                return TelegramTransportResponse(text="Кнопка устарела. Нажми «📅 Выбрать дату» ещё раз.")
             snapshot = self.state_repo.get(user.id)
             if snapshot is None or snapshot.draft is None:
-                return TelegramTransportResponse(text="Кнопка устарела. Отправьте событие заново.")
+                return TelegramTransportResponse(text="Кнопка устарела. Нажми «📅 Выбрать дату» ещё раз.")
             if not _recovery_draft_matches(snapshot.draft, pending.draft_fingerprint) or snapshot.draft.start_at is not None:
                 self.pending_calendar_recovery.pop(user.id, None)
-                return TelegramTransportResponse(text="Кнопка устарела: черновик изменился. Нажмите «📅 Выбрать дату» снова.")
+                return TelegramTransportResponse(text="Черновик изменился. Нажми «📅 Выбрать дату» ещё раз.")
             self.pending_calendar_recovery[user.id] = PendingCalendarDateRecovery(
                 session_token=pending.session_token,
                 draft_fingerprint=pending.draft_fingerprint,
                 selected_date=selected_date,
             )
-            return TelegramTransportResponse(text=f"Дата выбрана: {selected_date}. Введите время в формате HH:MM.")
+            return TelegramTransportResponse(
+                text=(
+                    f"Дата выбрана: {selected_date}.\n"
+                    "Теперь напиши время в формате HH:MM, например: 09:30.\n"
+                    "Это только обновит черновик — событие создастся после Confirm."
+                )
+            )
         if callback_data.startswith(CALLBACK_CALENDAR_DATE_NOOP_PREFIX):
             payload = callback_data.removeprefix(CALLBACK_CALENDAR_DATE_NOOP_PREFIX)
             token, _, month_raw = payload.partition(":")
             pending = self.pending_calendar_recovery.get(user.id)
             if pending is None or not token or token != pending.session_token:
-                return TelegramTransportResponse(text="Кнопка устарела. Нажмите «📅 Выбрать дату» снова.")
+                return TelegramTransportResponse(text="Кнопка устарела. Нажми «📅 Выбрать дату» ещё раз.")
             parsed_month = _parse_year_month(month_raw)
             if parsed_month is None:
-                return TelegramTransportResponse(text="Некорректный месяц в кнопке. Нажмите «📅 Выбрать дату» снова.")
+                return TelegramTransportResponse(text="Кнопка устарела. Нажми «📅 Выбрать дату» ещё раз.")
             snapshot = self.state_repo.get(user.id)
             if snapshot is None or snapshot.draft is None or not _recovery_draft_matches(snapshot.draft, pending.draft_fingerprint):
                 self.pending_calendar_recovery.pop(user.id, None)
-                return TelegramTransportResponse(text="Кнопка устарела: черновик изменился. Нажмите «📅 Выбрать дату» снова.")
-            return TelegramTransportResponse(text="Выберите дату:", button_rows=_build_month_grid_rows(parsed_month, pending.session_token))
+                return TelegramTransportResponse(text="Черновик изменился. Нажми «📅 Выбрать дату» ещё раз.")
+            return TelegramTransportResponse(text="Выбери дату для события.", button_rows=_build_month_grid_rows(parsed_month, pending.session_token))
         if callback_data == CALLBACK_CALENDAR_DATE_CANCEL:
             self.pending_calendar_recovery.pop(user.id, None)
-            return TelegramTransportResponse(text="Выбор даты отменён.")
+            return TelegramTransportResponse(text="Ок, выбор даты и времени отменён.")
         if callback_data == CALLBACK_REMINDERS and not self.supports_custom_reminders:
             return TelegramTransportResponse(text="Настройка уведомлений пока недоступна в быстром режиме календаря. Уведомления можно настроить в Google Calendar.")
         if callback_data == CALLBACK_REMINDERS:
