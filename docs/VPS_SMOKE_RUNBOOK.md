@@ -184,8 +184,12 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 4. Добавьте категорию с явным месяцем (например, формат `банк, владелец, 2026-05, категория, процент`).
 5. Выполните query категории и проверьте корректный structured ответ.
 6. Отправьте конфликтный/неполный cashback текст и проверьте clarification without silent mutation.
-7. Отправьте прямой календарный текст и проверьте preview (без записи до Confirm).
-8. Нажмите Confirm только в календарном preview и проверьте, что запись создается только после explicit confirm.
+7. Нажмите `📋 Активные категории` и проверьте month-navigation кнопки (`⬅️ Предыдущий`, `Текущий`, `Следующий ➡️`).
+8. Для любой активной строки нажмите `Удалить #...` и проверьте экран подтверждения с деталями (owner/bank/category/percent/month).
+9. Нажмите `↩️ Отмена` и проверьте, что запись не изменилась.
+10. Повторите удаление и нажмите `✅ Подтвердить удаление`; проверьте, что запись исчезла из активного списка и query по категории.
+11. Отправьте прямой календарный текст и проверьте preview (без записи до Confirm).
+12. Нажмите Confirm только в календарном preview и проверьте, что запись создается только после explicit confirm.
 
 ## 11) Docker isolation notes
 
@@ -214,6 +218,9 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 - [ ] `💳 Кэшбек` menu/help works
 - [ ] cashback add with explicit month works
 - [ ] cashback query works
+- [ ] cashback month navigation in `📋 Активные категории` works
+- [ ] cashback delete confirmation/cancel/confirm works (cancel does not mutate)
+- [ ] deleted cashback record disappears from active list and category query
 - [ ] cashback conflict returns clarification
 - [ ] preview works for direct calendar text
 - [ ] Confirm creates Google Calendar event only after explicit press

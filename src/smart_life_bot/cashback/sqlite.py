@@ -42,5 +42,28 @@ class SQLiteCashbackCategoriesRepository:
         rows = self._connection.execute("SELECT * FROM cashback_categories WHERE target_month=? AND is_deleted=0 ORDER BY category_key ASC, percent DESC", (target_month,)).fetchall()
         return [self._to_record(r) for r in rows]
 
+    def get_by_id(self, record_id: int) -> CashbackCategoryRecord | None:
+        row = self._connection.execute(
+            "SELECT * FROM cashback_categories WHERE id=?",
+            (record_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return self._to_record(row)
+
+    def soft_delete(self, record_id: int) -> CashbackCategoryRecord | None:
+        now = utcnow_iso()
+        cursor = self._connection.execute(
+            "UPDATE cashback_categories SET is_deleted=1, updated_at=? WHERE id=? AND is_deleted=0",
+            (now, record_id),
+        )
+        if cursor.rowcount == 0:
+            return None
+        self._connection.commit()
+        row = self._connection.execute("SELECT * FROM cashback_categories WHERE id=?", (record_id,)).fetchone()
+        if row is None:
+            return None
+        return self._to_record(row)
+
     def _to_record(self, row) -> CashbackCategoryRecord:
         return CashbackCategoryRecord(id=row["id"], owner_name=row["owner_name"], bank_name=row["bank_name"], category_raw=row["category_raw"], category_key=row["category_key"], percent=float(row["percent"]), target_month=row["target_month"], source_text=row["source_text"], created_at=_parse_iso_datetime(row["created_at"]), updated_at=_parse_iso_datetime(row["updated_at"]), is_deleted=bool(row["is_deleted"]))

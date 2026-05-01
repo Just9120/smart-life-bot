@@ -1,6 +1,6 @@
 from datetime import date
 
-from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, format_month_label
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase, format_month_label
 from smart_life_bot.cashback.parser import parse_structured_add
 from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
 from smart_life_bot.storage.sqlite import create_sqlite_connection, init_sqlite_schema
@@ -88,6 +88,7 @@ def test_list_active_categories_found_and_empty():
     assert found.target_month == "2026-05"
     assert "май 2026" in found.text
     assert "1. Владимир — Альфа — 5%" in found.text
+    assert "2. Елена — Т-Банк — 3%" in found.text
 
     empty = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026,6,3)).execute()
     assert empty.status == "list_empty"
@@ -108,6 +109,17 @@ def test_list_active_categories_selected_month_only():
     assert "Аптеки" in june.text
 
 
+def test_list_active_categories_uses_global_numbering_across_categories():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    add.execute("Альфа, Владимир, АЗС, 2%")
+    add.execute("Т-Банк, Елена, Супермаркеты, 7%")
+    result = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute()
+    assert result.status == "list_found"
+    assert "1. Владимир — Альфа — 2%" in result.text
+    assert "2. Елена — Т-Банк — 7%" in result.text
+
+
 def test_month_label_and_readable_month_in_messages():
     repo = _repo()
     assert format_month_label("2026-05") == "май 2026"
@@ -118,3 +130,36 @@ def test_month_label_and_readable_month_in_messages():
     query = QueryCashbackCategoryUseCase(repo, now_provider=lambda: date(2026,5,3)).execute('Аптеки')
     assert query.target_month == "2026-05"
     assert "май 2026" in query.text
+
+
+def test_soft_delete_hides_from_list_and_query_and_updates_timestamp():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    added = add.execute("Альфа, Владимир, Супермаркеты, 5%")
+    assert added is not None
+    record_id = added.records[0].id
+    before = repo.get_by_id(record_id)
+    assert before is not None and before.is_deleted is False
+    deleted_result = SoftDeleteCashbackCategoryUseCase(repo).execute(str(record_id))
+    assert deleted_result.status == "deleted"
+    after = repo.get_by_id(record_id)
+    assert after is not None and after.is_deleted is True
+    assert after.updated_at >= before.updated_at
+    assert repo.list_active("2026-05") == []
+    assert QueryCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute("Супермаркеты").status == "query_not_found"
+
+
+def test_delete_request_and_not_found_fail_safe_results():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    added = add.execute("Альфа, Владимир, Супермаркеты, 5%")
+    assert added is not None
+    request = RequestDeleteCashbackCategoryUseCase(repo).execute(str(added.records[0].id))
+    assert request.status == "delete_confirmation"
+    assert "Владимир" in request.text
+    assert "Альфа" in request.text
+    SoftDeleteCashbackCategoryUseCase(repo).execute(str(added.records[0].id))
+    not_found = SoftDeleteCashbackCategoryUseCase(repo).execute(str(added.records[0].id))
+    assert not_found.status == "delete_not_found"
+    invalid = RequestDeleteCashbackCategoryUseCase(repo).execute("bad")
+    assert invalid.status == "delete_invalid_callback"

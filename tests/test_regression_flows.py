@@ -8,6 +8,7 @@ from smart_life_bot.bot import (
     CALLBACK_EDIT,
     CALLBACK_CANCEL,
     CALLBACK_REMINDERS,
+    CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
 )
 from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase
 from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
@@ -150,3 +151,11 @@ def test_regression_cashback_use_case_structured_fields_exposed() -> None:
     assert len(updated.records) == 1
     assert updated.old_percent == 5
     assert updated.new_percent == 7
+
+
+def test_regression_cashback_selected_empty_month_has_safe_navigation() -> None:
+    router, deps = _build_router()
+    response = router.handle_callback(telegram_user_id=92008, callback_data=f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}2026-07")
+    assert "На июль 2026 кэшбек-категорий пока нет." in response.text
+    assert ("Текущий", "cashback:list:current") in response.buttons
+    assert len(deps.calendar_service.requests) == 0
