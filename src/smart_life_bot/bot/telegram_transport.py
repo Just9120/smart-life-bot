@@ -11,7 +11,7 @@ from smart_life_bot.application.dto import (
     EditEventDraftFieldInput,
     IncomingMessageInput,
 )
-from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, QueryCashbackCategoryUseCase
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
@@ -36,6 +36,7 @@ CALLBACK_REMINDERS_120 = "draft:reminders:120"
 CALLBACK_SETTINGS_PARSER_PYTHON = "settings:parser:python"
 CALLBACK_SETTINGS_PARSER_AUTO = "settings:parser:auto"
 CALLBACK_SETTINGS_PARSER_LLM = "settings:parser:llm"
+CALLBACK_CASHBACK_LIST_CURRENT = "cashback:list:current"
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +61,7 @@ class TelegramTransportRouter:
     supports_custom_reminders: bool = True
     add_cashback_category: AddCashbackCategoryUseCase | None = None
     query_cashback_category: QueryCashbackCategoryUseCase | None = None
+    list_active_cashback_categories: ListActiveCashbackCategoriesUseCase | None = None
 
     def handle_start(self) -> TelegramTransportResponse:
         return TelegramTransportResponse(
@@ -92,7 +94,20 @@ class TelegramTransportRouter:
             )
 
         if normalized == "💳 Кэшбек":
-            return TelegramTransportResponse(text="Раздел кэшбека: отправь строку в формате: банк, владелец, категория, процент")
+            return TelegramTransportResponse(
+                text=(
+                    "💳 Кэшбек\n\n"
+                    "Что можно сделать:\n\n"
+                    "* добавить категорию: Альфа, Владимир, май, Супермаркеты, 5%\n"
+                    "* быстро найти: Супермаркеты\n"
+                    "* посмотреть всё за месяц: 📋 Активные категории\n\n"
+                    "Владельцы: Виктор, Владимир, Елена."
+                ),
+                buttons=(("📋 Активные категории", CALLBACK_CASHBACK_LIST_CURRENT),),
+            )
+
+        if normalized == "📋 Активные категории" and self.list_active_cashback_categories is not None:
+            return TelegramTransportResponse(text=self.list_active_cashback_categories.execute().text)
 
         if self.add_cashback_category is not None:
             add_result = self.add_cashback_category.execute(normalized)
@@ -213,6 +228,9 @@ class TelegramTransportRouter:
             result, _ = self.set_parser_mode.execute(user_id=user.id, parser_mode=ParserMode.AUTO)
             settings_response = self._build_settings_response(user.id)
             return TelegramTransportResponse(text=f"{result.message}\n\n{settings_response.text}", buttons=settings_response.buttons)
+        if callback_data == CALLBACK_CASHBACK_LIST_CURRENT and self.list_active_cashback_categories is not None:
+            return TelegramTransportResponse(text=self.list_active_cashback_categories.execute().text)
+
         if callback_data == CALLBACK_SETTINGS_PARSER_LLM:
             result, _ = self.set_parser_mode.execute(user_id=user.id, parser_mode=ParserMode.LLM)
             settings_response = self._build_settings_response(user.id)

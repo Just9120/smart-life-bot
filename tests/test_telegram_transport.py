@@ -12,7 +12,7 @@ from smart_life_bot.application.use_cases import (
     ProcessIncomingMessageUseCase,
     SetParserModeUseCase,
 )
-from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, QueryCashbackCategoryUseCase
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase
 from smart_life_bot.auth.models import AuthContext
 from smart_life_bot.bot import (
     CALLBACK_CANCEL,
@@ -22,6 +22,7 @@ from smart_life_bot.bot import (
     CALLBACK_REMINDERS,
     CALLBACK_REMINDERS_10,
     CALLBACK_REMINDERS_30,
+    CALLBACK_CASHBACK_LIST_CURRENT,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
@@ -256,6 +257,7 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         supports_custom_reminders=True,
         add_cashback_category=AddCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
         query_cashback_category=QueryCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
+        list_active_cashback_categories=ListActiveCashbackCategoriesUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
     )
     return router, deps
 
@@ -332,7 +334,8 @@ def test_start_includes_footer_calendar_menu() -> None:
 def test_cashback_menu_text_does_not_create_calendar_event() -> None:
     router, deps = _build_router()
     response = router.handle_text_message(telegram_user_id=90600, text="💳 Кэшбек")
-    assert "Раздел кэшбека" in response.text
+    assert "Что можно сделать" in response.text
+    assert ("📋 Активные категории", CALLBACK_CASHBACK_LIST_CURRENT) in response.buttons
     assert len(deps.calendar_service.requests) == 0
 
 
@@ -867,3 +870,18 @@ def test_settings_llm_selection_keeps_current_mode_unchanged() -> None:
     preferences = deps.user_preferences_repo.get_for_user(user.id)
     assert preferences is not None
     assert preferences.parser_mode.value == "auto"
+
+def test_cashback_active_categories_text_route_no_calendar_call() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90601, text="Альфа, Владимир, май, Супермаркеты, 5%")
+    response = router.handle_text_message(telegram_user_id=90601, text="📋 Активные категории")
+    assert "📋 Активные категории кэшбека — май 2026" in response.text
+    assert "Супермаркеты" in response.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_cashback_active_categories_callback_empty() -> None:
+    router, deps = _build_router()
+    response = router.handle_callback(telegram_user_id=90602, callback_data=CALLBACK_CASHBACK_LIST_CURRENT)
+    assert "На май 2026 кэшбек-категорий пока нет." in response.text
+    assert len(deps.calendar_service.requests) == 0
