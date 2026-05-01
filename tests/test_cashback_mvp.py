@@ -172,6 +172,43 @@ def test_invalid_month_in_5_part_input_not_saved():
     assert repo.list_active('2026-05') == []
 
 
+def test_invalid_iso_month_13_comma_add_not_saved():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    result = add.execute("Альфа, Владимир, 2026-13, Супермаркеты, 5%")
+    assert result is not None
+    assert result.status == "invalid_month"
+    assert repo.list_active("2026-05") == []
+
+
+def test_invalid_iso_month_99_space_add_not_saved():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    result = add.execute("Т-Банк Владимир 2026-99 Аптеки 5%")
+    assert result is not None
+    assert result.status == "invalid_month"
+    assert repo.list_active("2026-05") == []
+
+
+def test_invalid_iso_zero_month_not_saved():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    result = add.execute("Т-Банк Владимир 2026-00 Аптеки 5%")
+    assert result is not None
+    assert result.status == "invalid_month"
+    assert repo.list_active("2026-05") == []
+
+
+def test_valid_explicit_iso_month_still_saved():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    result = add.execute("Альфа, Владимир, 2026-05, Супермаркеты, 5%")
+    assert result is not None
+    assert result.status == "added"
+    assert result.target_month == "2026-05"
+    assert len(repo.list_active("2026-05")) == 1
+
+
 def test_invalid_owner_result_contains_allowed_owners_and_not_saved():
     repo = _repo()
     add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))

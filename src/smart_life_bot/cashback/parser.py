@@ -30,7 +30,11 @@ def normalize_bank_name(value: str) -> str:
 def parse_month_token(token: str, today: date) -> str | None:
     t = normalize_category_key(token)
     if re.fullmatch(r"\d{4}-\d{2}", t):
-        return t
+        parsed = _parse_year_month_token(t)
+        if parsed is None:
+            return None
+        year, month = parsed
+        return f"{year:04d}-{month:02d}"
     month = RU_MONTHS.get(t)
     if month is None:
         return None
@@ -122,3 +126,40 @@ def looks_like_cashback_add_attempt(text: str) -> bool:
     if not re.match(r"^\d+(?:[\.,]\d+)?%$", tokens[-1]):
         return False
     return any(token in ALLOWED_OWNERS for token in tokens[:-1])
+
+
+def has_invalid_explicit_month_token(text: str, today: date) -> bool:
+    parts = [p.strip() for p in text.split(",") if p.strip()]
+    if len(parts) == 5:
+        month_token = parts[2]
+        if re.fullmatch(r"\d{4}-\d{2}", normalize_category_key(month_token)):
+            return parse_month_token(month_token, today) is None
+        return False
+
+    tokens = [t.strip() for t in re.split(r"[\s,]+", text.strip()) if t.strip()]
+    if len(tokens) < 5:
+        return False
+    owner_indexes = [idx for idx, token in enumerate(tokens[:-1]) if token in ALLOWED_OWNERS]
+    if len(owner_indexes) != 1:
+        return False
+    month_idx = owner_indexes[0] + 1
+    if month_idx >= len(tokens) - 1:
+        return False
+    month_token = tokens[month_idx]
+    if re.fullmatch(r"\d{4}-\d{2}", normalize_category_key(month_token)):
+        return parse_month_token(month_token, today) is None
+    return False
+
+
+def _parse_year_month_token(value: str) -> tuple[int, int] | None:
+    try:
+        year_raw, month_raw = value.split("-", maxsplit=1)
+        year = int(year_raw)
+        month = int(month_raw)
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if not (1 <= month <= 12):
+        return None
+    if not (1900 <= year <= 2100):
+        return None
+    return year, month

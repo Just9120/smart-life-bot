@@ -54,7 +54,11 @@ def test_regression_missing_start_at_draft_cannot_be_confirmed() -> None:
 
     assert ("✅ Confirm", CALLBACK_CONFIRM) not in preview.buttons
     assert len(deps.calendar_service.requests) == 0
-    assert "Cannot confirm event" in stale_confirm.text or "устарел" in stale_confirm.text
+    assert (
+        "Cannot confirm event" in stale_confirm.text
+        or "устарел" in stale_confirm.text
+        or "No pending draft for confirmation" in stale_confirm.text
+    )
 
 
 def test_regression_start_footer_contains_calendar_and_cashback() -> None:
@@ -118,6 +122,56 @@ def test_regression_cashback_space_separated_add_never_calls_calendar() -> None:
     assert "Добавил кэшбек" in add_with_month.text or "Обновил кэшбек" in add_with_month.text
     assert "🏆 Кэшбек" in query.text
     assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_cashback_query_not_found_does_not_fallthrough_to_calendar() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=92010, text="💳 Кэшбек")
+
+    response = router.handle_text_message(telegram_user_id=92010, text="Аптеки")
+
+    assert "ничего не найдено" in response.text
+    assert "Черновик события" not in response.text
+    user = deps.users_repo.get_by_telegram_id(92010)
+    assert user is not None
+    assert deps.state_repo.get(user.id) is None
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_missing_date_phrase_reaches_calendar_preview() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+
+    response = router.handle_text_message(telegram_user_id=92011, text="Тест без даты")
+
+    assert "Черновик события" in response.text
+    assert ("📅 Выбрать дату", "calendar:date:start") in response.buttons
+    assert "ничего не найдено" not in response.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_simple_russian_phrase_not_swallowed_by_cashback_query() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+
+    response = router.handle_text_message(telegram_user_id=92012, text="Купить хлеб")
+
+    assert "Черновик события" in response.text
+    assert ("📅 Выбрать дату", "calendar:date:start") in response.buttons
+    assert "ничего не найдено" not in response.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_common_one_two_word_event_texts_stay_in_calendar_flow() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+
+    for text in ("Созвон", "Тренировка", "Звонок маме"):
+        response = router.handle_text_message(telegram_user_id=92013, text=text)
+        assert "Черновик события" in response.text
+        assert ("📅 Выбрать дату", "calendar:date:start") in response.buttons
+        assert "ничего не найдено" not in response.text
+        assert len(deps.calendar_service.requests) == 0
 
 
 def test_regression_cashback_conflict_clarification_does_not_mutate_states() -> None:
