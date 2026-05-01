@@ -63,6 +63,8 @@ CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX = "cashback:list:owner:"
 CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX = "cashback:list:owner-current:"
 CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX = "cashback:transition:select:"
 CALLBACK_CASHBACK_TRANSITION_CANCEL = "cashback:transition:cancel"
+CALLBACK_CASHBACK_ADD_START = "cashback:add:start"
+CALLBACK_CASHBACK_SEARCH_HINT = "cashback:search:hint"
 CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX = "cashback:edit-percent:request:"
 LABEL_CASHBACK_ADD = "➕ Добавить категорию"
 LABEL_CASHBACK_SEARCH = "🔎 Найти категорию"
@@ -195,8 +197,8 @@ class TelegramTransportRouter:
                 ),
                 buttons=(
                     ("📋 Активные категории", CALLBACK_CASHBACK_LIST_CURRENT),
-                    (LABEL_CASHBACK_ADD, "cashback:add:start"),
-                    (LABEL_CASHBACK_SEARCH, "cashback:search:hint"),
+                    (LABEL_CASHBACK_ADD, CALLBACK_CASHBACK_ADD_START),
+                    (LABEL_CASHBACK_SEARCH, CALLBACK_CASHBACK_SEARCH_HINT),
                 ),
             )
         if normalized == LABEL_CASHBACK_ADD:
@@ -536,11 +538,11 @@ class TelegramTransportRouter:
         if callback_data == CALLBACK_CASHBACK_LIST_CURRENT and self.list_active_cashback_categories is not None:
             result = self.list_active_cashback_categories.execute()
             return TelegramTransportResponse(text=result.text, button_rows=self._build_cashback_action_button_rows(result))
-        if callback_data == "cashback:add:start":
+        if callback_data == CALLBACK_CASHBACK_ADD_START:
             self.pending_cashback_add[user.id] = True
             self.active_feature_context[user.id] = "cashback"
             return TelegramTransportResponse(text="Отправь категорию строкой в формате:\nАльфа, Владимир, май, Супермаркеты, 5%")
-        if callback_data == "cashback:search:hint":
+        if callback_data == CALLBACK_CASHBACK_SEARCH_HINT:
             self.active_feature_context[user.id] = "cashback"
             return TelegramTransportResponse(text="Напиши категорию, например: Аптеки.")
         if callback_data.startswith(CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX) and self.list_active_cashback_categories is not None:

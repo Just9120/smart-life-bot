@@ -1127,8 +1127,9 @@ def test_cashback_delete_buttons_are_unambiguous_with_global_list_numbering() ->
     router.handle_text_message(telegram_user_id=90607, text="Альфа, Владимир, май, АЗС, 2%")
     router.handle_text_message(telegram_user_id=90607, text="Т-Банк, Елена, май, Супермаркеты, 7%")
     listed = router.handle_text_message(telegram_user_id=90607, text="📋 Активные категории")
-    assert "#1 Владимир — Альфа — 2%" in listed.text
-    assert "#2 Елена — Т-Банк — 7%" in listed.text
+    assert "1. Владимир — Альфа — 2%" in listed.text
+    assert "2. Елена — Т-Банк — 7%" in listed.text
+    assert "#1" not in listed.text
     delete_buttons = [button for button in _flatten_buttons(listed) if button[0].startswith("🗑 Удалить #")]
     assert ("🗑 Удалить #1", "cashback:delete:request:1") in delete_buttons
     assert ("🗑 Удалить #2", "cashback:delete:request:2") in delete_buttons
@@ -1138,7 +1139,7 @@ def test_cashback_delete_buttons_are_unambiguous_with_global_list_numbering() ->
     confirm = router.handle_callback(telegram_user_id=90607, callback_data="cashback:delete:confirm:2")
     assert "Готово, убрал категорию из активных." in confirm.text
     assert "Активные кэшбек-категории — май 2026" in confirm.text
-    assert "#1 Владимир — Альфа — 2%" in confirm.text
+    assert "1. Владимир — Альфа — 2%" in confirm.text
     assert "#2" not in confirm.text
     confirm_delete_buttons = [button for button in _flatten_buttons(confirm) if button[0].startswith("🗑 Удалить #")]
     assert confirm_delete_buttons == [("🗑 Удалить #1", "cashback:delete:request:1")]

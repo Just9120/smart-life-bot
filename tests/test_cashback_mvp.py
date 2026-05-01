@@ -228,8 +228,9 @@ def test_list_active_categories_found_and_empty():
     assert found.status == "list_found"
     assert found.target_month == "2026-05"
     assert "май 2026" in found.text
-    assert "#1 Владимир — Альфа — 5%" in found.text
-    assert "#2 Елена — Т-Банк — 3%" in found.text
+    assert "1. Владимир — Альфа — 5%" in found.text
+    assert "2. Елена — Т-Банк — 3%" in found.text
+    assert "#1" not in found.text
 
     empty = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026,6,3)).execute()
     assert empty.status == "list_empty"
@@ -257,8 +258,8 @@ def test_list_active_categories_uses_global_numbering_across_categories():
     add.execute("Т-Банк, Елена, Супермаркеты, 7%")
     result = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute()
     assert result.status == "list_found"
-    assert "#1 Владимир — Альфа — 2%" in result.text
-    assert "#2 Елена — Т-Банк — 7%" in result.text
+    assert "1. Владимир — Альфа — 2%" in result.text
+    assert "2. Елена — Т-Банк — 7%" in result.text
 
 
 def test_month_label_and_readable_month_in_messages():
