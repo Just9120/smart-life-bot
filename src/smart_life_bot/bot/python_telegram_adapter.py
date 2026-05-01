@@ -21,6 +21,8 @@ from .telegram_transport import (
     CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
     CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
     CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX,
+    CALLBACK_CASHBACK_ADD_START,
+    CALLBACK_CASHBACK_SEARCH_HINT,
     CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX,
     CALLBACK_CASHBACK_LIST_CURRENT,
     CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
@@ -65,6 +67,8 @@ _ALLOWED_CALLBACKS = (
     "calendar:mode:quick",
     "calendar:mode:personal",
     CALLBACK_CASHBACK_LIST_CURRENT,
+    CALLBACK_CASHBACK_ADD_START,
+    CALLBACK_CASHBACK_SEARCH_HINT,
     CALLBACK_CASHBACK_TRANSITION_CANCEL,
     CALLBACK_CALENDAR_DATE_START,
     CALLBACK_CALENDAR_DATE_CANCEL,
@@ -88,7 +92,7 @@ _CALLBACK_PATTERN = (
     r"settings:parser:python|settings:parser:auto|settings:parser:llm|"
     r"calendar:mode:quick|calendar:mode:personal|"
     r"calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|"
-    r"cashback:list:current|cashback:list:month:\d{4}-\d{2}|"
+    r"cashback:list:current|cashback:add:start|cashback:search:hint|cashback:list:month:\d{4}-\d{2}|"
     r"cashback:list:owner:(?:\d+|all):month:\d{4}-\d{2}|cashback:list:owner-current:(?:\d+|all)|"
     r"cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:edit-percent:request:\d+|"
     r"cashback:transition:select:(?:[a-f0-9]{6}:)?\d{4}-\d{2}|cashback:transition:cancel)$"
