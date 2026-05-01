@@ -224,5 +224,6 @@ def test_regression_cashback_selected_empty_month_has_safe_navigation() -> None:
     router, deps = _build_router()
     response = router.handle_callback(telegram_user_id=92008, callback_data=f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}2026-07")
     assert "На июль 2026 кэшбек-категорий пока нет." in response.text
-    assert ("Текущий", "cashback:list:current") in response.buttons
+    buttons = [button for row in response.button_rows for button in row] if response.button_rows else list(response.buttons)
+    assert ("Текущий", "cashback:list:current") in buttons
     assert len(deps.calendar_service.requests) == 0
