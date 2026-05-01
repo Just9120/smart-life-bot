@@ -76,6 +76,7 @@ def test_regression_calendar_menu_navigation_never_creates_events() -> None:
     quick = router.handle_callback(telegram_user_id=92004, callback_data="calendar:mode:quick")
     personal = router.handle_callback(telegram_user_id=92004, callback_data="calendar:mode:personal")
 
+    assert "Текущий режим: 📅 Календарь" in menu.text
     assert ("⚡ Быстрый режим", "calendar:mode:quick") in menu.buttons
     assert ("🔐 Личный Google Calendar", "calendar:mode:personal") in menu.buttons
     assert "Быстрый режим" in quick.text
@@ -102,7 +103,7 @@ def test_regression_cashback_add_query_never_calls_calendar() -> None:
     add = router.handle_text_message(telegram_user_id=92006, text="Альфа, Владимир, 2026-05, Супермаркеты, 5%")
     query = router.handle_text_message(telegram_user_id=92006, text="Супермаркеты")
 
-    assert "Что можно сделать" in menu.text
+    assert "Текущий режим: 💳 Кэшбек" in menu.text
     assert "Добавил кэшбек" in add.text
     listed = router.handle_text_message(telegram_user_id=92006, text="📋 Активные категории")
     assert "Активные категории — май 2026" in listed.text
@@ -142,6 +143,7 @@ def test_regression_missing_date_phrase_reaches_calendar_preview() -> None:
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()
 
+    router.handle_text_message(telegram_user_id=92011, text="📅 Календарь")
     response = router.handle_text_message(telegram_user_id=92011, text="Тест без даты")
 
     assert "Черновик события" in response.text
@@ -154,6 +156,7 @@ def test_regression_simple_russian_phrase_not_swallowed_by_cashback_query() -> N
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()
 
+    router.handle_text_message(telegram_user_id=92012, text="📅 Календарь")
     response = router.handle_text_message(telegram_user_id=92012, text="Купить хлеб")
 
     assert "Черновик события" in response.text
@@ -166,6 +169,7 @@ def test_regression_common_one_two_word_event_texts_stay_in_calendar_flow() -> N
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()
 
+    router.handle_text_message(telegram_user_id=92013, text="📅 Календарь")
     for text in ("Созвон", "Тренировка", "Звонок маме"):
         response = router.handle_text_message(telegram_user_id=92013, text=text)
         assert "Черновик события" in response.text
@@ -192,6 +196,18 @@ def test_regression_cashback_conflict_clarification_does_not_mutate_states() -> 
     assert user is not None
     assert deps.state_repo.get(user.id) is None
     assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_unset_mode_plain_text_requires_explicit_mode() -> None:
+    router, deps = _build_router()
+
+    for user_suffix, text in enumerate(("Аптеки", "Супермаркеты", "Созвон", "Тренировка", "Звонок маме", "Тест без даты", "Купить хлеб"), start=1):
+        response = router.handle_text_message(telegram_user_id=92100 + user_suffix, text=text)
+        assert response.text == "Выбери режим: 📅 Календарь или 💳 Кэшбек."
+        assert ("📅 Календарь", "💳 Кэшбек") in response.reply_keyboard
+        user = deps.users_repo.get_by_telegram_id(92100 + user_suffix)
+        assert user is not None
+        assert deps.state_repo.get(user.id) is None
 
 
 def test_regression_cashback_use_case_structured_fields_exposed() -> None:

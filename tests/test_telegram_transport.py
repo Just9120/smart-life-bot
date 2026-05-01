@@ -1340,5 +1340,5 @@ def test_pending_edit_percent_clears_on_calendar_navigation() -> None:
     assert user is not None
     assert user.id in router.pending_cashback_percent_edit
     nav = router.handle_text_message(telegram_user_id=90705, text='📅 Календарь')
-    assert 'Выберите режим календаря' in nav.text
+    assert 'Текущий режим: 📅 Календарь' in nav.text
     assert user.id not in router.pending_cashback_percent_edit
