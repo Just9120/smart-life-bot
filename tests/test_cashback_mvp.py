@@ -163,3 +163,20 @@ def test_delete_request_and_not_found_fail_safe_results():
     assert not_found.status == "delete_not_found"
     invalid = RequestDeleteCashbackCategoryUseCase(repo).execute("bad")
     assert invalid.status == "delete_invalid_callback"
+
+
+def test_list_active_categories_owner_filter_and_invalid_owner():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    add.execute("Альфа, Владимир, май, АЗС, 2%")
+    add.execute("Т-Банк, Елена, май, АЗС, 5%")
+    filtered = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute(month="2026-05", owner_name="Владимир")
+    assert filtered.status == "list_found"
+    assert "— май 2026 — Владимир" in filtered.text
+    assert "Елена" not in filtered.text
+    assert len(filtered.records) == 1
+    empty = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute(month="2026-06", owner_name="Владимир")
+    assert empty.status == "list_empty"
+    assert "для владельца Владимир" in empty.text
+    invalid = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute(month="2026-05", owner_name="Иван")
+    assert invalid.error_code == "invalid_owner_filter"

@@ -62,7 +62,8 @@
 **Scope candidates**
 - Списки категорий по выбранному месяцу. _(first slice delivered: Telegram inline month navigation for `📋 Активные категории`)_
 - Soft-delete/deactivation slice delivered: удаление активной cashback-записи через Telegram только с явным confirm/cancel, без физического удаления строки.
-- Списки/фильтрация по owner/bank/category (если подтверждена продуктовая ценность).
+- Owner-filtered slice delivered: `📋 Активные категории` поддерживает inline owner filter + reset `Все владельцы` c сохранением выбранного месяца.
+- Списки/фильтрация по bank/category (если подтверждена продуктовая ценность).
 - Edit записей.
 - Опциональные explicit month buttons в transition period.
 - Сохранение transport-agnostic structured use-case результатов.

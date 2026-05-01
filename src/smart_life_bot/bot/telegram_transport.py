@@ -20,6 +20,7 @@ from smart_life_bot.application.cashback_use_cases import (
     parse_year_month,
     shift_year_month,
 )
+from smart_life_bot.cashback.models import ALLOWED_OWNERS
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
@@ -49,6 +50,8 @@ CALLBACK_CASHBACK_LIST_MONTH_PREFIX = "cashback:list:month:"
 CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX = "cashback:delete:request:"
 CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX = "cashback:delete:confirm:"
 CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX = "cashback:delete:cancel:"
+CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX = "cashback:list:owner:"
+CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX = "cashback:list:owner-current:"
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +79,23 @@ class TelegramTransportRouter:
     list_active_cashback_categories: ListActiveCashbackCategoriesUseCase | None = None
     request_delete_cashback_category: RequestDeleteCashbackCategoryUseCase | None = None
     soft_delete_cashback_category: SoftDeleteCashbackCategoryUseCase | None = None
+
+    @staticmethod
+    def _owner_filter_index(owner_name: str | None) -> str:
+        if owner_name is None:
+            return "all"
+        return str(ALLOWED_OWNERS.index(owner_name))
+
+    @staticmethod
+    def _decode_owner_filter(owner_token: str) -> str | None:
+        if owner_token == "all":
+            return None
+        if not owner_token.isdigit():
+            return None
+        index = int(owner_token)
+        if index < 0 or index >= len(ALLOWED_OWNERS):
+            return None
+        return ALLOWED_OWNERS[index]
 
     def handle_start(self) -> TelegramTransportResponse:
         return TelegramTransportResponse(
@@ -246,6 +266,13 @@ class TelegramTransportRouter:
         if callback_data == CALLBACK_CASHBACK_LIST_CURRENT and self.list_active_cashback_categories is not None:
             result = self.list_active_cashback_categories.execute()
             return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_action_buttons(result))
+        if callback_data.startswith(CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX) and self.list_active_cashback_categories is not None:
+            owner_token = callback_data.removeprefix(CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX)
+            owner_name = self._decode_owner_filter(owner_token)
+            if owner_name is None and owner_token != "all":
+                return TelegramTransportResponse(text="Не удалось применить фильтр владельца. Открой «📋 Активные категории» заново.")
+            result = self.list_active_cashback_categories.execute(owner_name=owner_name)
+            return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_action_buttons(result))
         if callback_data.startswith(CALLBACK_CASHBACK_LIST_MONTH_PREFIX) and self.list_active_cashback_categories is not None:
             selected_month = callback_data.removeprefix(CALLBACK_CASHBACK_LIST_MONTH_PREFIX)
             if parse_year_month(selected_month) is None:
@@ -256,6 +283,23 @@ class TelegramTransportRouter:
                     )
                 )
             result = self.list_active_cashback_categories.execute(month=selected_month)
+            return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_action_buttons(result))
+        if callback_data.startswith(CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX) and self.list_active_cashback_categories is not None:
+            encoded = callback_data.removeprefix(CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX)
+            if ":month:" not in encoded:
+                return TelegramTransportResponse(text="Не удалось открыть месяц из кнопки.\nПопробуйте снова через «📋 Активные категории».")
+            owner_token, selected_month = encoded.split(":month:", maxsplit=1)
+            owner_name = self._decode_owner_filter(owner_token)
+            if owner_name is None and owner_token != "all":
+                return TelegramTransportResponse(text="Не удалось применить фильтр владельца. Открой «📋 Активные категории» заново.")
+            if parse_year_month(selected_month) is None:
+                return TelegramTransportResponse(
+                    text=(
+                        "Не удалось открыть месяц из кнопки.\n"
+                        "Попробуйте снова через «📋 Активные категории»."
+                    )
+                )
+            result = self.list_active_cashback_categories.execute(month=selected_month, owner_name=owner_name)
             return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_action_buttons(result))
         if callback_data.startswith(CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX) and self.request_delete_cashback_category is not None:
             record_id = callback_data.removeprefix(CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX)
@@ -341,14 +385,28 @@ class TelegramTransportRouter:
         )
 
     def _build_cashback_action_buttons(self, result) -> tuple[tuple[str, str], ...]:
-        month_buttons = self._build_cashback_month_nav_buttons(result.target_month)
+        month_buttons = self._build_cashback_month_nav_buttons(result.target_month, owner_filter=result.owner_filter)
+        owner_buttons = self._build_cashback_owner_filter_buttons(result.target_month, result.owner_filter)
         if not result.records:
-            return month_buttons
+            return month_buttons + owner_buttons
         delete_buttons = tuple(
             (f"Удалить #{index}", f"{CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX}{row.id}")
             for index, row in enumerate(result.records, start=1)
         )
-        return month_buttons + delete_buttons
+        return month_buttons + owner_buttons + delete_buttons
+
+    def _build_cashback_owner_filter_buttons(self, target_month: str | None, owner_filter: str | None) -> tuple[tuple[str, str], ...]:
+        if target_month is None or parse_year_month(target_month) is None:
+            return ()
+        buttons: list[tuple[str, str]] = []
+        for index, owner in enumerate(ALLOWED_OWNERS):
+            label = f"👤 {owner}"
+            if owner == owner_filter:
+                label = f"✅ {owner}"
+            buttons.append((label, f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}{index}:month:{target_month}"))
+        all_label = "✅ Все владельцы" if owner_filter is None else "Все владельцы"
+        buttons.append((all_label, f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}all:month:{target_month}"))
+        return tuple(buttons)
 
     def _human_parser_mode(self, parser_mode: ParserMode) -> str:
         if parser_mode is ParserMode.PYTHON:
@@ -371,7 +429,7 @@ class TelegramTransportRouter:
             return "Python first, Claude fallback"
         return "Python fallback only (LLM not configured)"
 
-    def _build_cashback_month_nav_buttons(self, target_month: str | None) -> tuple[tuple[str, str], ...]:
+    def _build_cashback_month_nav_buttons(self, target_month: str | None, owner_filter: str | None = None) -> tuple[tuple[str, str], ...]:
         if target_month is None:
             return ()
         if parse_year_month(target_month) is None:
@@ -380,10 +438,12 @@ class TelegramTransportRouter:
         next_month = shift_year_month(target_month, delta=1)
         if prev_month is None or next_month is None:
             return ()
+        owner_token = self._owner_filter_index(owner_filter)
+        current_cb = CALLBACK_CASHBACK_LIST_CURRENT if owner_filter is None else f"{CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX}{owner_token}"
         return (
-            ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}{prev_month}"),
-            ("Текущий", CALLBACK_CASHBACK_LIST_CURRENT),
-            ("Следующий ➡️", f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}{next_month}"),
+            ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}{owner_token}:month:{prev_month}"),
+            ("Текущий", current_cb),
+            ("Следующий ➡️", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}{owner_token}:month:{next_month}"),
         )
 
 

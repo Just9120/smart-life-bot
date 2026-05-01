@@ -61,6 +61,7 @@ class CashbackResult:
     new_percent: float | None = None
     error_code: str | None = None
     allowed_owners: tuple[str, ...] = ()
+    owner_filter: str | None = None
 
 
 class RequestDeleteCashbackCategoryUseCase:
@@ -157,15 +158,38 @@ class ListActiveCashbackCategoriesUseCase:
         self.repo = repo
         self.now_provider = now_provider or (lambda: datetime.now(UTC).date())
 
-    def execute(self, month: str | None = None) -> CashbackResult:
+    def execute(self, month: str | None = None, owner_name: str | None = None) -> CashbackResult:
         today = self.now_provider()
         target_month = month or current_year_month(today)
         month_label = format_month_label(target_month)
-        rows = tuple(self.repo.list_active(target_month))
-        if not rows:
-            return CashbackResult(status="list_empty", target_month=target_month, records=(), text=f"На {month_label} кэшбек-категорий пока нет.\n\nДобавь первую категорию в формате:\nАльфа, Владимир, май, Супермаркеты, 5%")
+        if owner_name is not None and not validate_owner(owner_name):
+            return CashbackResult(
+                status="list_empty",
+                target_month=target_month,
+                owner_filter=None,
+                text="Не удалось применить фильтр владельца. Открой «📋 Активные категории» заново.",
+                error_code="invalid_owner_filter",
+            )
 
-        lines = [f"📋 Активные категории кэшбека — {month_label}", ""]
+        if owner_name is None:
+            rows = tuple(self.repo.list_active(target_month))
+        else:
+            rows = tuple(self.repo.list_active_by_owner(target_month, owner_name))
+        if not rows:
+            if owner_name is None:
+                return CashbackResult(status="list_empty", target_month=target_month, owner_filter=None, records=(), text=f"На {month_label} кэшбек-категорий пока нет.\n\nДобавь первую категорию в формате:\nАльфа, Владимир, май, Супермаркеты, 5%")
+            return CashbackResult(
+                status="list_empty",
+                target_month=target_month,
+                owner_filter=owner_name,
+                records=(),
+                text=f"На {month_label} для владельца {owner_name} кэшбек-категорий пока нет.",
+            )
+
+        header = f"📋 Активные категории кэшбека — {month_label}"
+        if owner_name is not None:
+            header = f"{header} — {owner_name}"
+        lines = [header, ""]
         current = None
         global_index = 0
         for row in rows:
@@ -178,4 +202,4 @@ class ListActiveCashbackCategoriesUseCase:
             global_index += 1
             lines.append(f"{global_index}. {row.owner_name} — {row.bank_name} — {row.percent:g}%")
 
-        return CashbackResult(status="list_found", target_month=target_month, records=rows, text="\n".join(lines))
+        return CashbackResult(status="list_found", target_month=target_month, owner_filter=owner_name, records=rows, text="\n".join(lines))
