@@ -51,7 +51,7 @@ def current_year_month(today: date) -> str:
 
 @dataclass(frozen=True, slots=True)
 class CashbackResult:
-    status: Literal["added", "updated", "invalid_owner", "transition_month_required", "not_cashback_add", "query_found", "query_not_found", "invalid_month", "list_found", "list_empty"]
+    status: Literal["added", "updated", "invalid_owner", "transition_month_required", "not_cashback_add", "query_found", "query_not_found", "invalid_month", "list_found", "list_empty", "delete_confirmation", "delete_cancelled", "deleted", "delete_not_found", "delete_invalid_callback"]
     text: str
     target_month: str | None = None
     created: bool = False
@@ -61,6 +61,49 @@ class CashbackResult:
     new_percent: float | None = None
     error_code: str | None = None
     allowed_owners: tuple[str, ...] = ()
+
+
+class RequestDeleteCashbackCategoryUseCase:
+    def __init__(self, repo) -> None:
+        self.repo = repo
+
+    def execute(self, record_id_raw: str) -> CashbackResult:
+        if not record_id_raw.isdigit():
+            return CashbackResult(status="delete_invalid_callback", text="Не удалось разобрать запись для удаления. Открой «📋 Активные категории» заново.")
+        record = self.repo.get_by_id(int(record_id_raw))
+        if record is None or record.is_deleted:
+            return CashbackResult(status="delete_not_found", text="Запись уже неактуальна или была удалена. Обнови список «📋 Активные категории».")
+        month_label = format_month_label(record.target_month)
+        return CashbackResult(
+            status="delete_confirmation",
+            text=(
+                "Подтверди деактивацию категории:\n"
+                f"{record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}\n\n"
+                "После подтверждения запись исчезнет из активных списков."
+            ),
+            target_month=record.target_month,
+            records=(record,),
+        )
+
+
+class SoftDeleteCashbackCategoryUseCase:
+    def __init__(self, repo) -> None:
+        self.repo = repo
+
+    def execute(self, record_id_raw: str) -> CashbackResult:
+        if not record_id_raw.isdigit():
+            return CashbackResult(status="delete_invalid_callback", text="Некорректная кнопка удаления. Открой «📋 Активные категории» заново.")
+        deleted = self.repo.soft_delete(int(record_id_raw))
+        if deleted is None:
+            return CashbackResult(status="delete_not_found", text="Запись уже удалена или не найдена. Обнови список «📋 Активные категории».")
+        month_label = format_month_label(deleted.target_month)
+        return CashbackResult(
+            status="deleted",
+            text=f"Деактивировано:\n{deleted.owner_name} — {deleted.bank_name} — {deleted.category_raw} — {deleted.percent:g}% — {month_label}",
+            target_month=deleted.target_month,
+            records=(deleted,),
+            updated=True,
+        )
 
 
 class AddCashbackCategoryUseCase:

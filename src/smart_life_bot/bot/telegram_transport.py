@@ -15,6 +15,8 @@ from smart_life_bot.application.cashback_use_cases import (
     AddCashbackCategoryUseCase,
     ListActiveCashbackCategoriesUseCase,
     QueryCashbackCategoryUseCase,
+    RequestDeleteCashbackCategoryUseCase,
+    SoftDeleteCashbackCategoryUseCase,
     parse_year_month,
     shift_year_month,
 )
@@ -44,6 +46,9 @@ CALLBACK_SETTINGS_PARSER_AUTO = "settings:parser:auto"
 CALLBACK_SETTINGS_PARSER_LLM = "settings:parser:llm"
 CALLBACK_CASHBACK_LIST_CURRENT = "cashback:list:current"
 CALLBACK_CASHBACK_LIST_MONTH_PREFIX = "cashback:list:month:"
+CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX = "cashback:delete:request:"
+CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX = "cashback:delete:confirm:"
+CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX = "cashback:delete:cancel:"
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +74,8 @@ class TelegramTransportRouter:
     add_cashback_category: AddCashbackCategoryUseCase | None = None
     query_cashback_category: QueryCashbackCategoryUseCase | None = None
     list_active_cashback_categories: ListActiveCashbackCategoriesUseCase | None = None
+    request_delete_cashback_category: RequestDeleteCashbackCategoryUseCase | None = None
+    soft_delete_cashback_category: SoftDeleteCashbackCategoryUseCase | None = None
 
     def handle_start(self) -> TelegramTransportResponse:
         return TelegramTransportResponse(
@@ -115,7 +122,7 @@ class TelegramTransportRouter:
 
         if normalized == "📋 Активные категории" and self.list_active_cashback_categories is not None:
             result = self.list_active_cashback_categories.execute()
-            return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_month_nav_buttons(result.target_month))
+            return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_action_buttons(result))
 
         if self.add_cashback_category is not None:
             add_result = self.add_cashback_category.execute(normalized)
@@ -238,7 +245,7 @@ class TelegramTransportRouter:
             return TelegramTransportResponse(text=f"{result.message}\n\n{settings_response.text}", buttons=settings_response.buttons)
         if callback_data == CALLBACK_CASHBACK_LIST_CURRENT and self.list_active_cashback_categories is not None:
             result = self.list_active_cashback_categories.execute()
-            return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_month_nav_buttons(result.target_month))
+            return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_action_buttons(result))
         if callback_data.startswith(CALLBACK_CASHBACK_LIST_MONTH_PREFIX) and self.list_active_cashback_categories is not None:
             selected_month = callback_data.removeprefix(CALLBACK_CASHBACK_LIST_MONTH_PREFIX)
             if parse_year_month(selected_month) is None:
@@ -249,7 +256,28 @@ class TelegramTransportRouter:
                     )
                 )
             result = self.list_active_cashback_categories.execute(month=selected_month)
-            return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_month_nav_buttons(result.target_month))
+            return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_action_buttons(result))
+        if callback_data.startswith(CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX) and self.request_delete_cashback_category is not None:
+            record_id = callback_data.removeprefix(CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX)
+            result = self.request_delete_cashback_category.execute(record_id)
+            if result.status != "delete_confirmation":
+                return TelegramTransportResponse(text=result.text)
+            return TelegramTransportResponse(
+                text=result.text,
+                buttons=(
+                    ("✅ Подтвердить удаление", f"{CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX}{record_id}"),
+                    ("↩️ Отмена", f"{CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX}{record_id}"),
+                ),
+            )
+        if callback_data.startswith(CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX):
+            return TelegramTransportResponse(text="Удаление отменено. Запись не изменена.")
+        if callback_data.startswith(CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX) and self.soft_delete_cashback_category is not None:
+            record_id = callback_data.removeprefix(CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX)
+            result = self.soft_delete_cashback_category.execute(record_id)
+            if result.target_month and self.list_active_cashback_categories is not None:
+                listing = self.list_active_cashback_categories.execute(month=result.target_month)
+                return TelegramTransportResponse(text=f"{result.text}\n\n{listing.text}", buttons=self._build_cashback_action_buttons(listing))
+            return TelegramTransportResponse(text=result.text)
 
         if callback_data == CALLBACK_SETTINGS_PARSER_LLM:
             result, _ = self.set_parser_mode.execute(user_id=user.id, parser_mode=ParserMode.LLM)
@@ -311,6 +339,16 @@ class TelegramTransportRouter:
                 ("🤖 LLM", CALLBACK_SETTINGS_PARSER_LLM),
             ),
         )
+
+    def _build_cashback_action_buttons(self, result) -> tuple[tuple[str, str], ...]:
+        month_buttons = self._build_cashback_month_nav_buttons(result.target_month)
+        if not result.records:
+            return month_buttons
+        delete_buttons = tuple(
+            (f"Удалить #{index}", f"{CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX}{row.id}")
+            for index, row in enumerate(result.records, start=1)
+        )
+        return month_buttons + delete_buttons
 
     def _human_parser_mode(self, parser_mode: ParserMode) -> str:
         if parser_mode is ParserMode.PYTHON:
