@@ -62,6 +62,8 @@ class CashbackResult:
     error_code: str | None = None
     allowed_owners: tuple[str, ...] = ()
     owner_filter: str | None = None
+    candidate_months: tuple[str, ...] = ()
+    pending_add: CashbackAddInput | None = None
 
 
 class RequestDeleteCashbackCategoryUseCase:
@@ -133,7 +135,16 @@ class AddCashbackCategoryUseCase:
             return CashbackResult(status="invalid_owner", text=f"Не понял владельца карты.\nДоступные владельцы: {', '.join(ALLOWED_OWNERS)}.\n\nФормат добавления:\nАльфа, Владимир, май, Супермаркеты, 5%", error_code="invalid_owner", allowed_owners=ALLOWED_OWNERS)
         if parsed.month is None:
             if in_transition_period(today):
-                return CashbackResult(status="transition_month_required", text="Сейчас переходный период между месяцами.\nУкажи месяц явно, например:\nАльфа, Владимир, май, Супермаркеты, 5%", error_code="transition_month_required")
+                current_month = current_year_month(today)
+                next_month = shift_year_month(current_month, delta=1)
+                candidate_months = (current_month, next_month) if next_month is not None else (current_month,)
+                return CashbackResult(
+                    status="transition_month_required",
+                    text="Сейчас переходный период между месяцами. К какому месяцу отнести категорию?",
+                    error_code="transition_month_required",
+                    candidate_months=candidate_months,
+                    pending_add=CashbackAddInput(parsed.bank, parsed.owner, parsed.category, parsed.percent, current_month, text),
+                )
             month = current_year_month(today)
         else:
             month = parsed.month
@@ -142,6 +153,33 @@ class AddCashbackCategoryUseCase:
         if updated:
             return CashbackResult(status="updated", text=f"Обновил кэшбек:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — было {old:g}%, стало {record.percent:g}% — {month_label}", target_month=month, updated=True, records=(record,), old_percent=old, new_percent=record.percent)
         return CashbackResult(status="added", text=f"Готово. Добавил кэшбек:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}", target_month=month, created=True, records=(record,), new_percent=record.percent)
+
+
+class CompleteTransitionCashbackCategoryUseCase:
+    def __init__(self, repo) -> None:
+        self.repo = repo
+
+    def execute(self, payload: CashbackAddInput, selected_month: str) -> CashbackResult:
+        if parse_year_month(selected_month) is None:
+            return CashbackResult(
+                status="invalid_month",
+                text="Некорректный месяц в кнопке. Открой «💳 Кэшбек» и попробуй снова.",
+                error_code="invalid_month",
+            )
+        record, updated, old = self.repo.upsert(
+            CashbackAddInput(
+                payload.bank_name,
+                payload.owner_name,
+                payload.category_raw,
+                payload.percent,
+                selected_month,
+                payload.source_text,
+            )
+        )
+        month_label = format_month_label(selected_month)
+        if updated:
+            return CashbackResult(status="updated", text=f"Обновил кэшбек:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — было {old:g}%, стало {record.percent:g}% — {month_label}", target_month=selected_month, updated=True, records=(record,), old_percent=old, new_percent=record.percent)
+        return CashbackResult(status="added", text=f"Готово. Добавил кэшбек:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}", target_month=selected_month, created=True, records=(record,), new_percent=record.percent)
 
 
 class QueryCashbackCategoryUseCase:

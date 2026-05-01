@@ -12,7 +12,7 @@ from smart_life_bot.application.use_cases import (
     ProcessIncomingMessageUseCase,
     SetParserModeUseCase,
 )
-from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase
 from smart_life_bot.auth.models import AuthContext
 from smart_life_bot.bot import (
     CALLBACK_CANCEL,
@@ -29,6 +29,8 @@ from smart_life_bot.bot import (
     CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX,
     CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
     CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
+    CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
+    CALLBACK_CASHBACK_TRANSITION_CANCEL,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
@@ -266,6 +268,7 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         list_active_cashback_categories=ListActiveCashbackCategoriesUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
         request_delete_cashback_category=RequestDeleteCashbackCategoryUseCase(cashback_repo),
         soft_delete_cashback_category=SoftDeleteCashbackCategoryUseCase(cashback_repo),
+        complete_transition_cashback_category=CompleteTransitionCashbackCategoryUseCase(cashback_repo),
     )
     return router, deps
 
@@ -1028,4 +1031,32 @@ def test_valid_cashback_add_has_priority_over_stale_duration_edit_state() -> Non
 
     assert "Добавил кэшбек" in response.text or "Обновил кэшбек" in response.text
     assert "Введите положительное целое число минут" not in response.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_cashback_transition_period_shows_month_buttons_and_completes() -> None:
+    router, deps = _build_router()
+    cashback_repo = SQLiteCashbackCategoriesRepository(deps.users_repo._connection)  # type: ignore[attr-defined]
+    object.__setattr__(
+        router,
+        "add_cashback_category",
+        AddCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 26, tzinfo=UTC).date()),
+    )
+    object.__setattr__(router, "complete_transition_cashback_category", CompleteTransitionCashbackCategoryUseCase(cashback_repo))
+
+    prompt = router.handle_text_message(telegram_user_id=90610, text="Альфа, Владимир, Супермаркеты, 5%")
+    assert "переходный период" in prompt.text
+    assert ("май 2026", f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-05") in prompt.buttons
+    assert ("июнь 2026", f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-06") in prompt.buttons
+    completed = router.handle_callback(telegram_user_id=90610, callback_data=f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-06")
+    assert "июнь 2026" in completed.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_cashback_transition_callback_malformed_or_stale_fails_safe() -> None:
+    router, deps = _build_router()
+    stale = router.handle_callback(telegram_user_id=90611, callback_data=f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-05")
+    assert "устарела" in stale.text
+    cancel = router.handle_callback(telegram_user_id=90611, callback_data=CALLBACK_CASHBACK_TRANSITION_CANCEL)
+    assert "отменено" in cancel.text
     assert len(deps.calendar_service.requests) == 0

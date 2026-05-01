@@ -1,6 +1,6 @@
 from datetime import date
 
-from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase, format_month_label
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase, format_month_label
 from smart_life_bot.cashback.parser import parse_structured_add
 from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
 from smart_life_bot.storage.sqlite import create_sqlite_connection, init_sqlite_schema
@@ -30,8 +30,24 @@ def test_upsert_and_query_sorted():
 
 def test_transition_requires_explicit_month():
     repo = _repo()
-    msg = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026,4,26)).execute('Альфа, Владимир, Супермаркеты, 5%').text
-    assert 'переходный период' in msg
+    result = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026,4,26)).execute('Альфа, Владимир, Супермаркеты, 5%')
+    assert result is not None
+    assert result.status == "transition_month_required"
+    assert result.candidate_months == ("2026-04", "2026-05")
+    assert result.pending_add is not None
+
+
+def test_transition_complete_with_selected_month_and_invalid_month_fail_safe():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 4, 26))
+    transition = add.execute("Альфа, Владимир, Супермаркеты, 5%")
+    assert transition is not None and transition.pending_add is not None
+    complete = CompleteTransitionCashbackCategoryUseCase(repo)
+    may = complete.execute(transition.pending_add, "2026-05")
+    assert may.status == "added"
+    assert may.target_month == "2026-05"
+    bad = complete.execute(transition.pending_add, "bad")
+    assert bad.status == "invalid_month"
 
 
 def test_category_normalization_query_and_duplicate_update():
