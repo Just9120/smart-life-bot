@@ -338,7 +338,7 @@ def test_plain_text_handler_maps_to_process_incoming_use_case() -> None:
 
     response = router.handle_text_message(telegram_user_id=90001, text="Team sync tomorrow at 10")
 
-    assert "Черновик события" in response.text
+    assert "Проверь черновик события" in response.text
     assert ("✅ Confirm", CALLBACK_CONFIRM) in response.buttons
     user = deps.users_repo.get_by_telegram_id(90001)
     assert user is not None
@@ -406,7 +406,7 @@ def test_telegram_cashback_add_and_query_flow() -> None:
 def test_calendar_text_flow_regression_still_returns_preview() -> None:
     router, _ = _build_router()
     response = router.handle_text_message(telegram_user_id=90602, text="Тест завтра в 15:00")
-    assert "Черновик события" in response.text
+    assert "Проверь черновик события" in response.text
 
 
 def test_conflict_message_prevents_calendar_and_cashback_mutation() -> None:
@@ -449,7 +449,7 @@ def test_reminder_preset_updates_draft_without_calendar_write() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90511, text="Team sync")
     response = router.handle_callback(telegram_user_id=90511, callback_data=CALLBACK_REMINDERS_10)
-    assert "- reminders: popup 10 min" in response.text
+    assert "Уведомления: 10 мин" in response.text
     assert len(deps.calendar_service.requests) == 0
 
 
@@ -478,7 +478,7 @@ def test_reminder_30_preset_updates_preview_and_confirm_uses_custom_reminder() -
     router.handle_text_message(telegram_user_id=90512, text="Team sync")
 
     reminder_response = router.handle_callback(telegram_user_id=90512, callback_data=CALLBACK_REMINDERS_30)
-    assert "- reminders: popup 30 min" in reminder_response.text
+    assert "Уведомления: 30 мин" in reminder_response.text
     assert len(deps.calendar_service.requests) == 0
 
     confirm_response = router.handle_callback(telegram_user_id=90512, callback_data=CALLBACK_CONFIRM)
@@ -503,7 +503,7 @@ def test_duration_input_updates_end_at_and_clears_editing_field() -> None:
     router.handle_text_message(telegram_user_id=90502, text="Team sync")
     router.handle_callback(telegram_user_id=90502, callback_data=CALLBACK_DURATION)
     response = router.handle_text_message(telegram_user_id=90502, text="20")
-    assert "end_at: 2026-03-12T10:20:00+00:00" in response.text
+    assert "Длительность: 20 мин" in response.text
     user = deps.users_repo.get_by_telegram_id(90502)
     snapshot = deps.state_repo.get(user.id) if user else None
     assert snapshot is not None
@@ -526,7 +526,7 @@ def test_duration_input_rejects_invalid_values_and_keeps_state(value: str) -> No
 def test_plain_number_outside_duration_mode_uses_normal_parse_flow() -> None:
     router, _ = _build_router()
     response = router.handle_text_message(telegram_user_id=90504, text="20")
-    assert "Черновик события:" in response.text
+    assert "Проверь черновик события:" in response.text
 
 
 def test_stale_confirm_is_blocked_while_duration_input_active() -> None:
@@ -618,7 +618,7 @@ def test_preview_buttons_hide_confirm_when_start_at_missing() -> None:
     assert ("📅 Выбрать дату", CALLBACK_CALENDAR_DATE_START) in response.buttons
     assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
     assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
-    assert "Нужно указать start_at перед созданием события." in response.text
+    assert "Чтобы создать событие, сначала выбери дату и время." in response.text
 
 
 def test_missing_date_recovery_flow_keeps_confirm_gated_until_valid_time() -> None:
@@ -684,7 +684,7 @@ def test_successful_edit_start_at_clears_pending_recovery_and_random_hhmm_does_n
     edited = router.handle_text_message(telegram_user_id=91004, text="/edit start_at 2026-08-10T12:00:00+00:00")
     assert ("✅ Confirm", CALLBACK_CONFIRM) in edited.buttons
     plain = router.handle_text_message(telegram_user_id=91004, text="09:15")
-    assert "Черновик события:" in plain.text
+    assert "Проверь черновик события:" in plain.text
 
 
 def test_invalid_edit_command_interrupts_recovery_and_hhmm_is_not_consumed() -> None:
@@ -698,7 +698,7 @@ def test_invalid_edit_command_interrupts_recovery_and_hhmm_is_not_consumed() -> 
     invalid_edit = router.handle_text_message(telegram_user_id=91006, text="/edit title")
     assert "Формат: /edit <field> <value>" in invalid_edit.text
     after = router.handle_text_message(telegram_user_id=91006, text="09:30")
-    assert "Черновик события:" in after.text
+    assert "Проверь черновик события:" in after.text
     assert "2026-06-15T09:30:00+00:00" not in after.text
     assert len(deps.calendar_service.requests) == 0
 
@@ -714,7 +714,7 @@ def test_edit_validation_failure_interrupts_recovery_and_hhmm_is_not_consumed() 
     invalid_start_at = router.handle_text_message(telegram_user_id=91007, text="/edit start_at tomorrow")
     assert "Invalid datetime format for 'start_at'" in invalid_start_at.text
     after = router.handle_text_message(telegram_user_id=91007, text="09:30")
-    assert "Черновик события:" in after.text
+    assert "Проверь черновик события:" in after.text
     assert "2026-06-15T09:30:00+00:00" not in after.text
     assert len(deps.calendar_service.requests) == 0
 
@@ -825,7 +825,7 @@ def test_edit_description_clear_flag_clears_optional_field() -> None:
 
     response = router.handle_text_message(telegram_user_id=90007, text="/edit description --clear")
 
-    assert "description:" not in response.text
+    assert "Описание:" not in response.text
     user = deps.users_repo.get_by_telegram_id(90007)
     assert user is not None
     state = deps.state_repo.get(user.id)
@@ -841,7 +841,7 @@ def test_edit_location_clear_flag_clears_optional_field() -> None:
 
     response = router.handle_text_message(telegram_user_id=90008, text="/edit location --clear")
 
-    assert "location:" not in response.text
+    assert "Место:" not in response.text
     user = deps.users_repo.get_by_telegram_id(90008)
     assert user is not None
     state = deps.state_repo.get(user.id)
@@ -855,14 +855,14 @@ def test_preview_formatting_contains_required_fields_and_disclaimer() -> None:
 
     response = router.handle_text_message(telegram_user_id=90005, text="Preview formatting")
 
-    assert "title:" in response.text
-    assert "start_at:" in response.text
-    assert "end_at:" in response.text
-    assert "timezone:" in response.text
-    assert "description:" in response.text
-    assert "location:" in response.text
+    assert "Название:" in response.text
+    assert "Дата и время:" in response.text
+    assert "Длительность:" in response.text
+    assert "Часовой пояс:" in response.text
+    assert "Описание:" in response.text
+    assert "Место:" in response.text
     assert "Парсинг:" in response.text
-    assert "НЕ будет создано" in response.text
+    assert "не создастся" in response.text
 
 
 def test_format_preview_message_shows_python_parser_diagnostics() -> None:
@@ -896,7 +896,7 @@ def test_format_preview_message_shows_custom_reminder_when_present() -> None:
         metadata={},
     )
     preview = format_preview_message(draft)
-    assert "- reminders: popup 10 min" in preview
+    assert "Уведомления: 10 мин" in preview
 
 
 def test_format_preview_message_shows_claude_diagnostics_and_issues() -> None:
@@ -1321,7 +1321,7 @@ def test_edit_percent_flow_valid_invalid_cancel_and_no_calendar_calls() -> None:
     assert user.id not in router.pending_cashback_percent_edit
 
     after_success = router.handle_text_message(telegram_user_id=90702, text='7%')
-    assert 'Черновик события' in after_success.text
+    assert 'Проверь черновик события' in after_success.text
 
     listing2 = router.handle_text_message(telegram_user_id=90702, text='📋 Активные категории')
     assert '7%' in listing2.text

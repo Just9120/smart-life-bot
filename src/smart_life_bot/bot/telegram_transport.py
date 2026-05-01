@@ -759,26 +759,38 @@ class TelegramTransportRouter:
 
 def format_preview_message(draft: EventDraft) -> str:
     validation_issue = detect_draft_validation_issue(draft, require_start_at=True)
+    date_time_value = draft.start_at.isoformat() if draft.start_at else "не выбраны"
+    duration_value = "—"
+    if draft.start_at is not None and draft.end_at is not None:
+        try:
+            duration_minutes = int((draft.end_at - draft.start_at).total_seconds() // 60)
+        except TypeError:
+            duration_minutes = 0
+        if duration_minutes > 0:
+            duration_value = f"{duration_minutes} мин"
     lines = [
-        "Черновик события:",
-        f"- title: {draft.title}",
-        f"- start_at: {draft.start_at.isoformat() if draft.start_at else '—'}",
-        f"- end_at: {draft.end_at.isoformat() if draft.end_at else '—'}",
-        f"- timezone: {draft.timezone or '—'}",
+        "Проверь черновик события:",
+        f"Название: {draft.title}",
+        f"Дата и время: {date_time_value}",
+        f"Длительность: {duration_value}",
+        f"Часовой пояс: {draft.timezone or '—'}",
     ]
     if draft.description:
-        lines.append(f"- description: {draft.description}")
+        lines.append(f"Описание: {draft.description}")
     if draft.location:
-        lines.append(f"- location: {draft.location}")
+        lines.append(f"Место: {draft.location}")
     if draft.reminder_minutes:
-        rendered = ", ".join(f"popup {minutes} min" for minutes in draft.reminder_minutes)
-        lines.append(f"- reminders: {rendered}")
+        rendered = ", ".join(f"{minutes} мин" for minutes in draft.reminder_minutes)
+        lines.append(f"Уведомления: {rendered}")
     else:
-        lines.append("- reminders: default popup 60 min, popup 30 min")
+        lines.append("Уведомления: по умолчанию (за 60 и 30 минут)")
     lines.extend(_format_parser_diagnostics(draft.metadata))
-    if validation_issue is not None:
+    if validation_issue is not None and draft.start_at is None:
+        lines.append("Чтобы создать событие, сначала выбери дату и время.")
+    elif validation_issue is not None:
         lines.append(validation_issue.preview_hint)
-    lines.append("Событие НЕ будет создано, пока вы явно не нажмёте Confirm.")
+    else:
+        lines.append("Событие не создастся, пока ты не нажмёшь подтверждение.")
     return "\n".join(lines)
 
 
