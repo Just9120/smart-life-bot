@@ -167,16 +167,15 @@ class ListActiveCashbackCategoriesUseCase:
 
         lines = [f"📋 Активные категории кэшбека — {month_label}", ""]
         current = None
-        index = 0
+        global_index = 0
         for row in rows:
             if row.category_raw != current:
                 if current is not None:
                     lines.append("")
                 current = row.category_raw
-                index = 0
                 lines.append(current)
                 lines.append("")
-            index += 1
-            lines.append(f"{index}. {row.owner_name} — {row.bank_name} — {row.percent:g}%")
+            global_index += 1
+            lines.append(f"{global_index}. {row.owner_name} — {row.bank_name} — {row.percent:g}%")
 
         return CashbackResult(status="list_found", target_month=target_month, records=rows, text="\n".join(lines))

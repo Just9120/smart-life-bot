@@ -951,3 +951,24 @@ def test_cashback_delete_malformed_callback_fails_safe() -> None:
     )
     assert "Не удалось разобрать запись" in response.text
     assert len(deps.calendar_service.requests) == 0
+
+
+def test_cashback_delete_buttons_are_unambiguous_with_global_list_numbering() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90607, text="Альфа, Владимир, май, АЗС, 2%")
+    router.handle_text_message(telegram_user_id=90607, text="Т-Банк, Елена, май, Супермаркеты, 7%")
+    listed = router.handle_text_message(telegram_user_id=90607, text="📋 Активные категории")
+    assert "1. Владимир — Альфа — 2%" in listed.text
+    assert "2. Елена — Т-Банк — 7%" in listed.text
+    delete_buttons = [button for button in listed.buttons if button[0].startswith("Удалить #")]
+    assert ("Удалить #1", "cashback:delete:request:1") in delete_buttons
+    assert ("Удалить #2", "cashback:delete:request:2") in delete_buttons
+
+    request_second = router.handle_callback(telegram_user_id=90607, callback_data="cashback:delete:request:2")
+    assert "Елена — Т-Банк — Супермаркеты — 7%" in request_second.text
+    router.handle_callback(telegram_user_id=90607, callback_data="cashback:delete:confirm:2")
+    query_azs = router.handle_text_message(telegram_user_id=90607, text="АЗС")
+    listed_after = router.handle_callback(telegram_user_id=90607, callback_data=CALLBACK_CASHBACK_LIST_CURRENT)
+    assert "🏆 Кэшбек" in query_azs.text
+    assert "Супермаркеты" not in listed_after.text
+    assert len(deps.calendar_service.requests) == 0
