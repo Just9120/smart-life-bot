@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 from typing import Literal
 
 from smart_life_bot.cashback.models import ALLOWED_OWNERS, CashbackAddInput
-from smart_life_bot.cashback.parser import in_transition_period, looks_like_cashback_add_attempt, normalize_bank_name, normalize_category_key, parse_structured_add, validate_owner
+from smart_life_bot.cashback.parser import has_invalid_explicit_month_token, in_transition_period, looks_like_cashback_add_attempt, normalize_bank_name, normalize_category_key, parse_structured_add, validate_owner
 
 RU_MONTH_LABELS = {
     1: "январь", 2: "февраль", 3: "март", 4: "апрель", 5: "май", 6: "июнь",
@@ -116,6 +116,8 @@ class AddCashbackCategoryUseCase:
 
     def execute(self, text: str) -> CashbackResult | None:
         today = self.now_provider()
+        if has_invalid_explicit_month_token(text, today):
+            return CashbackResult(status="invalid_month", text="Некорректный месяц.\nИспользуй русское название месяца или YYYY-MM, например: май или 2026-05.", error_code="invalid_month")
         parsed = parse_structured_add(text, today)
         if parsed is None:
             if looks_like_cashback_add_attempt(text):

@@ -54,7 +54,11 @@ def test_regression_missing_start_at_draft_cannot_be_confirmed() -> None:
 
     assert ("✅ Confirm", CALLBACK_CONFIRM) not in preview.buttons
     assert len(deps.calendar_service.requests) == 0
-    assert "Cannot confirm event" in stale_confirm.text or "устарел" in stale_confirm.text
+    assert (
+        "Cannot confirm event" in stale_confirm.text
+        or "устарел" in stale_confirm.text
+        or "No pending draft for confirmation" in stale_confirm.text
+    )
 
 
 def test_regression_start_footer_contains_calendar_and_cashback() -> None:
@@ -117,6 +121,19 @@ def test_regression_cashback_space_separated_add_never_calls_calendar() -> None:
     assert "Добавил кэшбек" in add.text or "Обновил кэшбек" in add.text
     assert "Добавил кэшбек" in add_with_month.text or "Обновил кэшбек" in add_with_month.text
     assert "🏆 Кэшбек" in query.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_cashback_query_not_found_does_not_fallthrough_to_calendar() -> None:
+    router, deps = _build_router()
+
+    response = router.handle_text_message(telegram_user_id=92010, text="Аптеки")
+
+    assert "ничего не найдено" in response.text
+    assert "Черновик события" not in response.text
+    user = deps.users_repo.get_by_telegram_id(92010)
+    assert user is not None
+    assert deps.state_repo.get(user.id) is None
     assert len(deps.calendar_service.requests) == 0
 
 

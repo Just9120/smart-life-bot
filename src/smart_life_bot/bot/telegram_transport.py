@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime
 import hashlib
+import re
 import secrets
 from zoneinfo import ZoneInfo
 
@@ -244,9 +245,9 @@ class TelegramTransportRouter:
                 self.state_repo.set(updated.__class__(user_id=updated.user_id, state=updated.state, draft=updated.draft, editing_field=None))
             return TelegramTransportResponse(text=self._get_pending_draft_text(user.id), buttons=self._build_draft_buttons_from_state(user.id))
 
-        if self.query_cashback_category is not None and "," not in normalized and normalized and normalized != "/start":
+        if self.query_cashback_category is not None and self._looks_like_cashback_query(normalized):
             cashback = self.query_cashback_category.execute(normalized)
-            if "ничего не найдено" not in cashback.text:
+            if cashback.status in {"query_found", "query_not_found"}:
                 return TelegramTransportResponse(text=cashback.text)
 
         result = self.process_incoming_message.execute(IncomingMessageInput(user_id=user.id, text=normalized))
@@ -264,6 +265,17 @@ class TelegramTransportRouter:
         has_calendar_marker = any(marker in lower for marker in ("завтра", "напомни", "в "))
         has_cashback_marker = ("кэшбек" in lower) or ("," in text and len([p for p in text.split(",") if p.strip()]) >= 4)
         return has_calendar_marker and has_cashback_marker
+
+    def _looks_like_cashback_query(self, text: str) -> bool:
+        normalized = text.strip()
+        if not normalized or "," in normalized or normalized == "/start":
+            return False
+        lower = normalized.lower()
+        if any(marker in lower for marker in ("завтра", "сегодня", "в ", "напомни", "calendar", "календар")):
+            return False
+        if any(ch.isdigit() for ch in normalized):
+            return False
+        return re.fullmatch(r"[А-Яа-яЁё\-\s]{2,}", normalized) is not None
 
     def handle_callback(self, telegram_user_id: int, callback_data: str) -> TelegramTransportResponse:
         user = self.users_repo.get_or_create_by_telegram_id(
