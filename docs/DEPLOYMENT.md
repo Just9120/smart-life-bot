@@ -72,7 +72,7 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 6. Capture previous runtime identity (`previous_container_id`, `previous_running_image_id`) before deploy for safe comparison.
 7. `host_commit="$(git rev-parse --short HEAD)"` + no-cache service-scoped rebuild: `docker compose build --no-cache --pull --build-arg APP_GIT_SHA="$host_commit" smart-life-bot` (compose service uses explicit local tag `smart-life-bot:local`).
 8. `built_service_image_id` diagnostics are read from the explicit local tag: `docker image inspect smart-life-bot:local --format='{{.Id}}'` (safe even when previous container references a stale/removed image).
-9. `docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight` (preflight now always runs against freshly rebuilt image).
+9. `docker compose run --rm -T --no-deps smart-life-bot python -m smart_life_bot.runtime.preflight < /dev/null` (preflight now always runs against freshly rebuilt image and must run with detached stdin because deploy executes through SSH heredoc).
 10. Перед запуском сервиса workflow явно останавливает и удаляет только целевой контейнер: `docker compose stop smart-life-bot || true` и `docker compose rm -f smart-life-bot || true` (без затрагивания других контейнеров).
 11. Деплой поднимает только целевой сервис без rebuild: `docker compose up -d --force-recreate --no-deps --no-build smart-life-bot`
 12. Post-deploy diagnostics (safe): workflow `GITHUB_REF`/`GITHUB_SHA`, remote `pwd`, remote branch, full/short remote HEAD, `docker compose version`, `docker compose ps smart-life-bot`, previous/new container ID, previous/new running image ID, built service image ID, new container created time/status.
