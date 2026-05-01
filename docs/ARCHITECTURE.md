@@ -1,5 +1,7 @@
 # Архитектура Phase 1 — Smart Life Ops Bot
 
+> **Role:** Canonical source for system structure, boundaries, and runtime architecture. Product UX details stay in [PRD](PRD_MVP.md), and accepted trade-off decisions stay in [Decisions](DECISIONS.md).
+
 ## 1. Цель технической архитектуры Phase 1
 
 Цель этого этапа — зафиксировать рабочую техническую архитектуру для реализации MVP-сценария:
