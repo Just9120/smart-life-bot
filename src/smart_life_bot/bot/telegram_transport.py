@@ -270,12 +270,15 @@ class TelegramTransportRouter:
         normalized = text.strip()
         if not normalized or "," in normalized or normalized == "/start":
             return False
-        lower = normalized.lower()
-        if any(marker in lower for marker in ("завтра", "сегодня", "в ", "напомни", "calendar", "календар")):
+        tokens = normalized.split()
+        if len(tokens) not in (1, 2):
             return False
         if any(ch.isdigit() for ch in normalized):
             return False
-        return re.fullmatch(r"[А-Яа-яЁё\-\s]{2,}", normalized) is not None
+        lower_tokens = [token.lower() for token in tokens]
+        if any(token in {"купить", "без", "даты", "напомни", "завтра", "сегодня"} for token in lower_tokens):
+            return False
+        return all(re.fullmatch(r"[А-Яа-яЁё\-]{2,}", token) is not None for token in tokens)
 
     def handle_callback(self, telegram_user_id: int, callback_data: str) -> TelegramTransportResponse:
         user = self.users_repo.get_or_create_by_telegram_id(

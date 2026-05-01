@@ -30,9 +30,7 @@ def normalize_bank_name(value: str) -> str:
 def parse_month_token(token: str, today: date) -> str | None:
     t = normalize_category_key(token)
     if re.fullmatch(r"\d{4}-\d{2}", t):
-        from smart_life_bot.application.cashback_use_cases import parse_year_month
-
-        parsed = parse_year_month(t)
+        parsed = _parse_year_month_token(t)
         if parsed is None:
             return None
         year, month = parsed
@@ -151,3 +149,17 @@ def has_invalid_explicit_month_token(text: str, today: date) -> bool:
     if re.fullmatch(r"\d{4}-\d{2}", normalize_category_key(month_token)):
         return parse_month_token(month_token, today) is None
     return False
+
+
+def _parse_year_month_token(value: str) -> tuple[int, int] | None:
+    try:
+        year_raw, month_raw = value.split("-", maxsplit=1)
+        year = int(year_raw)
+        month = int(month_raw)
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if not (1 <= month <= 12):
+        return None
+    if not (1900 <= year <= 2100):
+        return None
+    return year, month
