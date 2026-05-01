@@ -61,3 +61,10 @@ def parse_structured_add(text: str, today: date) -> ParsedAdd | None:
 
 def validate_owner(owner: str) -> bool:
     return owner.strip() in ALLOWED_OWNERS
+
+
+def looks_like_cashback_add_attempt(text: str) -> bool:
+    parts = [p.strip() for p in text.split(",") if p.strip()]
+    if len(parts) < 3:
+        return False
+    return "%" in text
