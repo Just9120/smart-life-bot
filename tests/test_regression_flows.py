@@ -25,7 +25,7 @@ def test_regression_calendar_preview_confirm_gate_before_write() -> None:
 
     response = router.handle_text_message(telegram_user_id=92001, text="Тест завтра в 15:00")
 
-    assert "Черновик события" in response.text
+    assert "Проверь черновик события" in response.text
     assert len(deps.calendar_service.requests) == 0
     user = deps.users_repo.get_by_telegram_id(92001)
     assert user is not None
@@ -134,7 +134,7 @@ def test_regression_cashback_query_not_found_does_not_fallthrough_to_calendar() 
     response = router.handle_text_message(telegram_user_id=92010, text="Аптеки")
 
     assert "ничего не найдено" in response.text
-    assert "Черновик события" not in response.text
+    assert "Проверь черновик события" not in response.text
     user = deps.users_repo.get_by_telegram_id(92010)
     assert user is not None
     assert deps.state_repo.get(user.id) is None
@@ -148,7 +148,7 @@ def test_regression_missing_date_phrase_reaches_calendar_preview() -> None:
     router.handle_text_message(telegram_user_id=92011, text="📅 Календарь")
     response = router.handle_text_message(telegram_user_id=92011, text="Тест без даты")
 
-    assert "Черновик события" in response.text
+    assert "Проверь черновик события" in response.text
     assert ("📅 Выбрать дату", "calendar:date:start") in response.buttons
     assert "ничего не найдено" not in response.text
     assert len(deps.calendar_service.requests) == 0
@@ -161,7 +161,7 @@ def test_regression_simple_russian_phrase_not_swallowed_by_cashback_query() -> N
     router.handle_text_message(telegram_user_id=92012, text="📅 Календарь")
     response = router.handle_text_message(telegram_user_id=92012, text="Купить хлеб")
 
-    assert "Черновик события" in response.text
+    assert "Проверь черновик события" in response.text
     assert ("📅 Выбрать дату", "calendar:date:start") in response.buttons
     assert "ничего не найдено" not in response.text
     assert len(deps.calendar_service.requests) == 0
@@ -174,7 +174,7 @@ def test_regression_common_one_two_word_event_texts_stay_in_calendar_flow() -> N
     router.handle_text_message(telegram_user_id=92013, text="📅 Календарь")
     for text in ("Созвон", "Тренировка", "Звонок маме"):
         response = router.handle_text_message(telegram_user_id=92013, text=text)
-        assert "Черновик события" in response.text
+        assert "Проверь черновик события" in response.text
         assert ("📅 Выбрать дату", "calendar:date:start") in response.buttons
         assert "ничего не найдено" not in response.text
         assert len(deps.calendar_service.requests) == 0

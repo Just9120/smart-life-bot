@@ -88,7 +88,7 @@ def test_runtime_on_text_returns_preview_response() -> None:
     try:
         response = container.runtime.on_text(telegram_user_id=1001, text="Team sync tomorrow at 10:00")
 
-        assert "Черновик события" in response.text
+        assert "Проверь черновик события" in response.text
         assert any(label == "✅ Confirm" for label, _ in response.buttons)
 
         user = container.users_repo.get_by_telegram_id(telegram_user_id=1001)
@@ -112,7 +112,7 @@ def test_runtime_uses_rule_based_parser_instead_of_fixed_fake_datetime() -> None
         response = container.runtime.on_text(telegram_user_id=1007, text="завтра в 15:00 созвон")
 
         assert "2026-01-01T09:00:00+00:00" not in response.text
-        assert "- start_at: " in response.text
+        assert "Дата и время:" in response.text
         assert "T15:00:00+00:00" in response.text
     finally:
         container.connection.close()
@@ -144,7 +144,7 @@ def test_runtime_composition_makes_no_network_calls(monkeypatch) -> None:
     container = build_runtime(_settings())
     try:
         response = container.runtime.on_text(telegram_user_id=1003, text="No network please")
-        assert "Черновик события" in response.text
+        assert "Проверь черновик события" in response.text
     finally:
         container.connection.close()
 
