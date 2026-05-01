@@ -172,6 +172,8 @@ jobs:
           assert CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX == "cashback:delete:cancel:"
           assert getattr(transport, "CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX") == "cashback:list:owner:"
           assert getattr(transport, "CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX") == "cashback:list:owner-current:"
+          assert getattr(transport, "CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX") == "cashback:transition:select:"
+          assert getattr(transport, "CALLBACK_CASHBACK_TRANSITION_CANCEL") == "cashback:transition:cancel"
 
           parser = RuleBasedMessageParser(default_timezone="Europe/Amsterdam")
           parsed = parser.parse("Тест завтра в 15:00 длительность 20 минут", user_id=1)

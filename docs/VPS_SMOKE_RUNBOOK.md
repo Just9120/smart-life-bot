@@ -157,7 +157,7 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 2. Сравните previous/new container ID и previous/new running image ID в deploy logs.
 3. Убедитесь, что контейнер пересоздан (`docker compose ps smart-life-bot`) и запущен после последнего rebuild.
 4. Проверьте build marker внутри runtime (`SMART_LIFE_BOT_BUILD_SHA`) и его равенство текущему host commit.
-5. Проверьте, что runtime импортирует актуальные cashback callback markers (`cashback:list:month:`, `cashback:delete:request:`, `cashback:delete:confirm:`, `cashback:delete:cancel:`, `cashback:list:owner:`, `cashback:list:owner-current:`).
+5. Проверьте, что runtime импортирует актуальные cashback callback markers (`cashback:list:month:`, `cashback:delete:request:`, `cashback:delete:confirm:`, `cashback:delete:cancel:`, `cashback:list:owner:`, `cashback:list:owner-current:`, `cashback:transition:select:`, `cashback:transition:cancel`).
 6. Только после этих проверок переходите к Telegram smoke-сценариям.
 
 ### 10.1 Happy path (минимум)
@@ -244,6 +244,8 @@ from smart_life_bot.bot.telegram_transport import (
     CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
     CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
     CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX,
+    CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
+    CALLBACK_CASHBACK_TRANSITION_CANCEL,
 )
 print('SMART_LIFE_BOT_BUILD_SHA=', os.environ.get('SMART_LIFE_BOT_BUILD_SHA', 'unknown'))
 print('CALLBACK_CASHBACK_LIST_MONTH_PREFIX=', CALLBACK_CASHBACK_LIST_MONTH_PREFIX)
@@ -252,6 +254,8 @@ print('CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX=', CALLBACK_CASHBACK_DELETE_CONFI
 print('CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX=', CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX)
 print('CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX=', CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX)
 print('CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX=', CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX)
+print('CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX=', CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX)
+print('CALLBACK_CASHBACK_TRANSITION_CANCEL=', CALLBACK_CASHBACK_TRANSITION_CANCEL)
 PY
 ```
 
