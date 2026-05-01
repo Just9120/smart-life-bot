@@ -1,6 +1,6 @@
 from datetime import date
 
-from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, QueryCashbackCategoryUseCase
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, format_month_label
 from smart_life_bot.cashback.parser import parse_structured_add
 from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
 from smart_life_bot.storage.sqlite import create_sqlite_connection, init_sqlite_schema
@@ -76,3 +76,31 @@ def test_invalid_owner_result_contains_allowed_owners_and_not_saved():
     assert result.status == 'invalid_owner'
     assert 'Виктор' in result.allowed_owners
     assert repo.list_active('2026-05') == []
+
+
+def test_list_active_categories_found_and_empty():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026,5,3))
+    add.execute('Альфа, Владимир, Супермаркеты, 5%')
+    add.execute('Т-Банк, Елена, Супермаркеты, 3%')
+    found = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026,5,3)).execute()
+    assert found.status == "list_found"
+    assert found.target_month == "2026-05"
+    assert "май 2026" in found.text
+    assert "1. Владимир — Альфа — 5%" in found.text
+
+    empty = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026,6,3)).execute()
+    assert empty.status == "list_empty"
+    assert empty.target_month == "2026-06"
+
+
+def test_month_label_and_readable_month_in_messages():
+    repo = _repo()
+    assert format_month_label("2026-05") == "май 2026"
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026,5,3)).execute('Альфа, Владимир, Супермаркеты, 5%')
+    assert add is not None
+    assert add.target_month == "2026-05"
+    assert "май 2026" in add.text
+    query = QueryCashbackCategoryUseCase(repo, now_provider=lambda: date(2026,5,3)).execute('Аптеки')
+    assert query.target_month == "2026-05"
+    assert "май 2026" in query.text
