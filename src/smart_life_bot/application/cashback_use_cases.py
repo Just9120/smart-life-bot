@@ -315,9 +315,9 @@ class ListActiveCashbackCategoriesUseCase:
                 lines.append(current)
             global_index += 1
             if owner_name is None:
-                row_text = f"#{global_index} {row.owner_name} — {row.bank_name} — {row.percent:g}%"
+                row_text = f"{global_index}. {row.owner_name} — {row.bank_name} — {row.percent:g}%"
             else:
-                row_text = f"#{global_index} {row.bank_name} — {row.percent:g}%"
+                row_text = f"{global_index}. {row.bank_name} — {row.percent:g}%"
             lines.append(row_text)
 
         return CashbackResult(status="list_found", target_month=target_month, owner_filter=owner_name, records=rows, text="\n".join(lines))
