@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
+import hashlib
+import secrets
 from zoneinfo import ZoneInfo
 
 from smart_life_bot.application.draft_validation import detect_draft_validation_issue
@@ -72,6 +74,8 @@ class PendingCashbackTransition:
 
 @dataclass(frozen=True, slots=True)
 class PendingCalendarDateRecovery:
+    session_token: str
+    draft_fingerprint: str
     selected_date: str
 
 
@@ -79,6 +83,7 @@ class PendingCalendarDateRecovery:
 class TelegramTransportResponse:
     text: str
     buttons: tuple[tuple[str, str], ...] = ()
+    button_rows: tuple[tuple[tuple[str, str], ...], ...] = ()
     reply_keyboard: tuple[tuple[str, ...], ...] = ()
 
 
@@ -201,6 +206,12 @@ class TelegramTransportRouter:
             if snapshot is None or snapshot.draft is None:
                 self.pending_calendar_recovery.pop(user.id, None)
                 return TelegramTransportResponse(text="Черновик устарел. Отправьте событие заново.")
+            if not _recovery_draft_matches(snapshot.draft, pending_calendar.draft_fingerprint):
+                self.pending_calendar_recovery.pop(user.id, None)
+                return TelegramTransportResponse(text="Кнопка устарела: черновик изменился. Нажмите «📅 Выбрать дату» снова.")
+            if snapshot.draft.start_at is not None:
+                self.pending_calendar_recovery.pop(user.id, None)
+                return TelegramTransportResponse(text="В черновике уже указано start_at. Если нужно, начните выбор даты заново.")
             draft = snapshot.draft
             draft_tz = _resolve_draft_timezone(draft.timezone)
             if draft_tz is None:
@@ -288,21 +299,49 @@ class TelegramTransportRouter:
             snapshot = self.state_repo.get(user.id)
             if snapshot is None or snapshot.draft is None:
                 return TelegramTransportResponse(text="Нет черновика для выбора даты.")
-            return TelegramTransportResponse(text="Выберите дату:", buttons=_build_month_grid_buttons(_resolve_month_for_picker(snapshot.draft)))
+            token = secrets.token_hex(3)
+            self.pending_calendar_recovery[user.id] = PendingCalendarDateRecovery(
+                session_token=token,
+                draft_fingerprint=_draft_fingerprint(snapshot.draft),
+                selected_date="",
+            )
+            return TelegramTransportResponse(
+                text="Выберите дату:",
+                button_rows=_build_month_grid_rows(_resolve_month_for_picker(snapshot.draft), token),
+            )
         if callback_data.startswith(CALLBACK_CALENDAR_DATE_MONTH_PREFIX):
-            month_raw = callback_data.removeprefix(CALLBACK_CALENDAR_DATE_MONTH_PREFIX)
+            payload = callback_data.removeprefix(CALLBACK_CALENDAR_DATE_MONTH_PREFIX)
+            token, _, month_raw = payload.partition(":")
+            pending = self.pending_calendar_recovery.get(user.id)
+            if pending is None or not token or token != pending.session_token:
+                return TelegramTransportResponse(text="Кнопка устарела. Нажмите «📅 Выбрать дату» снова.")
             parsed_month = _parse_year_month(month_raw)
             if parsed_month is None:
                 return TelegramTransportResponse(text="Некорректный месяц в кнопке. Нажмите «📅 Выбрать дату» снова.")
-            return TelegramTransportResponse(text="Выберите дату:", buttons=_build_month_grid_buttons(parsed_month))
+            snapshot = self.state_repo.get(user.id)
+            if snapshot is None or snapshot.draft is None or not _recovery_draft_matches(snapshot.draft, pending.draft_fingerprint):
+                self.pending_calendar_recovery.pop(user.id, None)
+                return TelegramTransportResponse(text="Кнопка устарела: черновик изменился. Нажмите «📅 Выбрать дату» снова.")
+            return TelegramTransportResponse(text="Выберите дату:", button_rows=_build_month_grid_rows(parsed_month, pending.session_token))
         if callback_data.startswith(CALLBACK_CALENDAR_DATE_SELECT_PREFIX):
-            selected_date = callback_data.removeprefix(CALLBACK_CALENDAR_DATE_SELECT_PREFIX)
+            payload = callback_data.removeprefix(CALLBACK_CALENDAR_DATE_SELECT_PREFIX)
+            token, _, selected_date = payload.partition(":")
+            pending = self.pending_calendar_recovery.get(user.id)
+            if pending is None or not token or token != pending.session_token:
+                return TelegramTransportResponse(text="Кнопка устарела. Нажмите «📅 Выбрать дату» снова.")
             if _parse_iso_date(selected_date) is None:
                 return TelegramTransportResponse(text="Некорректная дата в кнопке. Нажмите «📅 Выбрать дату» снова.")
             snapshot = self.state_repo.get(user.id)
             if snapshot is None or snapshot.draft is None:
                 return TelegramTransportResponse(text="Кнопка устарела. Отправьте событие заново.")
-            self.pending_calendar_recovery[user.id] = PendingCalendarDateRecovery(selected_date=selected_date)
+            if not _recovery_draft_matches(snapshot.draft, pending.draft_fingerprint) or snapshot.draft.start_at is not None:
+                self.pending_calendar_recovery.pop(user.id, None)
+                return TelegramTransportResponse(text="Кнопка устарела: черновик изменился. Нажмите «📅 Выбрать дату» снова.")
+            self.pending_calendar_recovery[user.id] = PendingCalendarDateRecovery(
+                session_token=pending.session_token,
+                draft_fingerprint=pending.draft_fingerprint,
+                selected_date=selected_date,
+            )
             return TelegramTransportResponse(text=f"Дата выбрана: {selected_date}. Введите время в формате HH:MM.")
         if callback_data == CALLBACK_CALENDAR_DATE_CANCEL:
             self.pending_calendar_recovery.pop(user.id, None)
@@ -444,6 +483,7 @@ class TelegramTransportRouter:
         )
         if result.status != "preview_ready":
             return TelegramTransportResponse(text=result.message)
+        self.pending_calendar_recovery.pop(user_id, None)
 
         return TelegramTransportResponse(
             text=self._get_pending_draft_text(user_id),
@@ -674,23 +714,35 @@ def _resolve_month_for_picker(draft: EventDraft) -> tuple[int, int]:
     return (datetime.now().year, datetime.now().month)
 
 
-def _build_month_grid_buttons(year_month: tuple[int, int]) -> tuple[tuple[str, str], ...]:
+def _build_month_grid_rows(year_month: tuple[int, int], token: str) -> tuple[tuple[tuple[str, str], ...], ...]:
     import calendar
     year, month = year_month
     cal = calendar.Calendar(firstweekday=0)
     month_label = f"{year:04d}-{month:02d}"
     prev_y, prev_m = (year - 1, 12) if month == 1 else (year, month - 1)
     next_y, next_m = (year + 1, 1) if month == 12 else (year, month + 1)
-    buttons: list[tuple[str, str]] = [
-        ("⬅️", f"{CALLBACK_CALENDAR_DATE_MONTH_PREFIX}{prev_y:04d}-{prev_m:02d}"),
-        (month_label, f"{CALLBACK_CALENDAR_DATE_MONTH_PREFIX}{month_label}"),
-        ("➡️", f"{CALLBACK_CALENDAR_DATE_MONTH_PREFIX}{next_y:04d}-{next_m:02d}"),
-    ]
+    rows: list[tuple[tuple[str, str], ...]] = [(
+        ("⬅️", f"{CALLBACK_CALENDAR_DATE_MONTH_PREFIX}{token}:{prev_y:04d}-{prev_m:02d}"),
+        (month_label, f"{CALLBACK_CALENDAR_DATE_MONTH_PREFIX}{token}:{month_label}"),
+        ("➡️", f"{CALLBACK_CALENDAR_DATE_MONTH_PREFIX}{token}:{next_y:04d}-{next_m:02d}"),
+    )]
     for week in cal.monthdayscalendar(year, month):
+        week_row: list[tuple[str, str]] = []
         for day in week:
             if day == 0:
+                week_row.append(("·", CALLBACK_CALENDAR_DATE_CANCEL))
                 continue
             iso = f"{year:04d}-{month:02d}-{day:02d}"
-            buttons.append((str(day), f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}{iso}"))
-    buttons.append(("↩️ Отмена", CALLBACK_CALENDAR_DATE_CANCEL))
-    return tuple(buttons)
+            week_row.append((str(day), f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}{token}:{iso}"))
+        rows.append(tuple(week_row))
+    rows.append((("↩️ Отмена", CALLBACK_CALENDAR_DATE_CANCEL),))
+    return tuple(rows)
+
+
+def _draft_fingerprint(draft: EventDraft) -> str:
+    payload = f"{draft.title}|{draft.start_at.isoformat() if draft.start_at else '-'}|{draft.end_at.isoformat() if draft.end_at else '-'}|{draft.timezone or '-'}"
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
+
+
+def _recovery_draft_matches(draft: EventDraft, fingerprint: str) -> bool:
+    return _draft_fingerprint(draft) == fingerprint
