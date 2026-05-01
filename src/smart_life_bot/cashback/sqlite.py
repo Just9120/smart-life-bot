@@ -42,6 +42,13 @@ class SQLiteCashbackCategoriesRepository:
         rows = self._connection.execute("SELECT * FROM cashback_categories WHERE target_month=? AND is_deleted=0 ORDER BY category_key ASC, percent DESC", (target_month,)).fetchall()
         return [self._to_record(r) for r in rows]
 
+    def list_active_by_owner(self, target_month: str, owner_name: str) -> list[CashbackCategoryRecord]:
+        rows = self._connection.execute(
+            "SELECT * FROM cashback_categories WHERE target_month=? AND owner_name=? AND is_deleted=0 ORDER BY category_key ASC, percent DESC",
+            (target_month, owner_name),
+        ).fetchall()
+        return [self._to_record(r) for r in rows]
+
     def get_by_id(self, record_id: int) -> CashbackCategoryRecord | None:
         row = self._connection.execute(
             "SELECT * FROM cashback_categories WHERE id=?",
