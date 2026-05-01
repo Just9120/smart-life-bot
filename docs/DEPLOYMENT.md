@@ -80,7 +80,7 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
    - deploy fails if `new_container_id == previous_container_id` (when previous exists);
    - deploy fails if `new_running_image_id != built_service_image_id`;
    - deploy fails if container env marker `SMART_LIFE_BOT_BUILD_SHA` does not match remote host commit.
-13. Post-deploy runtime verification inside container (`docker compose exec -T smart-life-bot ...`) проверяет build commit marker и ожидаемые кодовые признаки текущей версии, включая cashback month/delete callback markers (`CALLBACK_CASHBACK_LIST_MONTH_PREFIX`, `CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX`, `CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX`, `CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX`).
+13. Post-deploy runtime verification inside container (`docker compose exec -T smart-life-bot ...`) проверяет build commit marker и ожидаемые кодовые признаки текущей версии, включая cashback month/delete/owner-filter callback markers (`CALLBACK_CASHBACK_LIST_MONTH_PREFIX`, `CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX`, `CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX`, `CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX`, `CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX`, `CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX`).
 14. Duplicate polling diagnostics (safe, read-only): `docker compose ls`, filtered `docker ps -a`, filtered `ps aux` for `smart_life_bot`/`telegram_polling`/`smart-life-bot`.
 15. `docker compose logs --tail=100 smart-life-bot`
 
@@ -96,7 +96,7 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 - `previous_container_id` / `new_container_id` (должны отличаться при наличии предыдущего контейнера);
 - `previous_running_image_id` / `new_running_image_id` / `built_service_image_id` (`new_running_image_id` должен совпадать с built image);
 - `SMART_LIFE_BOT_BUILD_SHA == host_git_commit`;
-- `post_deploy_runtime_verification=ok` (включая cashback month/delete callback markers);
+- `post_deploy_runtime_verification=ok` (включая cashback month/delete/owner-filter callback markers);
 - duplicate polling diagnostics: `docker compose ls`, filtered `docker ps -a`, filtered `ps aux`.
 
 Ограничения безопасности:

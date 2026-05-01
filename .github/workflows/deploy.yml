@@ -143,6 +143,7 @@ jobs:
           from datetime import datetime
           import os
 
+          from smart_life_bot.bot import telegram_transport as transport
           from smart_life_bot.bot.telegram_transport import (
               CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
               CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
@@ -165,6 +166,8 @@ jobs:
           assert CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX == "cashback:delete:request:"
           assert CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX == "cashback:delete:confirm:"
           assert CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX == "cashback:delete:cancel:"
+          assert getattr(transport, "CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX") == "cashback:list:owner:"
+          assert getattr(transport, "CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX") == "cashback:list:owner-current:"
 
           parser = RuleBasedMessageParser(default_timezone="Europe/Amsterdam")
           parsed = parser.parse("Тест завтра в 15:00 длительность 20 минут", user_id=1)
