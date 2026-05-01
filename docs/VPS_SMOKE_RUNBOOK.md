@@ -140,6 +140,12 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 
 ## 10) Telegram smoke scenarios
 
+### 10.0 Deploy freshness / runtime identity (обязательно перед Telegram checks)
+1. Убедитесь, что деплой выполнен из актуального `main` (`git rev-parse --short HEAD`).
+2. Сравните previous/new container ID и previous/new running image ID в deploy logs.
+3. Убедитесь, что контейнер пересоздан (`docker compose ps smart-life-bot`) и запущен после последнего rebuild.
+4. При необходимости проверьте build marker внутри runtime (`SMART_LIFE_BOT_BUILD_SHA`).
+
 ### 10.1 Happy path (минимум)
 1. Отправьте `/start`.
 2. Отправьте `Тест завтра в 15:00`.
@@ -169,6 +175,16 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 ### 10.5 Parser settings checks (`/settings`)
 Проверьте parser modes (python/auto/llm) и безопасный fallback без LLM-конфига.
 
+### 10.6 Navigation + cashback smoke
+1. Отправьте `/start` и проверьте наличие footer menu с `📅 Календарь` и `💳 Кэшбек`.
+2. Нажмите `📅 Календарь` и проверьте, что открывается корректный календарный navigation path/режимы.
+3. Нажмите `💳 Кэшбек` и проверьте, что показываются меню/подсказки cashback-раздела.
+4. Добавьте категорию с явным месяцем (например, формат `банк, владелец, 2026-05, категория, процент`).
+5. Выполните query категории и проверьте корректный structured ответ.
+6. Отправьте конфликтный/неполный cashback текст и проверьте clarification without silent mutation.
+7. Отправьте прямой календарный текст и проверьте preview (без записи до Confirm).
+8. Нажмите Confirm только в календарном preview и проверьте, что запись создается только после explicit confirm.
+
 ## 11) Docker isolation notes
 
 - Не выполняйте глобальные Docker cleanup-команды (`docker system prune`, `docker rm` без фильтра и т.п.) в рамках этого smoke-runbook.
@@ -191,9 +207,14 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 - [ ] image build passed
 - [ ] preflight passed
 - [ ] polling started
-- [ ] `/start` works
-- [ ] preview works
-- [ ] Confirm creates Google Calendar event
+- [ ] `/start` works and footer menu shows `📅 Календарь` + `💳 Кэшбек`
+- [ ] `📅 Календарь` navigation path works
+- [ ] `💳 Кэшбек` menu/help works
+- [ ] cashback add with explicit month works
+- [ ] cashback query works
+- [ ] cashback conflict returns clarification
+- [ ] preview works for direct calendar text
+- [ ] Confirm creates Google Calendar event only after explicit press
 - [ ] Edit path works
 - [ ] Cancel path creates no event
 - [ ] non-confirmable draft hides Confirm
