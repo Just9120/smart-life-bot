@@ -64,6 +64,8 @@ CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX = "cashback:list:owner-current:"
 CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX = "cashback:transition:select:"
 CALLBACK_CASHBACK_TRANSITION_CANCEL = "cashback:transition:cancel"
 CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX = "cashback:edit-percent:request:"
+LABEL_CASHBACK_ADD = "➕ Добавить категорию"
+LABEL_CASHBACK_SEARCH = "🔎 Найти категорию"
 CALLBACK_CALENDAR_DATE_START = "calendar:date:start"
 CALLBACK_CALENDAR_DATE_MONTH_PREFIX = "calendar:date:month:"
 CALLBACK_CALENDAR_DATE_SELECT_PREFIX = "calendar:date:select:"
@@ -124,6 +126,7 @@ class TelegramTransportRouter:
     pending_calendar_recovery: dict[int, PendingCalendarDateRecovery] = field(default_factory=dict)
     active_feature_context: dict[int, str] = field(default_factory=dict)
     pending_cashback_percent_edit: dict[int, PendingCashbackPercentEdit] = field(default_factory=dict)
+    pending_cashback_add: dict[int, bool] = field(default_factory=dict)
 
     @staticmethod
     def _owner_filter_index(owner_name: str | None) -> str:
@@ -168,6 +171,7 @@ class TelegramTransportRouter:
         if normalized == "📅 Календарь":
             self.pending_cashback_transitions.pop(user.id, None)
             self.pending_cashback_percent_edit.pop(user.id, None)
+            self.pending_cashback_add.pop(user.id, None)
             self.active_feature_context[user.id] = "calendar"
             return TelegramTransportResponse(
                 text=(
@@ -189,8 +193,19 @@ class TelegramTransportRouter:
                     "Добавить категорию: Альфа, Владимир, май, Супермаркеты, 5%.\n"
                     "Напиши категорию, например: Аптеки."
                 ),
-                buttons=(("📋 Активные категории", CALLBACK_CASHBACK_LIST_CURRENT),),
+                buttons=(
+                    ("📋 Активные категории", CALLBACK_CASHBACK_LIST_CURRENT),
+                    (LABEL_CASHBACK_ADD, "cashback:add:start"),
+                    (LABEL_CASHBACK_SEARCH, "cashback:search:hint"),
+                ),
             )
+        if normalized == LABEL_CASHBACK_ADD:
+            self.pending_cashback_add[user.id] = True
+            self.active_feature_context[user.id] = "cashback"
+            return TelegramTransportResponse(text="Отправь категорию строкой в формате:\nАльфа, Владимир, май, Супермаркеты, 5%")
+        if normalized == LABEL_CASHBACK_SEARCH:
+            self.active_feature_context[user.id] = "cashback"
+            return TelegramTransportResponse(text="Напиши категорию, например: Аптеки.")
 
         if normalized == "📋 Активные категории" and self.list_active_cashback_categories is not None:
             self.active_feature_context[user.id] = "cashback"
@@ -210,6 +225,35 @@ class TelegramTransportRouter:
                 listing = self.list_active_cashback_categories.execute(month=result.target_month)
                 return TelegramTransportResponse(text=f"{result.text}\n\n{listing.text}", button_rows=self._build_cashback_action_button_rows(listing))
             return TelegramTransportResponse(text=result.text)
+
+        if normalized.lower() == "cancel" and user.id in self.pending_cashback_add:
+            self.pending_cashback_add.pop(user.id, None)
+            return TelegramTransportResponse(text="Добавление кэшбека отменено. Запись не изменена.")
+
+        if user.id in self.pending_cashback_add and self.add_cashback_category is not None:
+            add_result = self.add_cashback_category.execute(normalized)
+            if add_result is None:
+                return TelegramTransportResponse(
+                    text="Не понял формат кэшбека.\nФормат: Альфа, Владимир, май, Супермаркеты, 5%"
+                )
+            if add_result.status == "transition_month_required" and add_result.pending_add is not None:
+                self.active_feature_context[user.id] = "cashback"
+                transition_token = secrets.token_hex(3)
+                self.pending_cashback_transitions[user.id] = PendingCashbackTransition(
+                    session_token=transition_token,
+                    add_input=add_result.pending_add,
+                    candidate_months=add_result.candidate_months,
+                )
+                buttons = tuple(
+                    (format_month_label(month), f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}{transition_token}:{month}")
+                    for month in add_result.candidate_months
+                ) + (("↩️ Отмена", CALLBACK_CASHBACK_TRANSITION_CANCEL),)
+                return TelegramTransportResponse(text=add_result.text, buttons=buttons)
+            if add_result.status == "invalid_format":
+                return TelegramTransportResponse(text=f"{add_result.text}\n\nПример: Альфа, Владимир, май, Супермаркеты, 5%")
+            self.pending_cashback_add.pop(user.id, None)
+            self.active_feature_context[user.id] = "cashback"
+            return TelegramTransportResponse(text=add_result.text)
 
         if self.add_cashback_category is not None:
             add_result = self.add_cashback_category.execute(normalized)
@@ -492,6 +536,13 @@ class TelegramTransportRouter:
         if callback_data == CALLBACK_CASHBACK_LIST_CURRENT and self.list_active_cashback_categories is not None:
             result = self.list_active_cashback_categories.execute()
             return TelegramTransportResponse(text=result.text, button_rows=self._build_cashback_action_button_rows(result))
+        if callback_data == "cashback:add:start":
+            self.pending_cashback_add[user.id] = True
+            self.active_feature_context[user.id] = "cashback"
+            return TelegramTransportResponse(text="Отправь категорию строкой в формате:\nАльфа, Владимир, май, Супермаркеты, 5%")
+        if callback_data == "cashback:search:hint":
+            self.active_feature_context[user.id] = "cashback"
+            return TelegramTransportResponse(text="Напиши категорию, например: Аптеки.")
         if callback_data.startswith(CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX) and self.list_active_cashback_categories is not None:
             owner_token = callback_data.removeprefix(CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX)
             owner_name = self._decode_owner_filter(owner_token)

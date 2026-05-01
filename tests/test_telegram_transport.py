@@ -361,7 +361,37 @@ def test_cashback_menu_text_does_not_create_calendar_event() -> None:
     assert "Текущий режим: 💳 Кэшбек" in response.text
     assert "Напиши категорию, например: Аптеки." in response.text
     assert ("📋 Активные категории", CALLBACK_CASHBACK_LIST_CURRENT) in response.buttons
+    assert any(label == "➕ Добавить категорию" for label, _ in response.buttons)
+    assert any(label == "🔎 Найти категорию" for label, _ in response.buttons)
     assert len(deps.calendar_service.requests) == 0
+
+
+def test_cashback_explicit_add_flow_valid_invalid_and_cancel() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90640, text="💳 Кэшбек")
+    prompt = router.handle_text_message(telegram_user_id=90640, text="➕ Добавить категорию")
+    assert "Отправь категорию строкой" in prompt.text
+    user = deps.users_repo.get_by_telegram_id(90640)
+    assert user is not None and router.pending_cashback_add.get(user.id) is True
+    invalid = router.handle_text_message(telegram_user_id=90640, text="Аптеки")
+    assert "Не понял формат кэшбека" in invalid.text
+    assert router.pending_cashback_add.get(user.id) is True
+    ok = router.handle_text_message(telegram_user_id=90640, text="Альфа, Владимир, май, Супермаркеты, 5%")
+    assert "Добавил кэшбек" in ok.text
+    assert user.id not in router.pending_cashback_add
+    router.handle_text_message(telegram_user_id=90640, text="➕ Добавить категорию")
+    cancel = router.handle_text_message(telegram_user_id=90640, text="cancel")
+    assert "отменено" in cancel.text.lower()
+    assert user.id not in router.pending_cashback_add
+
+
+def test_switch_to_calendar_clears_pending_cashback_add() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90641, text="➕ Добавить категорию")
+    user = deps.users_repo.get_by_telegram_id(90641)
+    assert user is not None and router.pending_cashback_add.get(user.id) is True
+    router.handle_text_message(telegram_user_id=90641, text="📅 Календарь")
+    assert user.id not in router.pending_cashback_add
 
 
 def test_telegram_cashback_add_and_query_flow() -> None:
