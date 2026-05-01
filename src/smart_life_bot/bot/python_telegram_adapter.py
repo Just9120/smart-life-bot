@@ -27,6 +27,10 @@ from .telegram_transport import (
     CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
     CALLBACK_CASHBACK_TRANSITION_CANCEL,
     CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
+    CALLBACK_CALENDAR_DATE_CANCEL,
+    CALLBACK_CALENDAR_DATE_MONTH_PREFIX,
+    CALLBACK_CALENDAR_DATE_SELECT_PREFIX,
+    CALLBACK_CALENDAR_DATE_START,
     CALLBACK_CANCEL,
     CALLBACK_CONFIRM,
     CALLBACK_EDIT,
@@ -60,6 +64,8 @@ _ALLOWED_CALLBACKS = (
     "calendar:mode:personal",
     CALLBACK_CASHBACK_LIST_CURRENT,
     CALLBACK_CASHBACK_TRANSITION_CANCEL,
+    CALLBACK_CALENDAR_DATE_START,
+    CALLBACK_CALENDAR_DATE_CANCEL,
 )
 _ALLOWED_CALLBACK_PREFIXES = (
     CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
@@ -69,12 +75,15 @@ _ALLOWED_CALLBACK_PREFIXES = (
     CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
     CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
     CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
+    CALLBACK_CALENDAR_DATE_MONTH_PREFIX,
+    CALLBACK_CALENDAR_DATE_SELECT_PREFIX,
 )
 _CALLBACK_PATTERN = (
     r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|"
     r"draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|"
     r"settings:parser:python|settings:parser:auto|settings:parser:llm|"
     r"calendar:mode:quick|calendar:mode:personal|"
+    r"calendar:date:start|calendar:date:month:\d{4}-\d{2}|calendar:date:select:\d{4}-\d{2}-\d{2}|calendar:date:cancel|"
     r"cashback:list:current|cashback:list:month:\d{4}-\d{2}|"
     r"cashback:list:owner:\d+:month:\d{4}-\d{2}|cashback:list:owner-current:\d+|"
     r"cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|"

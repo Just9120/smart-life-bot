@@ -31,6 +31,10 @@ from smart_life_bot.bot import (
     CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
     CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
     CALLBACK_CASHBACK_TRANSITION_CANCEL,
+    CALLBACK_CALENDAR_DATE_START,
+    CALLBACK_CALENDAR_DATE_MONTH_PREFIX,
+    CALLBACK_CALENDAR_DATE_SELECT_PREFIX,
+    CALLBACK_CALENDAR_DATE_CANCEL,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
@@ -571,9 +575,46 @@ def test_preview_buttons_hide_confirm_when_start_at_missing() -> None:
     response = router.handle_text_message(telegram_user_id=90010, text="Missing start_at")
 
     assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("📅 Выбрать дату", CALLBACK_CALENDAR_DATE_START) in response.buttons
     assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
     assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
     assert "Нужно указать start_at перед созданием события." in response.text
+
+
+def test_missing_date_recovery_flow_keeps_confirm_gated_until_valid_time() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+    preview = router.handle_text_message(telegram_user_id=91001, text="Missing start_at")
+    assert ("✅ Confirm", CALLBACK_CONFIRM) not in preview.buttons
+    month = router.handle_callback(telegram_user_id=91001, callback_data=CALLBACK_CALENDAR_DATE_START)
+    assert "Выберите дату" in month.text
+    assert any(cb.startswith(CALLBACK_CALENDAR_DATE_SELECT_PREFIX) for _, cb in month.buttons)
+    assert len(deps.calendar_service.requests) == 0
+    ask_time = router.handle_callback(telegram_user_id=91001, callback_data=f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}2026-06-15")
+    assert "Введите время" in ask_time.text
+    bad_time = router.handle_text_message(telegram_user_id=91001, text="9pm")
+    assert "Неверный формат времени" in bad_time.text
+    ok_time = router.handle_text_message(telegram_user_id=91001, text="09:45")
+    assert ("✅ Confirm", CALLBACK_CONFIRM) in ok_time.buttons
+    assert "2026-06-15T09:45:00+00:00" in ok_time.text
+    assert len(deps.calendar_service.requests) == 0
+    confirmed = router.handle_callback(telegram_user_id=91001, callback_data=CALLBACK_CONFIRM)
+    assert "Event created successfully" in confirmed.text
+    assert len(deps.calendar_service.requests) == 1
+
+
+def test_calendar_date_recovery_cancel_and_malformed_callbacks_fail_safely() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+    router.handle_text_message(telegram_user_id=91002, text="Missing start_at")
+    malformed = router.handle_callback(telegram_user_id=91002, callback_data=f"{CALLBACK_CALENDAR_DATE_MONTH_PREFIX}2026-99")
+    assert "Некорректный месяц" in malformed.text
+    malformed_date = router.handle_callback(telegram_user_id=91002, callback_data=f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}2026-02-31")
+    assert "Некорректная дата" in malformed_date.text
+    router.handle_callback(telegram_user_id=91002, callback_data=f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}2026-06-15")
+    cancelled = router.handle_callback(telegram_user_id=91002, callback_data=CALLBACK_CANCEL)
+    assert "Draft cancelled" in cancelled.text
+    assert len(deps.calendar_service.requests) == 0
 
 
 def test_preview_buttons_hide_confirm_when_timezone_invalid() -> None:
