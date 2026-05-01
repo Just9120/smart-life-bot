@@ -144,7 +144,11 @@ class TelegramTransportRouter:
 
     def handle_start(self) -> TelegramTransportResponse:
         return TelegramTransportResponse(
-            text="Выбери режим: 📅 Календарь или 💳 Кэшбек.",
+            text=(
+                "Привет! Выбери, с чем работаем сейчас:\n\n"
+                "📅 Календарь — создать событие через черновик и подтверждение.\n"
+                "💳 Кэшбек — добавить, найти или изменить кэшбек-категории."
+            ),
             reply_keyboard=(("📅 Календарь", "💳 Кэшбек"),),
         )
 
@@ -166,7 +170,11 @@ class TelegramTransportRouter:
             self.pending_cashback_percent_edit.pop(user.id, None)
             self.active_feature_context[user.id] = "calendar"
             return TelegramTransportResponse(
-                text="Текущий режим: 📅 Календарь",
+                text=(
+                    "Текущий режим: 📅 Календарь\n\n"
+                    "Отправь текст события, а я покажу черновик. "
+                    "Событие не создастся, пока ты не нажмёшь подтверждение."
+                ),
                 buttons=(("⚡ Быстрый режим", "calendar:mode:quick"), ("🔐 Личный Google Calendar", "calendar:mode:personal")),
                 reply_keyboard=(("📅 Календарь", "💳 Кэшбек"),),
             )
@@ -177,12 +185,9 @@ class TelegramTransportRouter:
             return TelegramTransportResponse(
                 text=(
                     "Текущий режим: 💳 Кэшбек\n\n"
-                    "💳 Кэшбек\n\n"
-                    "Что можно сделать:\n\n"
-                    "* добавить категорию: Альфа, Владимир, май, Супермаркеты, 5%\n"
-                    "* быстро найти: Супермаркеты\n"
-                    "* посмотреть всё за месяц: 📋 Активные категории\n\n"
-                    "Владельцы: Виктор, Владимир, Елена."
+                    "📋 Активные категории — посмотреть и изменить текущие категории.\n"
+                    "Добавить категорию: Альфа, Владимир, май, Супермаркеты, 5%.\n"
+                    "Напиши категорию, например: Аптеки."
                 ),
                 buttons=(("📋 Активные категории", CALLBACK_CASHBACK_LIST_CURRENT),),
             )
