@@ -118,10 +118,11 @@ Compose service uses explicit local image tag `smart-life-bot:local`. Build embe
 ## 7) Preflight (обязательный шаг перед polling)
 
 ```bash
-docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
+docker compose run --rm -T --no-deps smart-life-bot python -m smart_life_bot.runtime.preflight < /dev/null
 ```
 
 Ожидаемое поведение preflight:
+- запускается с `-T` и detached stdin (`< /dev/null`), чтобы команда не могла поглотить stdin при запуске из SSH heredoc (как в GitHub Actions deploy workflow);
 - валидирует settings, timezone, SQLite и runtime composition;
 - **не** запускает polling;
 - **не** делает вызовы Telegram API / Google API;

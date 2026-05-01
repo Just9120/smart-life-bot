@@ -95,7 +95,9 @@ jobs:
           echo "previous_container_id=${previous_container_id:-none}"
           echo "previous_running_image_id=${previous_running_image_id}"
 
+          echo "deploy_phase=build_start"
           docker compose build --no-cache --pull --build-arg APP_GIT_SHA="$host_commit" smart-life-bot
+          echo "deploy_phase=build_done"
           built_image_id="$(docker image inspect smart-life-bot:local --format='{{.Id}}' 2>/dev/null || true)"
           echo "built_service_image_id=${built_image_id:-unknown}"
           if [ -z "$built_image_id" ]; then
@@ -103,12 +105,18 @@ jobs:
             exit 1
           fi
 
-          docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
+          echo "deploy_phase=preflight_start"
+          docker compose run --rm -T --no-deps smart-life-bot python -m smart_life_bot.runtime.preflight < /dev/null
+          echo "deploy_phase=preflight_ok"
 
+          echo "deploy_phase=stop_rm_start"
           docker compose stop smart-life-bot || true
           docker compose rm -f smart-life-bot || true
+          echo "deploy_phase=stop_rm_done"
 
+          echo "deploy_phase=up_start"
           docker compose up -d --force-recreate --no-deps --no-build smart-life-bot
+          echo "deploy_phase=up_done"
 
           docker compose ps smart-life-bot
 
@@ -143,6 +151,7 @@ jobs:
           echo "duplicate_polling_diagnostics=host_processes"
           ps aux | awk 'tolower($0) ~ /smart_life_bot|telegram_polling|smart-life-bot/' || true
 
+          echo "deploy_phase=runtime_verification_start"
           docker compose exec -T -e HOST_COMMIT="$host_commit" smart-life-bot python - <<'PY'
           from datetime import datetime
           import os
@@ -196,6 +205,7 @@ jobs:
 
           print("post_deploy_runtime_verification=ok")
           PY
+          echo "deploy_phase=runtime_verification_ok"
 
           docker compose logs --tail=100 smart-life-bot
           REMOTE_SCRIPT
