@@ -90,6 +90,31 @@ def test_category_normalization_query_and_duplicate_update():
     assert rows.records[0].percent == 7
 
 
+
+
+def test_duplicate_same_percent_returns_already_exists_and_does_not_create_extra_row():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    first = add.execute("Т-Банк, Владимир, Аптеки, 5%")
+    second = add.execute("Т-Банк, Владимир, Аптеки, 5%")
+    assert first is not None and first.status == "added"
+    assert second is not None and second.status == "already_exists"
+    assert "Такая категория уже есть" in second.text
+    active = repo.list_active("2026-05")
+    assert len(active) == 1
+    assert active[0].percent == 5
+
+
+def test_duplicate_same_percent_space_separated_returns_already_exists():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    add.execute("Т-Банк Владимир Аптеки 5%")
+    repeated = add.execute("Т-Банк Владимир Аптеки 5%")
+    assert repeated is not None and repeated.status == "already_exists"
+    listed = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute()
+    assert listed.status == "list_found"
+    assert len(listed.records) == 1
+
 def test_explicit_month_parsing_variants():
     repo = _repo()
     add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 4, 26))

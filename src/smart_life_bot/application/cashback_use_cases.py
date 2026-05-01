@@ -51,7 +51,7 @@ def current_year_month(today: date) -> str:
 
 @dataclass(frozen=True, slots=True)
 class CashbackResult:
-    status: Literal["added", "updated", "invalid_owner", "transition_month_required", "not_cashback_add", "query_found", "query_not_found", "invalid_month", "list_found", "list_empty", "delete_confirmation", "delete_cancelled", "deleted", "delete_not_found", "delete_invalid_callback", "invalid_format"]
+    status: Literal["added", "updated", "already_exists", "invalid_owner", "transition_month_required", "not_cashback_add", "query_found", "query_not_found", "invalid_month", "list_found", "list_empty", "delete_confirmation", "delete_cancelled", "deleted", "delete_not_found", "delete_invalid_callback", "invalid_format"]
     text: str
     target_month: str | None = None
     created: bool = False
@@ -148,10 +148,12 @@ class AddCashbackCategoryUseCase:
             month = current_year_month(today)
         else:
             month = parsed.month
-        record, updated, old = self.repo.upsert(CashbackAddInput(parsed.bank, parsed.owner, parsed.category, parsed.percent, month, text))
+        record, change, old = self.repo.upsert(CashbackAddInput(parsed.bank, parsed.owner, parsed.category, parsed.percent, month, text))
         month_label = format_month_label(month)
-        if updated:
+        if change == "updated":
             return CashbackResult(status="updated", text=f"Обновил кэшбек:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — было {old:g}%, стало {record.percent:g}% — {month_label}", target_month=month, updated=True, records=(record,), old_percent=old, new_percent=record.percent)
+        if change == "no_change":
+            return CashbackResult(status="already_exists", text=f"Такая категория уже есть:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}", target_month=month, records=(record,), old_percent=old, new_percent=record.percent)
         return CashbackResult(status="added", text=f"Готово. Добавил кэшбек:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}", target_month=month, created=True, records=(record,), new_percent=record.percent)
 
 
@@ -166,7 +168,7 @@ class CompleteTransitionCashbackCategoryUseCase:
                 text="Некорректный месяц в кнопке. Открой «💳 Кэшбек» и попробуй снова.",
                 error_code="invalid_month",
             )
-        record, updated, old = self.repo.upsert(
+        record, change, old = self.repo.upsert(
             CashbackAddInput(
                 payload.bank_name,
                 payload.owner_name,
@@ -177,8 +179,10 @@ class CompleteTransitionCashbackCategoryUseCase:
             )
         )
         month_label = format_month_label(selected_month)
-        if updated:
+        if change == "updated":
             return CashbackResult(status="updated", text=f"Обновил кэшбек:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — было {old:g}%, стало {record.percent:g}% — {month_label}", target_month=selected_month, updated=True, records=(record,), old_percent=old, new_percent=record.percent)
+        if change == "no_change":
+            return CashbackResult(status="already_exists", text=f"Такая категория уже есть:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}", target_month=selected_month, records=(record,), old_percent=old, new_percent=record.percent)
         return CashbackResult(status="added", text=f"Готово. Добавил кэшбек:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}", target_month=selected_month, created=True, records=(record,), new_percent=record.percent)
 
 

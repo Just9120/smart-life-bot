@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from smart_life_bot.cashback.models import CashbackAddInput, CashbackCategoryRecord
 from smart_life_bot.cashback.parser import normalize_category_key
 from smart_life_bot.storage.sqlite import _parse_iso_datetime, utcnow_iso
@@ -9,7 +11,7 @@ class SQLiteCashbackCategoriesRepository:
     def __init__(self, connection):
         self._connection = connection
 
-    def upsert(self, payload: CashbackAddInput) -> tuple[CashbackCategoryRecord, bool, float | None]:
+    def upsert(self, payload: CashbackAddInput) -> tuple[CashbackCategoryRecord, Literal["created", "updated", "no_change"], float | None]:
         category_key = normalize_category_key(payload.category_raw)
         existing = self._connection.execute(
             """SELECT * FROM cashback_categories WHERE target_month=? AND owner_name=? AND bank_name=? AND category_key=? AND is_deleted=0""",
@@ -18,10 +20,13 @@ class SQLiteCashbackCategoriesRepository:
         now = utcnow_iso()
         if existing is not None:
             old = float(existing["percent"])
+            if abs(old - float(payload.percent)) <= 1e-9:
+                row = self._connection.execute("SELECT * FROM cashback_categories WHERE id=?", (existing["id"],)).fetchone()
+                return self._to_record(row), "no_change", old
             self._connection.execute("UPDATE cashback_categories SET percent=?, source_text=?, updated_at=? WHERE id=?", (payload.percent, payload.source_text, now, existing["id"]))
             self._connection.commit()
             row = self._connection.execute("SELECT * FROM cashback_categories WHERE id=?", (existing["id"],)).fetchone()
-            return self._to_record(row), True, old
+            return self._to_record(row), "updated", old
         self._connection.execute(
             """INSERT INTO cashback_categories (owner_name, bank_name, category_raw, category_key, percent, target_month, source_text, created_at, updated_at, is_deleted)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
@@ -29,7 +34,7 @@ class SQLiteCashbackCategoriesRepository:
         )
         self._connection.commit()
         row = self._connection.execute("SELECT * FROM cashback_categories ORDER BY id DESC LIMIT 1").fetchone()
-        return self._to_record(row), False, None
+        return self._to_record(row), "created", None
 
     def query(self, category_key: str, target_month: str) -> list[CashbackCategoryRecord]:
         rows = self._connection.execute(
