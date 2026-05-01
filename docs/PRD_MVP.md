@@ -1,5 +1,7 @@
 # PRD — Smart Life Ops Bot MVP
 
+> **Role:** Canonical source for user-facing product behavior and MVP UX. Architecture/deploy internals are summarized here and detailed in [Architecture](ARCHITECTURE.md) and runbook/config docs.
+
 ## 1. Продукт
 
 - **Название проекта:** Smart Life Ops Bot.

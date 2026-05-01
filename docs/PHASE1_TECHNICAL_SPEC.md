@@ -1,5 +1,7 @@
 # PHASE 1 Technical Spec — Smart Life Ops Bot
 
+> **Role:** Phase 1 implementation-detail spec. If overlap appears, user-facing behavior remains canonical in [PRD](PRD_MVP.md), architecture boundaries in [Architecture](ARCHITECTURE.md), and durable decisions in [Decisions](DECISIONS.md).
+
 ## 1. Назначение документа
 
 Этот документ фиксирует рабочую техническую спецификацию Phase 1 для поэтапной реализации следующими PR.

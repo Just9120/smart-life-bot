@@ -1,5 +1,7 @@
 # Configuration / Env Model — Smart Life Ops Bot
 
+> **Role:** Canonical source for env/configuration variables and runtime config model. For deploy smoke steps use [VPS smoke runbook](VPS_SMOKE_RUNBOOK.md).
+
 Связанный документ для первого ручного серверного теста: `docs/VPS_SMOKE_RUNBOOK.md`.
 
 ## 1. Назначение

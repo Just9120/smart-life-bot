@@ -1,5 +1,7 @@
 # Implementation Roadmap / Sprint Milestones
 
+> **Role:** Canonical source for adjustable implementation sequencing (sprints/milestones). Keep product behavior in [PRD](PRD_MVP.md), architecture in [Architecture](ARCHITECTURE.md), and test policy in [Testing](TESTING.md).
+
 Эти этапы фиксируют **implementation milestones/sprints**, а не жесткие Scrum-коммитменты.
 
 > Scope может корректироваться по мере продуктовых находок, результатов live smoke-проверок и появления новых рисков.

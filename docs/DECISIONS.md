@@ -1,5 +1,7 @@
 # Журнал начальных решений (ADR-like)
 
+> **Role:** Canonical ADR-style decision log (why, trade-offs, status). Do not duplicate full implementation specs/runbook steps here; reference [Architecture](ARCHITECTURE.md), [Implementation roadmap](IMPLEMENTATION_ROADMAP.md), and operational docs when needed.
+
 ## Легенда статусов
 
 - **Accepted** — активное базовое решение.

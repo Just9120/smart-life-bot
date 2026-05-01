@@ -1,6 +1,10 @@
 # Testing & Regression Strategy
 
-Документ описывает **практическую стратегию тестирования** для Smart Life Ops Bot.
+> **Role:** Canonical source for automated testing and regression strategy. Manual deploy smoke commands/checklists belong in [VPS smoke runbook](VPS_SMOKE_RUNBOOK.md).
+
+Документ описывает **практическую стратегию automated/regression тестирования** для Smart Life Ops Bot.
+
+Пошаговые ручные post-deploy проверки вынесены в [VPS smoke runbook](VPS_SMOKE_RUNBOOK.md), чтобы не дублировать операционные чеклисты.
 
 ## 1) Ключевая идея
 

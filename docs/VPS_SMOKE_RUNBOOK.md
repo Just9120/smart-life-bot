@@ -1,5 +1,7 @@
 # VPS Smoke Runbook (Manual First Test)
 
+> **Role:** Canonical source for manual operator smoke checks after deploy. Automated regression strategy and CI test levels are maintained in [Testing](TESTING.md).
+
 Этот runbook фиксирует **первый ручной smoke-проход на VPS** через Docker Compose runtime.
 
 ## 1) Purpose и scope
