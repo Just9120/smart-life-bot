@@ -106,7 +106,7 @@ def test_regression_cashback_add_query_never_calls_calendar() -> None:
     assert "Текущий режим: 💳 Кэшбек" in menu.text
     assert "Добавил кэшбек" in add.text
     listed = router.handle_text_message(telegram_user_id=92006, text="📋 Активные категории")
-    assert "Активные категории — май 2026" in listed.text
+    assert "Активные кэшбек-категории — май 2026" in listed.text
     assert "🏆 Кэшбек" in query.text
     assert "Владимир — Альфа — 5%" in query.text
     assert len(deps.calendar_service.requests) == 0
@@ -239,7 +239,7 @@ def test_regression_cashback_use_case_structured_fields_exposed() -> None:
 def test_regression_cashback_selected_empty_month_has_safe_navigation() -> None:
     router, deps = _build_router()
     response = router.handle_callback(telegram_user_id=92008, callback_data=f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}2026-07")
-    assert "На июль 2026 кэшбек-категорий пока нет." in response.text
+    assert "На июль 2026 активных кэшбек-категорий пока нет." in response.text
     buttons = [button for row in response.button_rows for button in row] if response.button_rows else list(response.buttons)
     assert ("Текущий", "cashback:list:current") in buttons
     assert len(deps.calendar_service.requests) == 0
