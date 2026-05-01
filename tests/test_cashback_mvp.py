@@ -1,7 +1,7 @@
 from datetime import date
 
 from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase, format_month_label
-from smart_life_bot.cashback.parser import parse_structured_add
+from smart_life_bot.cashback.parser import normalize_bank_name, parse_structured_add
 from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
 from smart_life_bot.storage.sqlite import create_sqlite_connection, init_sqlite_schema
 
@@ -18,6 +18,17 @@ def test_structured_add_parse():
     assert parsed.owner == 'Владимир'
     assert parsed.percent == 5
 
+
+def test_bank_name_normalization_t_bank_variants_and_unknown_cleanup():
+    assert normalize_bank_name("Т-Банк") == "Т-Банк"
+    assert normalize_bank_name("Т-банк") == "Т-Банк"
+    assert normalize_bank_name("т-банк") == "Т-Банк"
+    assert normalize_bank_name("Т банк") == "Т-Банк"
+    assert normalize_bank_name("т банк") == "Т-Банк"
+    assert normalize_bank_name("ТБанк") == "Т-Банк"
+    assert normalize_bank_name("тбанк") == "Т-Банк"
+    assert normalize_bank_name("  My   Bank  ") == "My Bank"
+    assert normalize_bank_name("  My -  Bank  ") == "My-Bank"
 
 
 
@@ -114,6 +125,33 @@ def test_duplicate_same_percent_space_separated_returns_already_exists():
     listed = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute()
     assert listed.status == "list_found"
     assert len(listed.records) == 1
+
+
+def test_duplicate_same_percent_with_normalized_bank_returns_already_exists_and_single_active_row():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    first = add.execute("Т-Банк Владимир Аптеки 5%")
+    second = add.execute("Т-банк Владимир Аптеки 5%")
+    assert first is not None and first.status == "added"
+    assert second is not None and second.status == "already_exists"
+    active = repo.list_active("2026-05")
+    assert len(active) == 1
+    assert active[0].bank_name == "Т-Банк"
+
+
+def test_changed_percent_with_normalized_bank_updates_existing_row():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    first = add.execute("Т-Банк Владимир Аптеки 5%")
+    second = add.execute("т банк Владимир Аптеки 7%")
+    assert first is not None and first.status == "added"
+    assert second is not None and second.status == "updated"
+    assert second.old_percent == 5
+    assert second.new_percent == 7
+    active = repo.list_active("2026-05")
+    assert len(active) == 1
+    assert active[0].bank_name == "Т-Банк"
+    assert active[0].percent == 7
 
 def test_explicit_month_parsing_variants():
     repo = _repo()

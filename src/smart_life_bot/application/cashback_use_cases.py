@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 from typing import Literal
 
 from smart_life_bot.cashback.models import ALLOWED_OWNERS, CashbackAddInput
-from smart_life_bot.cashback.parser import in_transition_period, looks_like_cashback_add_attempt, normalize_category_key, parse_structured_add, validate_owner
+from smart_life_bot.cashback.parser import in_transition_period, looks_like_cashback_add_attempt, normalize_bank_name, normalize_category_key, parse_structured_add, validate_owner
 
 RU_MONTH_LABELS = {
     1: "январь", 2: "февраль", 3: "март", 4: "апрель", 5: "май", 6: "июнь",
@@ -143,12 +143,13 @@ class AddCashbackCategoryUseCase:
                     text="Сейчас переходный период между месяцами. К какому месяцу отнести категорию?",
                     error_code="transition_month_required",
                     candidate_months=candidate_months,
-                    pending_add=CashbackAddInput(parsed.bank, parsed.owner, parsed.category, parsed.percent, current_month, text),
+                    pending_add=CashbackAddInput(normalize_bank_name(parsed.bank), parsed.owner, parsed.category, parsed.percent, current_month, text),
                 )
             month = current_year_month(today)
         else:
             month = parsed.month
-        record, change, old = self.repo.upsert(CashbackAddInput(parsed.bank, parsed.owner, parsed.category, parsed.percent, month, text))
+        normalized_bank = normalize_bank_name(parsed.bank)
+        record, change, old = self.repo.upsert(CashbackAddInput(normalized_bank, parsed.owner, parsed.category, parsed.percent, month, text))
         month_label = format_month_label(month)
         if change == "updated":
             return CashbackResult(status="updated", text=f"Обновил кэшбек:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — было {old:g}%, стало {record.percent:g}% — {month_label}", target_month=month, updated=True, records=(record,), old_percent=old, new_percent=record.percent)

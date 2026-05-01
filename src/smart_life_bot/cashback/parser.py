@@ -18,6 +18,14 @@ def normalize_category_key(value: str) -> str:
     value = value.strip().lower().replace("ё", "е")
     return re.sub(r"\s+", " ", value)
 
+def normalize_bank_name(value: str) -> str:
+    cleaned = re.sub(r"\s+", " ", value.strip())
+    cleaned = re.sub(r"\s*-\s*", "-", cleaned)
+    canonical_key = re.sub(r"[\s-]+", "", cleaned).lower().replace("ё", "е")
+    if canonical_key == "тбанк":
+        return "Т-Банк"
+    return cleaned
+
 
 def parse_month_token(token: str, today: date) -> str | None:
     t = normalize_category_key(token)
