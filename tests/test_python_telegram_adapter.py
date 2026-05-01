@@ -10,10 +10,19 @@ from telegram import InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
 from smart_life_bot.bot import (
+    CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
+    CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
+    CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX,
+    CALLBACK_CASHBACK_LIST_CURRENT,
+    CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
+    CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX,
+    CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
+    CALLBACK_CASHBACK_TRANSITION_CANCEL,
+    CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
     CALLBACK_CANCEL,
     CALLBACK_CONFIRM,
-    CALLBACK_EDIT,
     CALLBACK_DURATION,
+    CALLBACK_EDIT,
     CALLBACK_REMINDERS,
     CALLBACK_REMINDERS_10,
     CALLBACK_REMINDERS_30,
@@ -88,7 +97,7 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
         assert len(callback_handlers) == 1
         assert (
             callback_handlers[0].pattern.pattern
-            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal)$"
+            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal|cashback:list:current|cashback:list:month:\d{4}-\d{2}|cashback:list:owner:\d+:month:\d{4}-\d{2}|cashback:list:owner-current:\d+|cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:transition:select:\d{4}-\d{2}|cashback:transition:cancel)$"
         )
         assert tuple(application.bot_data["allowed_callback_data"]) == (
             CALLBACK_CONFIRM,
@@ -105,6 +114,17 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
             CALLBACK_SETTINGS_PARSER_LLM,
             "calendar:mode:quick",
             "calendar:mode:personal",
+            CALLBACK_CASHBACK_LIST_CURRENT,
+            CALLBACK_CASHBACK_TRANSITION_CANCEL,
+        )
+        assert tuple(application.bot_data["allowed_callback_prefixes"]) == (
+            CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
+            CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
+            CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX,
+            CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX,
+            CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
+            CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
+            CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
         )
     finally:
         container.connection.close()
@@ -215,9 +235,55 @@ def test_callback_handler_preserves_existing_callback_data_values() -> None:
     assert [call.kwargs["callback_data"] for call in runtime.on_callback.call_args_list] == [
         CALLBACK_CONFIRM,
         CALLBACK_EDIT,
-    CALLBACK_DURATION,
+        CALLBACK_DURATION,
         CALLBACK_CANCEL,
     ]
+
+
+def test_callback_pattern_accepts_supported_cashback_callbacks() -> None:
+    container = build_runtime(_settings())
+    try:
+        application = build_telegram_application(_settings(), container.runtime)
+        registered_handlers = [handler for handlers in application.handlers.values() for handler in handlers]
+        callback_handler = next(handler for handler in registered_handlers if isinstance(handler, CallbackQueryHandler))
+        pattern = callback_handler.pattern
+        assert pattern is not None
+
+        for callback_data in (
+            CALLBACK_CASHBACK_LIST_CURRENT,
+            f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}2026-05",
+            f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-05",
+            f"{CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX}1",
+            f"{CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX}123",
+            f"{CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX}123",
+            f"{CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX}123",
+            f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}2026-05",
+            CALLBACK_CASHBACK_TRANSITION_CANCEL,
+        ):
+            assert pattern.match(callback_data) is not None
+    finally:
+        container.connection.close()
+
+
+def test_callback_pattern_rejects_unrelated_callback_data() -> None:
+    container = build_runtime(_settings())
+    try:
+        application = build_telegram_application(_settings(), container.runtime)
+        registered_handlers = [handler for handlers in application.handlers.values() for handler in handlers]
+        callback_handler = next(handler for handler in registered_handlers if isinstance(handler, CallbackQueryHandler))
+        pattern = callback_handler.pattern
+        assert pattern is not None
+
+        for callback_data in (
+            "cashback:list:month:2026-5",
+            "cashback:list:owner:abc:month:2026-05",
+            "cashback:delete:request:abc",
+            "cashback:transition:select:26-05",
+            "unknown:callback:data",
+        ):
+            assert pattern.match(callback_data) is None
+    finally:
+        container.connection.close()
 
 
 def test_callback_handler_accepts_settings_callback_data_values() -> None:
