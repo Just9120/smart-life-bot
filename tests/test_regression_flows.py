@@ -107,6 +107,19 @@ def test_regression_cashback_add_query_never_calls_calendar() -> None:
     assert len(deps.calendar_service.requests) == 0
 
 
+def test_regression_cashback_space_separated_add_never_calls_calendar() -> None:
+    router, deps = _build_router()
+
+    add = router.handle_text_message(telegram_user_id=92009, text="Т-Банк Владимир Аптеки 5%")
+    add_with_month = router.handle_text_message(telegram_user_id=92009, text="Т-Банк Владимир 2026-05 Супермаркеты 3%")
+    query = router.handle_text_message(telegram_user_id=92009, text="Аптеки")
+
+    assert "Добавил кэшбек" in add.text or "Обновил кэшбек" in add.text
+    assert "Добавил кэшбек" in add_with_month.text or "Обновил кэшбек" in add_with_month.text
+    assert "🏆 Кэшбек" in query.text
+    assert len(deps.calendar_service.requests) == 0
+
+
 def test_regression_cashback_conflict_clarification_does_not_mutate_states() -> None:
     router, deps = _build_router()
 
