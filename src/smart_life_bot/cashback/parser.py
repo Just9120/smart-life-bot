@@ -44,19 +44,60 @@ class ParsedAdd:
 
 def parse_structured_add(text: str, today: date) -> ParsedAdd | None:
     parts = [p.strip() for p in text.split(",") if p.strip()]
-    if len(parts) not in (4, 5):
+    if len(parts) in (4, 5):
+        bank, owner = parts[0], parts[1]
+        if len(parts) == 5:
+            month = parse_month_token(parts[2], today)
+            category, percent_raw = parts[3], parts[4]
+        else:
+            month = None
+            category, percent_raw = parts[2], parts[3]
+        m = re.match(r"^\s*(\d+(?:[\.,]\d+)?)\s*%?\s*$", percent_raw)
+        if m:
+            return ParsedAdd(bank=bank, owner=owner, category=category, percent=float(m.group(1).replace(",", ".")), month=month)
+
+    return _parse_space_fallback(text, today)
+
+
+def _parse_space_fallback(text: str, today: date) -> ParsedAdd | None:
+    tokens = [t.strip() for t in re.split(r"[\s,]+", text.strip()) if t.strip()]
+    if len(tokens) < 4:
         return None
-    bank, owner = parts[0], parts[1]
-    if len(parts) == 5:
-        month = parse_month_token(parts[2], today)
-        category, percent_raw = parts[3], parts[4]
-    else:
-        month = None
-        category, percent_raw = parts[2], parts[3]
-    m = re.match(r"^\s*(\d+(?:[\.,]\d+)?)\s*%?\s*$", percent_raw)
-    if not m:
+
+    percent_match = re.match(r"^(\d+(?:[\.,]\d+)?)%$", tokens[-1])
+    if not percent_match:
         return None
-    return ParsedAdd(bank=bank, owner=owner, category=category, percent=float(m.group(1).replace(",", ".")), month=month)
+    percent = float(percent_match.group(1).replace(",", "."))
+
+    owner_indexes = [idx for idx, token in enumerate(tokens[:-1]) if token in ALLOWED_OWNERS]
+    if len(owner_indexes) != 1:
+        return None
+    owner_idx = owner_indexes[0]
+    owner = tokens[owner_idx]
+
+    bank_tokens = tokens[:owner_idx]
+    if not bank_tokens:
+        return None
+
+    cursor = owner_idx + 1
+    month: str | None = None
+    if cursor < len(tokens) - 1:
+        maybe_month = parse_month_token(tokens[cursor], today)
+        if maybe_month is not None:
+            month = maybe_month
+            cursor += 1
+
+    category_tokens = tokens[cursor:-1]
+    if not category_tokens:
+        return None
+
+    return ParsedAdd(
+        bank=" ".join(bank_tokens),
+        owner=owner,
+        category=" ".join(category_tokens),
+        percent=percent,
+        month=month,
+    )
 
 
 def validate_owner(owner: str) -> bool:
@@ -65,6 +106,11 @@ def validate_owner(owner: str) -> bool:
 
 def looks_like_cashback_add_attempt(text: str) -> bool:
     parts = [p.strip() for p in text.split(",") if p.strip()]
-    if len(parts) < 3:
+    if len(parts) >= 3 and "%" in text:
+        return True
+    tokens = [t for t in re.split(r"[\s,]+", text.strip()) if t]
+    if len(tokens) < 4:
         return False
-    return "%" in text
+    if not re.match(r"^\d+(?:[\.,]\d+)?%$", tokens[-1]):
+        return False
+    return any(token in ALLOWED_OWNERS for token in tokens[:-1])

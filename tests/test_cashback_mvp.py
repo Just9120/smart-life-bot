@@ -19,6 +19,31 @@ def test_structured_add_parse():
     assert parsed.percent == 5
 
 
+
+
+def test_structured_add_space_separated_and_missing_final_comma():
+    today = date(2026, 5, 3)
+    spaced = parse_structured_add('Т-Банк Владимир Аптеки 5%', today)
+    assert spaced is not None
+    assert spaced.bank == 'Т-Банк'
+    assert spaced.owner == 'Владимир'
+    assert spaced.category == 'Аптеки'
+    assert spaced.percent == 5
+
+    spaced_month_ru = parse_structured_add('Т-Банк Владимир май Аптеки 5%', today)
+    assert spaced_month_ru is not None
+    assert spaced_month_ru.month == '2026-05'
+
+    spaced_month_iso = parse_structured_add('Т-Банк Владимир 2026-05 Аптеки 5%', today)
+    assert spaced_month_iso is not None
+    assert spaced_month_iso.month == '2026-05'
+
+    missing_final_comma = parse_structured_add('Т-Банк, Владимир, Аптеки 5%', today)
+    assert missing_final_comma is not None
+    assert missing_final_comma.bank == 'Т-Банк'
+    assert missing_final_comma.owner == 'Владимир'
+    assert missing_final_comma.category == 'Аптеки'
+    assert missing_final_comma.percent == 5
 def test_upsert_and_query_sorted():
     repo = _repo()
     add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026,5,3))

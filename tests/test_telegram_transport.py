@@ -1006,7 +1006,7 @@ def test_cashback_owner_filter_malformed_callback_fails_safe() -> None:
     assert "Не удалось открыть месяц" in bad_month.text
     assert len(deps.calendar_service.requests) == 0
 
-def test_cashback_like_malformed_input_does_not_fall_into_duration_edit() -> None:
+def test_cashback_missing_final_comma_add_works_and_does_not_fall_into_duration_edit() -> None:
     router, deps = _build_router()
     user_id = 93001
 
@@ -1015,7 +1015,7 @@ def test_cashback_like_malformed_input_does_not_fall_into_duration_edit() -> Non
 
     response = router.handle_text_message(telegram_user_id=user_id, text="Т-Банк, Владимир, Аптеки 5%")
 
-    assert "Не понял формат кэшбека" in response.text
+    assert "Добавил кэшбек" in response.text or "Обновил кэшбек" in response.text
     assert "Введите положительное целое число минут" not in response.text
     assert len(deps.calendar_service.requests) == 0
 
