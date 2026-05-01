@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from smart_life_bot.application.draft_validation import detect_draft_validation_issue
 from smart_life_bot.application.dto import (
@@ -17,6 +17,8 @@ from smart_life_bot.application.cashback_use_cases import (
     QueryCashbackCategoryUseCase,
     RequestDeleteCashbackCategoryUseCase,
     SoftDeleteCashbackCategoryUseCase,
+    CompleteTransitionCashbackCategoryUseCase,
+    format_month_label,
     parse_year_month,
     shift_year_month,
 )
@@ -52,6 +54,14 @@ CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX = "cashback:delete:confirm:"
 CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX = "cashback:delete:cancel:"
 CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX = "cashback:list:owner:"
 CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX = "cashback:list:owner-current:"
+CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX = "cashback:transition:select:"
+CALLBACK_CASHBACK_TRANSITION_CANCEL = "cashback:transition:cancel"
+
+
+@dataclass(frozen=True, slots=True)
+class PendingCashbackTransition:
+    add_input: object
+    candidate_months: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +89,8 @@ class TelegramTransportRouter:
     list_active_cashback_categories: ListActiveCashbackCategoriesUseCase | None = None
     request_delete_cashback_category: RequestDeleteCashbackCategoryUseCase | None = None
     soft_delete_cashback_category: SoftDeleteCashbackCategoryUseCase | None = None
+    complete_transition_cashback_category: CompleteTransitionCashbackCategoryUseCase | None = None
+    pending_cashback_transitions: dict[int, PendingCashbackTransition] = field(default_factory=dict)
 
     @staticmethod
     def _owner_filter_index(owner_name: str | None) -> str:
@@ -147,6 +159,16 @@ class TelegramTransportRouter:
         if self.add_cashback_category is not None:
             add_result = self.add_cashback_category.execute(normalized)
             if add_result is not None:
+                if add_result.status == "transition_month_required" and add_result.pending_add is not None:
+                    self.pending_cashback_transitions[user.id] = PendingCashbackTransition(
+                        add_input=add_result.pending_add,
+                        candidate_months=add_result.candidate_months,
+                    )
+                    buttons = tuple(
+                        (format_month_label(month), f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}{month}")
+                        for month in add_result.candidate_months
+                    ) + (("↩️ Отмена", CALLBACK_CASHBACK_TRANSITION_CANCEL),)
+                    return TelegramTransportResponse(text=add_result.text, buttons=buttons)
                 return TelegramTransportResponse(text=add_result.text)
 
 
@@ -321,6 +343,18 @@ class TelegramTransportRouter:
             if result.target_month and self.list_active_cashback_categories is not None:
                 listing = self.list_active_cashback_categories.execute(month=result.target_month)
                 return TelegramTransportResponse(text=f"{result.text}\n\n{listing.text}", buttons=self._build_cashback_action_buttons(listing))
+            return TelegramTransportResponse(text=result.text)
+        if callback_data == CALLBACK_CASHBACK_TRANSITION_CANCEL:
+            self.pending_cashback_transitions.pop(user.id, None)
+            return TelegramTransportResponse(text="Добавление кэшбека отменено. Запись не изменена.")
+        if callback_data.startswith(CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX) and self.complete_transition_cashback_category is not None:
+            selected_month = callback_data.removeprefix(CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX)
+            pending = self.pending_cashback_transitions.pop(user.id, None)
+            if pending is None:
+                return TelegramTransportResponse(text="Кнопка устарела. Отправь кэшбек заново.")
+            if selected_month not in pending.candidate_months:
+                return TelegramTransportResponse(text="Некорректный месяц в кнопке. Отправь кэшбек заново.")
+            result = self.complete_transition_cashback_category.execute(pending.add_input, selected_month)
             return TelegramTransportResponse(text=result.text)
 
         if callback_data == CALLBACK_SETTINGS_PARSER_LLM:

@@ -65,7 +65,7 @@
 - Owner-filtered slice delivered: `📋 Активные категории` поддерживает inline owner filter + reset `Все владельцы` c сохранением выбранного месяца.
 - Списки/фильтрация по bank/category (если подтверждена продуктовая ценность).
 - Edit записей.
-- Опциональные explicit month buttons в transition period.
+- Transition-period explicit month buttons delivered: валидный 4-part cashback add в конце месяца показывает inline current/next month и завершается без повторного ввода.
 - Сохранение transport-agnostic structured use-case результатов.
 
 ---
