@@ -104,6 +104,8 @@ def test_regression_cashback_add_query_never_calls_calendar() -> None:
     query = router.handle_text_message(telegram_user_id=92006, text="Супермаркеты")
 
     assert "Текущий режим: 💳 Кэшбек" in menu.text
+    assert any(label == "➕ Добавить категорию" for label, _ in menu.buttons)
+    assert any(label == "🔎 Найти категорию" for label, _ in menu.buttons)
     assert "Добавил кэшбек" in add.text
     listed = router.handle_text_message(telegram_user_id=92006, text="📋 Активные категории")
     assert "Активные кэшбек-категории — май 2026" in listed.text
