@@ -12,7 +12,7 @@ from smart_life_bot.application.use_cases import (
     ProcessIncomingMessageUseCase,
     SetParserModeUseCase,
 )
-from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase, UpdateCashbackCategoryPercentUseCase
 from smart_life_bot.auth.models import AuthContext
 from smart_life_bot.bot import (
     CALLBACK_CANCEL,
@@ -273,6 +273,7 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         list_active_cashback_categories=ListActiveCashbackCategoriesUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
         request_delete_cashback_category=RequestDeleteCashbackCategoryUseCase(cashback_repo),
         soft_delete_cashback_category=SoftDeleteCashbackCategoryUseCase(cashback_repo),
+        update_cashback_category_percent=UpdateCashbackCategoryPercentUseCase(cashback_repo),
         complete_transition_cashback_category=CompleteTransitionCashbackCategoryUseCase(cashback_repo),
     )
     return router, deps
@@ -1254,3 +1255,37 @@ def test_cashback_transition_legacy_callback_is_stale_and_does_not_mutate_storag
     assert cashback_repo.list_active("2026-05") == []
     assert cashback_repo.list_active("2026-06") == []
 
+
+def test_active_list_contains_edit_percent_buttons_with_row_indexes() -> None:
+    router, _ = _build_router()
+    router.handle_text_message(telegram_user_id=90701, text='Альфа, Владимир, Аптеки, 5%')
+    response = router.handle_text_message(telegram_user_id=90701, text='📋 Активные категории')
+    assert any(label == 'Изменить % #1' for label, _ in response.buttons)
+
+
+def test_edit_percent_flow_valid_invalid_cancel_and_no_calendar_calls() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90702, text='Альфа, Владимир, Аптеки, 5%')
+    listing = router.handle_text_message(telegram_user_id=90702, text='📋 Активные категории')
+    edit_cb = next(cb for label, cb in listing.buttons if label.startswith('Изменить % #1'))
+    prompt = router.handle_callback(telegram_user_id=90702, callback_data=edit_cb)
+    assert 'Введи новый процент' in prompt.text
+    invalid = router.handle_text_message(telegram_user_id=90702, text='abc')
+    assert 'Некорректный процент' in invalid.text
+    valid = router.handle_text_message(telegram_user_id=90702, text='7%')
+    assert 'Обновил процент' in valid.text
+    assert len(deps.calendar_service.requests) == 0
+
+    listing2 = router.handle_text_message(telegram_user_id=90702, text='📋 Активные категории')
+    edit_cb2 = next(cb for label, cb in listing2.buttons if label.startswith('Изменить % #1'))
+    router.handle_callback(telegram_user_id=90702, callback_data=edit_cb2)
+    cancel = router.handle_text_message(telegram_user_id=90702, text='cancel')
+    assert 'отменено' in cancel.text.lower()
+
+
+def test_edit_percent_malformed_or_stale_callback_fails_safely() -> None:
+    router, _ = _build_router()
+    malformed = router.handle_callback(telegram_user_id=90703, callback_data='cashback:edit-percent:request:bad')
+    assert 'Неизвестное действие' in malformed.text or 'не найдена' in malformed.text.lower()
+    stale = router.handle_callback(telegram_user_id=90703, callback_data='cashback:edit-percent:request:9999')
+    assert 'устарела' in stale.text.lower() or 'не найдена' in stale.text.lower()
