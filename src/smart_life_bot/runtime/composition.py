@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 
-from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, QueryCashbackCategoryUseCase
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
@@ -129,6 +129,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         supports_custom_reminders=settings.google_auth_mode is not GoogleAuthMode.SERVICE_ACCOUNT_SHARED_CALENDAR_MODE,
         add_cashback_category=AddCashbackCategoryUseCase(cashback_repo),
         query_cashback_category=QueryCashbackCategoryUseCase(cashback_repo),
+        list_active_cashback_categories=ListActiveCashbackCategoriesUseCase(cashback_repo),
     )
 
     return RuntimeContainer(

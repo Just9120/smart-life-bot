@@ -11,7 +11,13 @@ from smart_life_bot.application.dto import (
     EditEventDraftFieldInput,
     IncomingMessageInput,
 )
-from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase
+from smart_life_bot.application.cashback_use_cases import (
+    AddCashbackCategoryUseCase,
+    ListActiveCashbackCategoriesUseCase,
+    QueryCashbackCategoryUseCase,
+    parse_year_month,
+    shift_year_month,
+)
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
@@ -37,6 +43,7 @@ CALLBACK_SETTINGS_PARSER_PYTHON = "settings:parser:python"
 CALLBACK_SETTINGS_PARSER_AUTO = "settings:parser:auto"
 CALLBACK_SETTINGS_PARSER_LLM = "settings:parser:llm"
 CALLBACK_CASHBACK_LIST_CURRENT = "cashback:list:current"
+CALLBACK_CASHBACK_LIST_MONTH_PREFIX = "cashback:list:month:"
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,7 +114,8 @@ class TelegramTransportRouter:
             )
 
         if normalized == "📋 Активные категории" and self.list_active_cashback_categories is not None:
-            return TelegramTransportResponse(text=self.list_active_cashback_categories.execute().text)
+            result = self.list_active_cashback_categories.execute()
+            return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_month_nav_buttons(result.target_month))
 
         if self.add_cashback_category is not None:
             add_result = self.add_cashback_category.execute(normalized)
@@ -229,7 +237,19 @@ class TelegramTransportRouter:
             settings_response = self._build_settings_response(user.id)
             return TelegramTransportResponse(text=f"{result.message}\n\n{settings_response.text}", buttons=settings_response.buttons)
         if callback_data == CALLBACK_CASHBACK_LIST_CURRENT and self.list_active_cashback_categories is not None:
-            return TelegramTransportResponse(text=self.list_active_cashback_categories.execute().text)
+            result = self.list_active_cashback_categories.execute()
+            return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_month_nav_buttons(result.target_month))
+        if callback_data.startswith(CALLBACK_CASHBACK_LIST_MONTH_PREFIX) and self.list_active_cashback_categories is not None:
+            selected_month = callback_data.removeprefix(CALLBACK_CASHBACK_LIST_MONTH_PREFIX)
+            if parse_year_month(selected_month) is None:
+                return TelegramTransportResponse(
+                    text=(
+                        "Не удалось открыть месяц из кнопки.\n"
+                        "Попробуйте снова через «📋 Активные категории»."
+                    )
+                )
+            result = self.list_active_cashback_categories.execute(month=selected_month)
+            return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_month_nav_buttons(result.target_month))
 
         if callback_data == CALLBACK_SETTINGS_PARSER_LLM:
             result, _ = self.set_parser_mode.execute(user_id=user.id, parser_mode=ParserMode.LLM)
@@ -312,6 +332,21 @@ class TelegramTransportRouter:
         if self.llm_available:
             return "Python first, Claude fallback"
         return "Python fallback only (LLM not configured)"
+
+    def _build_cashback_month_nav_buttons(self, target_month: str | None) -> tuple[tuple[str, str], ...]:
+        if target_month is None:
+            return ()
+        if parse_year_month(target_month) is None:
+            return ()
+        prev_month = shift_year_month(target_month, delta=-1)
+        next_month = shift_year_month(target_month, delta=1)
+        if prev_month is None or next_month is None:
+            return ()
+        return (
+            ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}{prev_month}"),
+            ("Текущий", CALLBACK_CASHBACK_LIST_CURRENT),
+            ("Следующий ➡️", f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}{next_month}"),
+        )
 
 
 def format_preview_message(draft: EventDraft) -> str:
