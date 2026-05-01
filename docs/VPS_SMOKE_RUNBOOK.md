@@ -95,17 +95,27 @@ Compose использует bind mount:
 
 Это container-visible path convention для переменной `GOOGLE_SERVICE_ACCOUNT_JSON`; хостовый путь задаётся через bind mount в `compose.yaml`.
 
-## 5) Build image (fresh code marker)
+## 5) Stop/remove service container before rebuild (stale-runtime guard)
+
+```bash
+cd /opt/smart-life-bot
+docker compose stop smart-life-bot || true
+docker compose rm -f smart-life-bot || true
+```
+
+Этот шаг затрагивает только сервис `smart-life-bot` текущего compose-проекта и не останавливает/не удаляет чужие контейнеры.
+
+## 6) Build image (fresh code marker)
 
 ```bash
 cd /opt/smart-life-bot
 host_commit="$(git rev-parse --short HEAD)"
-docker compose build --no-cache --build-arg APP_GIT_SHA="$host_commit" smart-life-bot
+docker compose build --no-cache --pull --build-arg APP_GIT_SHA="$host_commit" smart-life-bot
 ```
 
 Compose service uses explicit local image tag `smart-life-bot:local`. Build embeds safe marker `SMART_LIFE_BOT_BUILD_SHA=$host_commit` inside image so runtime verification can prove container code matches current `main` commit.
 
-## 6) Preflight (обязательный шаг перед polling)
+## 7) Preflight (обязательный шаг перед polling)
 
 ```bash
 docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.preflight
@@ -117,21 +127,21 @@ docker compose run --rm smart-life-bot python -m smart_life_bot.runtime.prefligh
 - **не** делает вызовы Telegram API / Google API;
 - **не** печатает secrets.
 
-## 7) Start polling runtime
+## 8) Start polling runtime
 
 ```bash
-docker compose up -d --force-recreate --no-deps smart-life-bot
+docker compose up -d --force-recreate --no-deps --no-build smart-life-bot
 ```
 
 Одновременно должен работать только один polling consumer.
 
-## 8) Logs
+## 9) Logs
 
 ```bash
 docker compose logs -f smart-life-bot
 ```
 
-## 9) Stop runtime
+## 10) Stop runtime
 
 ```bash
 docker compose stop smart-life-bot
@@ -140,7 +150,7 @@ docker compose stop smart-life-bot
 docker compose down  # только из /opt/smart-life-bot: затрагивает только compose-проект этого репозитория
 ```
 
-## 10) Telegram smoke scenarios
+## 11) Telegram smoke scenarios
 
 ### 10.0 Deploy freshness / runtime identity (обязательно перед Telegram checks)
 1. Убедитесь, что деплой выполнен из актуального `main` (`git rev-parse --short HEAD`).
@@ -194,13 +204,13 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 12. Отправьте прямой календарный текст и проверьте preview (без записи до Confirm).
 13. Нажмите Confirm только в календарном preview и проверьте, что запись создается только после explicit confirm.
 
-## 11) Docker isolation notes
+## 12) Docker isolation notes
 
 - Не выполняйте глобальные Docker cleanup-команды (`docker system prune`, `docker rm` без фильтра и т.п.) в рамках этого smoke-runbook.
 - Используйте только service-scoped команды (`smart-life-bot`) из директории `/opt/smart-life-bot`.
 - `docker compose down` допустим только в директории этого репозитория и влияет только на compose-проект Smart Life Ops Bot.
 
-## 12) Troubleshooting
+## 13) Troubleshooting
 
 - Docker не установлен / сервис не запущен.
 - Compose plugin отсутствует (`docker compose version`).
@@ -212,7 +222,7 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 - `Event creation failed` после Confirm: проверьте sharing calendar, calendar ID и service account key.
 
 
-### 12.1 Stale runtime diagnostics (manual commands, safe)
+### 13.1 Stale runtime diagnostics (manual commands, safe)
 
 ```bash
 cd /opt/smart-life-bot
@@ -245,12 +255,13 @@ PY
 ```
 
 Interpretation:
+- на хосте может существовать старый образ `smart-life-bot-smart-life-bot:latest`; это не критерий валидности деплоя;
 - running container image ID must equal `docker image inspect smart-life-bot:local` ID;
 - `SMART_LIFE_BOT_BUILD_SHA` must equal `git rev-parse --short HEAD`;
 - cashback callback markers must match expected latest literals;
 - if any mismatch exists, Telegram smoke is stale and invalid until redeploy is fixed.
 
-### 12.2 Duplicate polling consumer diagnostics (read-only)
+### 13.2 Duplicate polling consumer diagnostics (read-only)
 
 ```bash
 docker compose ls
@@ -260,7 +271,7 @@ ps aux | awk 'tolower($0) ~ /smart_life_bot|telegram_polling|smart-life-bot/'
 
 Do not stop/remove unrelated containers or processes during diagnostics.
 
-## 13) Smoke result checklist
+## 14) Smoke result checklist
 
 - [ ] image build passed
 - [ ] preflight passed
@@ -283,7 +294,7 @@ Do not stop/remove unrelated containers or processes during diagnostics.
 - [ ] в service-account режиме reminder controls не обязательны и не проверяются как рабочая user-visible фича
 - [ ] polling stopped
 
-## 14) Связь с manual GitHub Actions deploy
+## 15) Связь с manual GitHub Actions deploy
 
 После успешного ручного smoke на VPS деплой можно запускать и через GitHub Actions workflow `Deploy VPS` (manual `workflow_dispatch`).
 
