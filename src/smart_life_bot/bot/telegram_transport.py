@@ -111,6 +111,7 @@ class TelegramTransportRouter:
     complete_transition_cashback_category: CompleteTransitionCashbackCategoryUseCase | None = None
     pending_cashback_transitions: dict[int, PendingCashbackTransition] = field(default_factory=dict)
     pending_calendar_recovery: dict[int, PendingCalendarDateRecovery] = field(default_factory=dict)
+    active_feature_context: dict[int, str] = field(default_factory=dict)
 
     @staticmethod
     def _owner_filter_index(owner_name: str | None) -> str:
@@ -153,6 +154,7 @@ class TelegramTransportRouter:
             return TelegramTransportResponse(text="Похоже, здесь несколько вариантов. Что сделать?")
 
         if normalized == "📅 Календарь":
+            self.active_feature_context[user.id] = "calendar"
             return TelegramTransportResponse(
                 text="Выберите режим календаря:",
                 buttons=(("⚡ Быстрый режим", "calendar:mode:quick"), ("🔐 Личный Google Calendar", "calendar:mode:personal")),
@@ -160,6 +162,7 @@ class TelegramTransportRouter:
             )
 
         if normalized == "💳 Кэшбек":
+            self.active_feature_context[user.id] = "cashback"
             return TelegramTransportResponse(
                 text=(
                     "💳 Кэшбек\n\n"
@@ -173,6 +176,7 @@ class TelegramTransportRouter:
             )
 
         if normalized == "📋 Активные категории" and self.list_active_cashback_categories is not None:
+            self.active_feature_context[user.id] = "cashback"
             result = self.list_active_cashback_categories.execute()
             return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_action_buttons(result))
 
@@ -180,6 +184,7 @@ class TelegramTransportRouter:
             add_result = self.add_cashback_category.execute(normalized)
             if add_result is not None:
                 if add_result.status == "transition_month_required" and add_result.pending_add is not None:
+                    self.active_feature_context[user.id] = "cashback"
                     transition_token = secrets.token_hex(3)
                     self.pending_cashback_transitions[user.id] = PendingCashbackTransition(
                         session_token=transition_token,
@@ -191,6 +196,7 @@ class TelegramTransportRouter:
                         for month in add_result.candidate_months
                     ) + (("↩️ Отмена", CALLBACK_CASHBACK_TRANSITION_CANCEL),)
                     return TelegramTransportResponse(text=add_result.text, buttons=buttons)
+                self.active_feature_context[user.id] = "cashback"
                 return TelegramTransportResponse(text=add_result.text)
 
 
@@ -245,12 +251,13 @@ class TelegramTransportRouter:
                 self.state_repo.set(updated.__class__(user_id=updated.user_id, state=updated.state, draft=updated.draft, editing_field=None))
             return TelegramTransportResponse(text=self._get_pending_draft_text(user.id), buttons=self._build_draft_buttons_from_state(user.id))
 
-        if self.query_cashback_category is not None and self._looks_like_cashback_query(normalized):
+        if self.query_cashback_category is not None and self._is_cashback_query_in_context(user.id, normalized):
             cashback = self.query_cashback_category.execute(normalized)
             if cashback.status in {"query_found", "query_not_found"}:
                 return TelegramTransportResponse(text=cashback.text)
 
         result = self.process_incoming_message.execute(IncomingMessageInput(user_id=user.id, text=normalized))
+        self.active_feature_context[user.id] = "calendar"
         if result.status != "preview_ready":
             return TelegramTransportResponse(text=result.message)
 
@@ -279,6 +286,11 @@ class TelegramTransportRouter:
         if any(token in {"купить", "без", "даты", "напомни", "завтра", "сегодня"} for token in lower_tokens):
             return False
         return all(re.fullmatch(r"[А-Яа-яЁё\-]{2,}", token) is not None for token in tokens)
+
+    def _is_cashback_query_in_context(self, user_id: int, text: str) -> bool:
+        if self.active_feature_context.get(user_id) != "cashback":
+            return False
+        return self._looks_like_cashback_query(text)
 
     def handle_callback(self, telegram_user_id: int, callback_data: str) -> TelegramTransportResponse:
         user = self.users_repo.get_or_create_by_telegram_id(

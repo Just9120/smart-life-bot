@@ -126,6 +126,7 @@ def test_regression_cashback_space_separated_add_never_calls_calendar() -> None:
 
 def test_regression_cashback_query_not_found_does_not_fallthrough_to_calendar() -> None:
     router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=92010, text="💳 Кэшбек")
 
     response = router.handle_text_message(telegram_user_id=92010, text="Аптеки")
 
@@ -159,6 +160,18 @@ def test_regression_simple_russian_phrase_not_swallowed_by_cashback_query() -> N
     assert ("📅 Выбрать дату", "calendar:date:start") in response.buttons
     assert "ничего не найдено" not in response.text
     assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_common_one_two_word_event_texts_stay_in_calendar_flow() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+
+    for text in ("Созвон", "Тренировка", "Звонок маме"):
+        response = router.handle_text_message(telegram_user_id=92013, text=text)
+        assert "Черновик события" in response.text
+        assert ("📅 Выбрать дату", "calendar:date:start") in response.buttons
+        assert "ничего не найдено" not in response.text
+        assert len(deps.calendar_service.requests) == 0
 
 
 def test_regression_cashback_conflict_clarification_does_not_mutate_states() -> None:
