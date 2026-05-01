@@ -64,6 +64,7 @@ CALLBACK_CALENDAR_DATE_START = "calendar:date:start"
 CALLBACK_CALENDAR_DATE_MONTH_PREFIX = "calendar:date:month:"
 CALLBACK_CALENDAR_DATE_SELECT_PREFIX = "calendar:date:select:"
 CALLBACK_CALENDAR_DATE_CANCEL = "calendar:date:cancel"
+CALLBACK_CALENDAR_DATE_NOOP_PREFIX = "calendar:date:noop:"
 
 
 @dataclass(frozen=True, slots=True)
@@ -343,6 +344,20 @@ class TelegramTransportRouter:
                 selected_date=selected_date,
             )
             return TelegramTransportResponse(text=f"Дата выбрана: {selected_date}. Введите время в формате HH:MM.")
+        if callback_data.startswith(CALLBACK_CALENDAR_DATE_NOOP_PREFIX):
+            payload = callback_data.removeprefix(CALLBACK_CALENDAR_DATE_NOOP_PREFIX)
+            token, _, month_raw = payload.partition(":")
+            pending = self.pending_calendar_recovery.get(user.id)
+            if pending is None or not token or token != pending.session_token:
+                return TelegramTransportResponse(text="Кнопка устарела. Нажмите «📅 Выбрать дату» снова.")
+            parsed_month = _parse_year_month(month_raw)
+            if parsed_month is None:
+                return TelegramTransportResponse(text="Некорректный месяц в кнопке. Нажмите «📅 Выбрать дату» снова.")
+            snapshot = self.state_repo.get(user.id)
+            if snapshot is None or snapshot.draft is None or not _recovery_draft_matches(snapshot.draft, pending.draft_fingerprint):
+                self.pending_calendar_recovery.pop(user.id, None)
+                return TelegramTransportResponse(text="Кнопка устарела: черновик изменился. Нажмите «📅 Выбрать дату» снова.")
+            return TelegramTransportResponse(text="Выберите дату:", button_rows=_build_month_grid_rows(parsed_month, pending.session_token))
         if callback_data == CALLBACK_CALENDAR_DATE_CANCEL:
             self.pending_calendar_recovery.pop(user.id, None)
             return TelegramTransportResponse(text="Выбор даты отменён.")
@@ -730,7 +745,7 @@ def _build_month_grid_rows(year_month: tuple[int, int], token: str) -> tuple[tup
         week_row: list[tuple[str, str]] = []
         for day in week:
             if day == 0:
-                week_row.append(("·", CALLBACK_CALENDAR_DATE_CANCEL))
+                week_row.append(("·", f"{CALLBACK_CALENDAR_DATE_NOOP_PREFIX}{token}:{month_label}"))
                 continue
             iso = f"{year:04d}-{month:02d}-{day:02d}"
             week_row.append((str(day), f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}{token}:{iso}"))

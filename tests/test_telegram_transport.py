@@ -35,6 +35,7 @@ from smart_life_bot.bot import (
     CALLBACK_CALENDAR_DATE_MONTH_PREFIX,
     CALLBACK_CALENDAR_DATE_SELECT_PREFIX,
     CALLBACK_CALENDAR_DATE_CANCEL,
+    CALLBACK_CALENDAR_DATE_NOOP_PREFIX,
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
@@ -645,6 +646,23 @@ def test_successful_edit_start_at_clears_pending_recovery_and_random_hhmm_does_n
     assert ("✅ Confirm", CALLBACK_CONFIRM) in edited.buttons
     plain = router.handle_text_message(telegram_user_id=91004, text="09:15")
     assert "Черновик события:" in plain.text
+
+
+def test_calendar_blank_placeholder_is_noop_not_cancel() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+    router.handle_text_message(telegram_user_id=91005, text="Missing start_at")
+    started = router.handle_callback(telegram_user_id=91005, callback_data=CALLBACK_CALENDAR_DATE_START)
+    flattened = [button for row in started.button_rows for button in row]
+    noop_buttons = [cb for label, cb in flattened if label == "·"]
+    assert noop_buttons
+    noop_cb = noop_buttons[0]
+    assert noop_cb.startswith(CALLBACK_CALENDAR_DATE_NOOP_PREFIX)
+    response = router.handle_callback(telegram_user_id=91005, callback_data=noop_cb)
+    assert "Выберите дату" in response.text
+    ask_time = router.handle_callback(telegram_user_id=91005, callback_data=f"{CALLBACK_CALENDAR_DATE_SELECT_PREFIX}{noop_cb.split(':')[3]}:2026-06-15")
+    assert "Введите время" in ask_time.text
+    assert len(deps.calendar_service.requests) == 0
 
 
 def test_preview_buttons_hide_confirm_when_timezone_invalid() -> None:

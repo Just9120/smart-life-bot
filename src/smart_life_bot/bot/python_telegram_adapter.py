@@ -31,6 +31,7 @@ from .telegram_transport import (
     CALLBACK_CALENDAR_DATE_MONTH_PREFIX,
     CALLBACK_CALENDAR_DATE_SELECT_PREFIX,
     CALLBACK_CALENDAR_DATE_START,
+    CALLBACK_CALENDAR_DATE_NOOP_PREFIX,
     CALLBACK_CANCEL,
     CALLBACK_CONFIRM,
     CALLBACK_EDIT,
@@ -77,13 +78,14 @@ _ALLOWED_CALLBACK_PREFIXES = (
     CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX,
     CALLBACK_CALENDAR_DATE_MONTH_PREFIX,
     CALLBACK_CALENDAR_DATE_SELECT_PREFIX,
+    CALLBACK_CALENDAR_DATE_NOOP_PREFIX,
 )
 _CALLBACK_PATTERN = (
     r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|"
     r"draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|"
     r"settings:parser:python|settings:parser:auto|settings:parser:llm|"
     r"calendar:mode:quick|calendar:mode:personal|"
-    r"calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:cancel|"
+    r"calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|"
     r"cashback:list:current|cashback:list:month:\d{4}-\d{2}|"
     r"cashback:list:owner:\d+:month:\d{4}-\d{2}|cashback:list:owner-current:\d+|"
     r"cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|"
