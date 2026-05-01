@@ -64,9 +64,9 @@ def parse_structured_add(text: str, today: date) -> ParsedAdd | None:
         else:
             month = None
             category, percent_raw = parts[2], parts[3]
-        m = re.match(r"^\s*(\d+(?:[\.,]\d+)?)\s*%?\s*$", percent_raw)
-        if m:
-            return ParsedAdd(bank=bank, owner=owner, category=category, percent=float(m.group(1).replace(",", ".")), month=month)
+        percent = parse_percent_value(percent_raw)
+        if percent is not None:
+            return ParsedAdd(bank=bank, owner=owner, category=category, percent=percent, month=month)
 
     return _parse_space_fallback(text, today)
 
@@ -110,6 +110,16 @@ def _parse_space_fallback(text: str, today: date) -> ParsedAdd | None:
         percent=percent,
         month=month,
     )
+
+
+def parse_percent_value(raw: str) -> float | None:
+    match = re.match(r"^\s*(\d+(?:[\.,]\d+)?)\s*%?\s*$", raw)
+    if not match:
+        return None
+    value = float(match.group(1).replace(",", "."))
+    if value <= 0:
+        return None
+    return value
 
 
 def validate_owner(owner: str) -> bool:

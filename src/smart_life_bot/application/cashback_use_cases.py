@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 from typing import Literal
 
 from smart_life_bot.cashback.models import ALLOWED_OWNERS, CashbackAddInput
-from smart_life_bot.cashback.parser import has_invalid_explicit_month_token, in_transition_period, looks_like_cashback_add_attempt, normalize_bank_name, normalize_category_key, parse_structured_add, validate_owner
+from smart_life_bot.cashback.parser import has_invalid_explicit_month_token, in_transition_period, looks_like_cashback_add_attempt, normalize_bank_name, normalize_category_key, parse_percent_value, parse_structured_add, validate_owner
 
 RU_MONTH_LABELS = {
     1: "январь", 2: "февраль", 3: "март", 4: "апрель", 5: "май", 6: "июнь",
@@ -51,7 +51,7 @@ def current_year_month(today: date) -> str:
 
 @dataclass(frozen=True, slots=True)
 class CashbackResult:
-    status: Literal["added", "updated", "already_exists", "invalid_owner", "transition_month_required", "not_cashback_add", "query_found", "query_not_found", "invalid_month", "list_found", "list_empty", "delete_confirmation", "delete_cancelled", "deleted", "delete_not_found", "delete_invalid_callback", "invalid_format"]
+    status: Literal["added", "updated", "already_exists", "invalid_owner", "transition_month_required", "not_cashback_add", "query_found", "query_not_found", "invalid_month", "list_found", "list_empty", "delete_confirmation", "delete_cancelled", "deleted", "delete_not_found", "delete_invalid_callback", "invalid_format", "edit_percent_not_found", "edit_percent_invalid", "edit_percent_updated", "edit_percent_no_change"]
     text: str
     target_month: str | None = None
     created: bool = False
@@ -106,6 +106,65 @@ class SoftDeleteCashbackCategoryUseCase:
             target_month=deleted.target_month,
             records=(deleted,),
             updated=True,
+        )
+
+
+class RequestEditCashbackCategoryPercentUseCase:
+    def __init__(self, repo) -> None:
+        self.repo = repo
+
+    def execute(self, record_id_raw: str) -> CashbackResult:
+        if not record_id_raw.isdigit():
+            return CashbackResult(status="edit_percent_not_found", text="Не удалось разобрать запись. Открой «📋 Активные категории» заново.")
+        record = self.repo.get_by_id(int(record_id_raw))
+        if record is None or record.is_deleted:
+            return CashbackResult(status="edit_percent_not_found", text="Запись не найдена или уже неактуальна. Обнови «📋 Активные категории».")
+        month_label = format_month_label(record.target_month)
+        return CashbackResult(
+            status="edit_percent_no_change",
+            text=f"Изменение процента:\n{record.owner_name} — {record.bank_name} — {record.category_raw} — сейчас {record.percent:g}% — {month_label}",
+            target_month=record.target_month,
+            records=(record,),
+            old_percent=record.percent,
+            new_percent=record.percent,
+        )
+
+
+class UpdateCashbackCategoryPercentUseCase:
+    def __init__(self, repo) -> None:
+        self.repo = repo
+
+    def execute(self, record_id_raw: str, percent_raw: str) -> CashbackResult:
+        if not record_id_raw.isdigit():
+            return CashbackResult(status="edit_percent_not_found", text="Не удалось разобрать запись. Открой «📋 Активные категории» заново.")
+        percent = parse_percent_value(percent_raw)
+        if percent is None:
+            return CashbackResult(
+                status="edit_percent_invalid",
+                text="Некорректный процент. Введи число в формате 7, 7%, 7,5% или 7.5%.",
+                error_code="invalid_percent",
+            )
+        updated = self.repo.update_percent(int(record_id_raw), percent)
+        if updated is None:
+            return CashbackResult(status="edit_percent_not_found", text="Запись не найдена или уже неактуальна. Обнови «📋 Активные категории».")
+        record, change = updated
+        month_label = format_month_label(record.target_month)
+        if change == "no_change":
+            return CashbackResult(
+                status="edit_percent_no_change",
+                text=f"Процент не изменился: {record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}",
+                target_month=record.target_month,
+                records=(record,),
+                old_percent=record.percent,
+                new_percent=record.percent,
+            )
+        return CashbackResult(
+            status="edit_percent_updated",
+            text=f"Обновил процент: {record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}",
+            target_month=record.target_month,
+            records=(record,),
+            updated=True,
+            new_percent=record.percent,
         )
 
 

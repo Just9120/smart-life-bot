@@ -21,8 +21,10 @@ from smart_life_bot.application.cashback_use_cases import (
     ListActiveCashbackCategoriesUseCase,
     QueryCashbackCategoryUseCase,
     RequestDeleteCashbackCategoryUseCase,
+    RequestEditCashbackCategoryPercentUseCase,
     SoftDeleteCashbackCategoryUseCase,
     CompleteTransitionCashbackCategoryUseCase,
+    UpdateCashbackCategoryPercentUseCase,
     format_month_label,
     parse_year_month,
     shift_year_month,
@@ -61,6 +63,7 @@ CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX = "cashback:list:owner:"
 CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX = "cashback:list:owner-current:"
 CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX = "cashback:transition:select:"
 CALLBACK_CASHBACK_TRANSITION_CANCEL = "cashback:transition:cancel"
+CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX = "cashback:edit-percent:request:"
 CALLBACK_CALENDAR_DATE_START = "calendar:date:start"
 CALLBACK_CALENDAR_DATE_MONTH_PREFIX = "calendar:date:month:"
 CALLBACK_CALENDAR_DATE_SELECT_PREFIX = "calendar:date:select:"
@@ -80,6 +83,12 @@ class PendingCalendarDateRecovery:
     session_token: str
     draft_fingerprint: str
     selected_date: str
+
+
+@dataclass(frozen=True, slots=True)
+class PendingCashbackPercentEdit:
+    record_id: int
+    target_month: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,11 +116,14 @@ class TelegramTransportRouter:
     query_cashback_category: QueryCashbackCategoryUseCase | None = None
     list_active_cashback_categories: ListActiveCashbackCategoriesUseCase | None = None
     request_delete_cashback_category: RequestDeleteCashbackCategoryUseCase | None = None
+    request_edit_cashback_category_percent: RequestEditCashbackCategoryPercentUseCase | None = None
     soft_delete_cashback_category: SoftDeleteCashbackCategoryUseCase | None = None
     complete_transition_cashback_category: CompleteTransitionCashbackCategoryUseCase | None = None
+    update_cashback_category_percent: UpdateCashbackCategoryPercentUseCase | None = None
     pending_cashback_transitions: dict[int, PendingCashbackTransition] = field(default_factory=dict)
     pending_calendar_recovery: dict[int, PendingCalendarDateRecovery] = field(default_factory=dict)
     active_feature_context: dict[int, str] = field(default_factory=dict)
+    pending_cashback_percent_edit: dict[int, PendingCashbackPercentEdit] = field(default_factory=dict)
 
     @staticmethod
     def _owner_filter_index(owner_name: str | None) -> str:
@@ -154,6 +166,7 @@ class TelegramTransportRouter:
             return TelegramTransportResponse(text="Похоже, здесь несколько вариантов. Что сделать?")
 
         if normalized == "📅 Календарь":
+            self.pending_cashback_percent_edit.pop(user.id, None)
             self.active_feature_context[user.id] = "calendar"
             return TelegramTransportResponse(
                 text="Выберите режим календаря:",
@@ -179,6 +192,20 @@ class TelegramTransportRouter:
             self.active_feature_context[user.id] = "cashback"
             result = self.list_active_cashback_categories.execute()
             return TelegramTransportResponse(text=result.text, buttons=self._build_cashback_action_buttons(result))
+
+        pending_edit = self.pending_cashback_percent_edit.get(user.id)
+        if pending_edit is not None and self.update_cashback_category_percent is not None:
+            if normalized.lower() == "cancel":
+                self.pending_cashback_percent_edit.pop(user.id, None)
+                return TelegramTransportResponse(text="Изменение процента отменено. Запись не изменена.")
+            result = self.update_cashback_category_percent.execute(str(pending_edit.record_id), normalized)
+            if result.status == "edit_percent_invalid":
+                return TelegramTransportResponse(text=result.text)
+            self.pending_cashback_percent_edit.pop(user.id, None)
+            if result.target_month and self.list_active_cashback_categories is not None:
+                listing = self.list_active_cashback_categories.execute(month=result.target_month)
+                return TelegramTransportResponse(text=f"{result.text}\n\n{listing.text}", buttons=self._build_cashback_action_buttons(listing))
+            return TelegramTransportResponse(text=result.text)
 
         if self.add_cashback_category is not None:
             add_result = self.add_cashback_category.execute(normalized)
@@ -309,6 +336,7 @@ class TelegramTransportRouter:
 
         if callback_data == CALLBACK_CANCEL:
             self.pending_calendar_recovery.pop(user.id, None)
+            self.pending_cashback_percent_edit.pop(user.id, None)
             result = self.cancel_draft.execute(CancelEventDraftInput(user_id=user.id))
             return TelegramTransportResponse(text=result.message)
 
@@ -484,6 +512,14 @@ class TelegramTransportRouter:
                     ("↩️ Отмена", f"{CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX}{record_id}"),
                 ),
             )
+        if callback_data.startswith(CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX) and self.request_edit_cashback_category_percent is not None:
+            record_id = callback_data.removeprefix(CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX)
+            result = self.request_edit_cashback_category_percent.execute(record_id)
+            if not result.records:
+                return TelegramTransportResponse(text=result.text)
+            record = result.records[0]
+            self.pending_cashback_percent_edit[user.id] = PendingCashbackPercentEdit(record_id=record.id, target_month=record.target_month)
+            return TelegramTransportResponse(text=f"Введи новый процент для «{record.category_raw}» ({record.owner_name} — {record.bank_name}).\nФормат: 7, 7%, 7,5% или 7.5%.\n\nДля отмены отправь: cancel")
         if callback_data.startswith(CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX):
             return TelegramTransportResponse(text="Удаление отменено. Запись не изменена.")
         if callback_data.startswith(CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX) and self.soft_delete_cashback_category is not None:
@@ -580,7 +616,11 @@ class TelegramTransportRouter:
             (f"Удалить #{index}", f"{CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX}{row.id}")
             for index, row in enumerate(result.records, start=1)
         )
-        return month_buttons + owner_buttons + delete_buttons
+        edit_buttons = tuple(
+            (f"Изменить % #{index}", f"{CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX}{row.id}")
+            for index, row in enumerate(result.records, start=1)
+        )
+        return month_buttons + owner_buttons + edit_buttons + delete_buttons
 
     def _build_cashback_owner_filter_buttons(self, target_month: str | None, owner_filter: str | None) -> tuple[tuple[str, str], ...]:
         if target_month is None or parse_year_month(target_month) is None:

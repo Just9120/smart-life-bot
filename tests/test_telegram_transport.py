@@ -12,7 +12,7 @@ from smart_life_bot.application.use_cases import (
     ProcessIncomingMessageUseCase,
     SetParserModeUseCase,
 )
-from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase
+from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, RequestEditCashbackCategoryPercentUseCase, SoftDeleteCashbackCategoryUseCase, UpdateCashbackCategoryPercentUseCase
 from smart_life_bot.auth.models import AuthContext
 from smart_life_bot.bot import (
     CALLBACK_CANCEL,
@@ -272,7 +272,9 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         query_cashback_category=QueryCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
         list_active_cashback_categories=ListActiveCashbackCategoriesUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
         request_delete_cashback_category=RequestDeleteCashbackCategoryUseCase(cashback_repo),
+        request_edit_cashback_category_percent=RequestEditCashbackCategoryPercentUseCase(cashback_repo),
         soft_delete_cashback_category=SoftDeleteCashbackCategoryUseCase(cashback_repo),
+        update_cashback_category_percent=UpdateCashbackCategoryPercentUseCase(cashback_repo),
         complete_transition_cashback_category=CompleteTransitionCashbackCategoryUseCase(cashback_repo),
     )
     return router, deps
@@ -1254,3 +1256,82 @@ def test_cashback_transition_legacy_callback_is_stale_and_does_not_mutate_storag
     assert cashback_repo.list_active("2026-05") == []
     assert cashback_repo.list_active("2026-06") == []
 
+
+def test_active_list_contains_edit_percent_buttons_with_row_indexes() -> None:
+    router, _ = _build_router()
+    router.handle_text_message(telegram_user_id=90701, text='Альфа, Владимир, Аптеки, 5%')
+    response = router.handle_text_message(telegram_user_id=90701, text='📋 Активные категории')
+    assert any(label == 'Изменить % #1' for label, _ in response.buttons)
+
+
+def test_edit_percent_flow_valid_invalid_cancel_and_no_calendar_calls() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90702, text='Альфа, Владимир, Аптеки, 5%')
+    listing = router.handle_text_message(telegram_user_id=90702, text='📋 Активные категории')
+    edit_cb = next(cb for label, cb in listing.buttons if label.startswith('Изменить % #1'))
+    prompt = router.handle_callback(telegram_user_id=90702, callback_data=edit_cb)
+    assert 'Введи новый процент' in prompt.text
+    invalid = router.handle_text_message(telegram_user_id=90702, text='abc')
+    assert 'Некорректный процент' in invalid.text
+    valid = router.handle_text_message(telegram_user_id=90702, text='7%')
+    assert 'Обновил процент' in valid.text
+    assert '7%' in valid.text
+    assert len(deps.calendar_service.requests) == 0
+    user = deps.users_repo.get_by_telegram_id(90702)
+    assert user is not None
+    assert user.id not in router.pending_cashback_percent_edit
+
+    after_success = router.handle_text_message(telegram_user_id=90702, text='7%')
+    assert 'Черновик события' in after_success.text
+
+    listing2 = router.handle_text_message(telegram_user_id=90702, text='📋 Активные категории')
+    assert '7%' in listing2.text
+    edit_cb2 = next(cb for label, cb in listing2.buttons if label.startswith('Изменить % #1'))
+    router.handle_callback(telegram_user_id=90702, callback_data=edit_cb2)
+    cancel = router.handle_text_message(telegram_user_id=90702, text='cancel')
+    assert 'отменено' in cancel.text.lower()
+
+
+def test_edit_percent_malformed_or_stale_callback_fails_safely() -> None:
+    router, _ = _build_router()
+    malformed = router.handle_callback(telegram_user_id=90703, callback_data='cashback:edit-percent:request:bad')
+    assert 'не удалось разобрать запись' in malformed.text.lower()
+    stale = router.handle_callback(telegram_user_id=90703, callback_data='cashback:edit-percent:request:9999')
+    assert 'устарела' in stale.text.lower() or 'не найдена' in stale.text.lower()
+
+
+def test_pending_edit_percent_blocks_add_query_and_calendar_routing() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90704, text='Альфа, Владимир, Аптеки, 5%')
+    listing = router.handle_text_message(telegram_user_id=90704, text='📋 Активные категории')
+    edit_cb = next(cb for label, cb in listing.buttons if label.startswith('Изменить % #1'))
+    router.handle_callback(telegram_user_id=90704, callback_data=edit_cb)
+    user = deps.users_repo.get_by_telegram_id(90704)
+    assert user is not None
+    assert user.id in router.pending_cashback_percent_edit
+
+    add_like = router.handle_text_message(telegram_user_id=90704, text='Альфа, Владимир, Аптеки, 7%')
+    assert 'Некорректный процент' in add_like.text
+    query_like = router.handle_text_message(telegram_user_id=90704, text='Аптеки')
+    assert 'Некорректный процент' in query_like.text
+    calendar_like = router.handle_text_message(telegram_user_id=90704, text='Созвон')
+    assert 'Некорректный процент' in calendar_like.text
+    assert len(deps.calendar_service.requests) == 0
+    current_rows = router.list_active_cashback_categories.repo.list_active('2026-05')  # type: ignore[union-attr]
+    assert len(current_rows) == 1
+    assert current_rows[0].percent == 5
+    assert user.id in router.pending_cashback_percent_edit
+
+
+def test_pending_edit_percent_clears_on_calendar_navigation() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90705, text='Альфа, Владимир, Аптеки, 5%')
+    listing = router.handle_text_message(telegram_user_id=90705, text='📋 Активные категории')
+    edit_cb = next(cb for label, cb in listing.buttons if label.startswith('Изменить % #1'))
+    router.handle_callback(telegram_user_id=90705, callback_data=edit_cb)
+    user = deps.users_repo.get_by_telegram_id(90705)
+    assert user is not None
+    assert user.id in router.pending_cashback_percent_edit
+    nav = router.handle_text_message(telegram_user_id=90705, text='📅 Календарь')
+    assert 'Выберите режим календаря' in nav.text
+    assert user.id not in router.pending_cashback_percent_edit

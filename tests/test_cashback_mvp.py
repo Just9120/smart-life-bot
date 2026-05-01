@@ -321,3 +321,51 @@ def test_list_active_categories_owner_filter_and_invalid_owner():
     assert "для владельца Владимир" in empty.text
     invalid = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute(month="2026-05", owner_name="Иван")
     assert invalid.error_code == "invalid_owner_filter"
+
+
+def test_update_percent_by_id_changes_only_percent_and_updated_at():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    add.execute('Альфа, Владимир, Супермаркеты, 5%')
+    row = repo.list_active('2026-05')[0]
+    created_at = row.created_at
+    updated_at = row.updated_at
+    from smart_life_bot.application.cashback_use_cases import UpdateCashbackCategoryPercentUseCase
+    result = UpdateCashbackCategoryPercentUseCase(repo).execute(str(row.id), '7,5%')
+    assert result.status == 'edit_percent_updated'
+    changed = repo.get_by_id(row.id)
+    assert changed is not None
+    assert changed.percent == 7.5
+    assert changed.created_at == created_at
+    assert changed.updated_at >= updated_at
+    assert changed.owner_name == row.owner_name
+    assert changed.bank_name == row.bank_name
+    assert changed.category_raw == row.category_raw
+    assert changed.target_month == row.target_month
+
+
+def test_update_percent_missing_deleted_and_invalid_fail_safe():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    add.execute('Альфа, Владимир, Супермаркеты, 5%')
+    row = repo.list_active('2026-05')[0]
+    from smart_life_bot.application.cashback_use_cases import UpdateCashbackCategoryPercentUseCase
+    use_case = UpdateCashbackCategoryPercentUseCase(repo)
+    bad = use_case.execute(str(row.id), 'abc')
+    assert bad.status == 'edit_percent_invalid'
+    assert repo.get_by_id(row.id).percent == 5
+    repo.soft_delete(row.id)
+    deleted = use_case.execute(str(row.id), '7')
+    assert deleted.status == 'edit_percent_not_found'
+    missing = use_case.execute('9999', '7')
+    assert missing.status == 'edit_percent_not_found'
+
+
+def test_update_percent_same_value_is_noop():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    add.execute('Альфа, Владимир, Супермаркеты, 5%')
+    row = repo.list_active('2026-05')[0]
+    from smart_life_bot.application.cashback_use_cases import UpdateCashbackCategoryPercentUseCase
+    result = UpdateCashbackCategoryPercentUseCase(repo).execute(str(row.id), '5%')
+    assert result.status == 'edit_percent_no_change'

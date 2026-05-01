@@ -11,7 +11,9 @@ from smart_life_bot.application.cashback_use_cases import (
     ListActiveCashbackCategoriesUseCase,
     QueryCashbackCategoryUseCase,
     RequestDeleteCashbackCategoryUseCase,
+    RequestEditCashbackCategoryPercentUseCase,
     SoftDeleteCashbackCategoryUseCase,
+    UpdateCashbackCategoryPercentUseCase,
 )
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
@@ -138,7 +140,9 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         query_cashback_category=QueryCashbackCategoryUseCase(cashback_repo),
         list_active_cashback_categories=ListActiveCashbackCategoriesUseCase(cashback_repo),
         request_delete_cashback_category=RequestDeleteCashbackCategoryUseCase(cashback_repo),
+        request_edit_cashback_category_percent=RequestEditCashbackCategoryPercentUseCase(cashback_repo),
         soft_delete_cashback_category=SoftDeleteCashbackCategoryUseCase(cashback_repo),
+        update_cashback_category_percent=UpdateCashbackCategoryPercentUseCase(cashback_repo),
         complete_transition_cashback_category=CompleteTransitionCashbackCategoryUseCase(cashback_repo),
     )
 
