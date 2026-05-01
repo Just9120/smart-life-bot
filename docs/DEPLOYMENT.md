@@ -81,7 +81,7 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
    - deploy fails if `new_container_id == previous_container_id` (when previous exists);
    - deploy fails if `new_running_image_id != built_service_image_id`;
    - deploy fails if container env marker `SMART_LIFE_BOT_BUILD_SHA` does not match remote host commit.
-14. Post-deploy runtime verification inside container (`docker compose exec -T smart-life-bot ...`) проверяет build commit marker и ожидаемые кодовые признаки текущей версии, включая cashback month/delete/owner-filter callback markers (`CALLBACK_CASHBACK_LIST_MONTH_PREFIX`, `CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX`, `CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX`, `CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX`, `CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX`, `CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX`).
+14. Post-deploy runtime verification inside container (`docker compose exec -T smart-life-bot ...`) проверяет build commit marker и ожидаемые кодовые признаки текущей версии, включая cashback month/delete/owner-filter/transition callback markers (`CALLBACK_CASHBACK_LIST_MONTH_PREFIX`, `CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX`, `CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX`, `CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX`, `CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX`, `CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX`, `CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX`, `CALLBACK_CASHBACK_TRANSITION_CANCEL`).
 15. Duplicate polling diagnostics (safe, read-only): `docker compose ls`, filtered `docker ps -a`, filtered `ps aux` for `smart_life_bot`/`telegram_polling`/`smart-life-bot`.
 16. `docker compose logs --tail=100 smart-life-bot`
 
@@ -99,7 +99,7 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 - на хосте может существовать старый образ/тег `smart-life-bot-smart-life-bot:latest`; это не критерий свежести runtime;
 - валидный критерий freshness: `new_running_image_id` контейнера должен совпадать с image ID `smart-life-bot:local`;
 - `SMART_LIFE_BOT_BUILD_SHA == host_git_commit`;
-- `post_deploy_runtime_verification=ok` (включая cashback month/delete/owner-filter callback markers);
+- `post_deploy_runtime_verification=ok` (включая cashback month/delete/owner-filter/transition callback markers);
 - duplicate polling diagnostics: `docker compose ls`, filtered `docker ps -a`, filtered `ps aux`.
 
 Ограничения безопасности:
