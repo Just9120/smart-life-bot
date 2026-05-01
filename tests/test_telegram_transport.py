@@ -1010,7 +1010,7 @@ def test_cashback_like_malformed_input_does_not_fall_into_duration_edit() -> Non
     router.handle_text_message(telegram_user_id=user_id, text="Тест завтра в 15:00")
     router.handle_callback(telegram_user_id=user_id, callback_data=CALLBACK_DURATION)
 
-    response = router.handle_text_message(telegram_user_id=user_id, text="Т-Банк, Владимир, Аптеки 5%")
+    response = router.handle_text_message(telegram_user_id=user_id, text="Т-Банк Владимир Елена Аптеки 5%")
 
     assert "Не понял формат кэшбека" in response.text
     assert "Введите положительное целое число минут" not in response.text
@@ -1028,4 +1028,13 @@ def test_valid_cashback_add_has_priority_over_stale_duration_edit_state() -> Non
 
     assert "Добавил кэшбек" in response.text or "Обновил кэшбек" in response.text
     assert "Введите положительное целое число минут" not in response.text
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_space_separated_cashback_add_and_partial_comma_work_via_transport() -> None:
+    router, deps = _build_router()
+    space = router.handle_text_message(telegram_user_id=93003, text="Т-Банк Владимир Аптеки 5%")
+    typo = router.handle_text_message(telegram_user_id=93003, text="Т-Банк, Владимир, Аптеки 5%")
+    assert "Добавил кэшбек" in space.text or "Обновил кэшбек" in space.text
+    assert "Добавил кэшбек" in typo.text or "Обновил кэшбек" in typo.text
     assert len(deps.calendar_service.requests) == 0

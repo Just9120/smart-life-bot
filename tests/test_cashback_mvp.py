@@ -19,6 +19,18 @@ def test_structured_add_parse():
     assert parsed.percent == 5
 
 
+def test_structured_add_parse_space_separated_and_partial_comma():
+    today = date(2026, 5, 3)
+    plain = parse_structured_add('Т-Банк Владимир Аптеки 5%', today)
+    with_month = parse_structured_add('Т-Банк Владимир май Аптеки 5%', today)
+    with_iso_month = parse_structured_add('Т-Банк Владимир 2026-05 Аптеки 5%', today)
+    partial_comma = parse_structured_add('Т-Банк, Владимир, Аптеки 5%', today)
+    assert plain is not None and plain.month is None and plain.category == 'Аптеки'
+    assert with_month is not None and with_month.month == '2026-05'
+    assert with_iso_month is not None and with_iso_month.month == '2026-05'
+    assert partial_comma is not None and partial_comma.owner == 'Владимир'
+
+
 def test_upsert_and_query_sorted():
     repo = _repo()
     add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026,5,3))
@@ -76,6 +88,33 @@ def test_invalid_owner_result_contains_allowed_owners_and_not_saved():
     assert result.status == 'invalid_owner'
     assert 'Виктор' in result.allowed_owners
     assert repo.list_active('2026-05') == []
+
+
+def test_space_separated_add_and_transition_behavior():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    added = add.execute('Т-Банк Владимир Аптеки 5%')
+    assert added is not None
+    assert added.status == 'added'
+    assert added.target_month == '2026-05'
+    transition = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 26)).execute('Т-Банк Владимир Аптеки 5%')
+    assert transition is not None
+    assert transition.status == 'transition_month_required'
+
+
+def test_space_separated_invalid_shapes_are_rejected_safely():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    assert add.execute('Т-Банк Владимир Аптеки') is None
+    invalid_owner = add.execute('Т-Банк Иван Аптеки 5%')
+    assert invalid_owner is None
+    ambiguous = add.execute('Т-Банк Владимир Елена Аптеки 5%')
+    assert ambiguous is not None
+    assert ambiguous.status == 'invalid_format'
+    missing_bank = add.execute('Владимир Аптеки 5%')
+    assert missing_bank is None
+    missing_category = add.execute('Т-Банк Владимир 5%')
+    assert missing_category is None
 
 
 def test_list_active_categories_found_and_empty():
