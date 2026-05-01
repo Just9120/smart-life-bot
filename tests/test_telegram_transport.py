@@ -327,6 +327,12 @@ def _build_router_no_html_link() -> tuple[TelegramTransportRouter, Deps]:
     return router, deps
 
 
+def _flatten_buttons(response) -> list[tuple[str, str]]:
+    if response.button_rows:
+        return [button for row in response.button_rows for button in row]
+    return list(response.buttons)
+
+
 def test_plain_text_handler_maps_to_process_incoming_use_case() -> None:
     router, deps = _build_router()
 
@@ -1010,11 +1016,12 @@ def test_cashback_active_categories_text_route_no_calendar_call() -> None:
     router.handle_text_message(telegram_user_id=90601, text="Альфа, Владимир, май, Супермаркеты, 5%")
     response = router.handle_text_message(telegram_user_id=90601, text="📋 Активные категории")
     assert "Активные категории — май 2026" in response.text
-    assert ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}all:month:2026-04") in response.buttons
-    assert ("Текущий", CALLBACK_CASHBACK_LIST_CURRENT) in response.buttons
-    assert ("Следующий ➡️", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}all:month:2026-06") in response.buttons
-    assert ("👤 Владимир", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-05") in response.buttons
-    assert ("✅ Все владельцы", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}all:month:2026-05") in response.buttons
+    buttons = _flatten_buttons(response)
+    assert ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}all:month:2026-04") in buttons
+    assert ("Текущий", CALLBACK_CASHBACK_LIST_CURRENT) in buttons
+    assert ("Следующий ➡️", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}all:month:2026-06") in buttons
+    assert ("👤 Владимир", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-05") in buttons
+    assert ("✅ Все", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}all:month:2026-05") in buttons
     assert "Супермаркеты" in response.text
     assert len(deps.calendar_service.requests) == 0
 
@@ -1052,7 +1059,7 @@ def test_cashback_delete_request_cancel_confirm_flow() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90605, text="Альфа, Владимир, май, Супермаркеты, 5%")
     listed = router.handle_text_message(telegram_user_id=90605, text="📋 Активные категории")
-    delete_button = next(button for button in listed.buttons if button[0].startswith("Удалить #"))
+    delete_button = next(button for button in _flatten_buttons(listed) if button[0].startswith("🗑 Удалить #"))
     request = router.handle_callback(telegram_user_id=90605, callback_data=delete_button[1])
     assert "Подтверди деактивацию" in request.text
     assert any(btn[1].startswith(CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX) for btn in request.buttons)
@@ -1091,9 +1098,9 @@ def test_cashback_delete_buttons_are_unambiguous_with_global_list_numbering() ->
     listed = router.handle_text_message(telegram_user_id=90607, text="📋 Активные категории")
     assert "#1 Владимир — Альфа — 2%" in listed.text
     assert "#2 Елена — Т-Банк — 7%" in listed.text
-    delete_buttons = [button for button in listed.buttons if button[0].startswith("Удалить #")]
-    assert ("Удалить #1", "cashback:delete:request:1") in delete_buttons
-    assert ("Удалить #2", "cashback:delete:request:2") in delete_buttons
+    delete_buttons = [button for button in _flatten_buttons(listed) if button[0].startswith("🗑 Удалить #")]
+    assert ("🗑 Удалить #1", "cashback:delete:request:1") in delete_buttons
+    assert ("🗑 Удалить #2", "cashback:delete:request:2") in delete_buttons
 
     request_second = router.handle_callback(telegram_user_id=90607, callback_data="cashback:delete:request:2")
     assert "Елена — Т-Банк — Супермаркеты — 7%" in request_second.text
@@ -1102,8 +1109,8 @@ def test_cashback_delete_buttons_are_unambiguous_with_global_list_numbering() ->
     assert "Активные категории — май 2026" in confirm.text
     assert "#1 Владимир — Альфа — 2%" in confirm.text
     assert "#2" not in confirm.text
-    confirm_delete_buttons = [button for button in confirm.buttons if button[0].startswith("Удалить #")]
-    assert confirm_delete_buttons == [("Удалить #1", "cashback:delete:request:1")]
+    confirm_delete_buttons = [button for button in _flatten_buttons(confirm) if button[0].startswith("🗑 Удалить #")]
+    assert confirm_delete_buttons == [("🗑 Удалить #1", "cashback:delete:request:1")]
     query_azs = router.handle_text_message(telegram_user_id=90607, text="АЗС")
     listed_after = router.handle_callback(telegram_user_id=90607, callback_data=CALLBACK_CASHBACK_LIST_CURRENT)
     assert "🏆 Кэшбек" in query_azs.text
@@ -1120,7 +1127,7 @@ def test_cashback_owner_filter_month_navigation_and_reset() -> None:
     filtered = router.handle_callback(telegram_user_id=90608, callback_data=f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-05")
     assert "Фильтр: Владимир" in filtered.text
     assert "Елена" not in filtered.text
-    assert ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-04") in filtered.buttons
+    assert ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-04") in _flatten_buttons(filtered)
     june = router.handle_callback(telegram_user_id=90608, callback_data=f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-06")
     assert "Фильтр: Владимир" in june.text
     reset = router.handle_callback(telegram_user_id=90608, callback_data=f"{CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX}all")
@@ -1261,14 +1268,14 @@ def test_active_list_contains_edit_percent_buttons_with_row_indexes() -> None:
     router, _ = _build_router()
     router.handle_text_message(telegram_user_id=90701, text='Альфа, Владимир, Аптеки, 5%')
     response = router.handle_text_message(telegram_user_id=90701, text='📋 Активные категории')
-    assert any(label == 'Изменить % #1' for label, _ in response.buttons)
+    assert any(label == '✏️ Изменить % #1' for label, _ in _flatten_buttons(response))
 
 
 def test_edit_percent_flow_valid_invalid_cancel_and_no_calendar_calls() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90702, text='Альфа, Владимир, Аптеки, 5%')
     listing = router.handle_text_message(telegram_user_id=90702, text='📋 Активные категории')
-    edit_cb = next(cb for label, cb in listing.buttons if label.startswith('Изменить % #1'))
+    edit_cb = next(cb for label, cb in _flatten_buttons(listing) if label.startswith('✏️ Изменить % #1'))
     prompt = router.handle_callback(telegram_user_id=90702, callback_data=edit_cb)
     assert 'Введи новый процент' in prompt.text
     invalid = router.handle_text_message(telegram_user_id=90702, text='abc')
@@ -1286,7 +1293,7 @@ def test_edit_percent_flow_valid_invalid_cancel_and_no_calendar_calls() -> None:
 
     listing2 = router.handle_text_message(telegram_user_id=90702, text='📋 Активные категории')
     assert '7%' in listing2.text
-    edit_cb2 = next(cb for label, cb in listing2.buttons if label.startswith('Изменить % #1'))
+    edit_cb2 = next(cb for label, cb in _flatten_buttons(listing2) if label.startswith('✏️ Изменить % #1'))
     router.handle_callback(telegram_user_id=90702, callback_data=edit_cb2)
     cancel = router.handle_text_message(telegram_user_id=90702, text='cancel')
     assert 'отменено' in cancel.text.lower()
@@ -1304,7 +1311,7 @@ def test_pending_edit_percent_blocks_add_query_and_calendar_routing() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90704, text='Альфа, Владимир, Аптеки, 5%')
     listing = router.handle_text_message(telegram_user_id=90704, text='📋 Активные категории')
-    edit_cb = next(cb for label, cb in listing.buttons if label.startswith('Изменить % #1'))
+    edit_cb = next(cb for label, cb in _flatten_buttons(listing) if label.startswith('✏️ Изменить % #1'))
     router.handle_callback(telegram_user_id=90704, callback_data=edit_cb)
     user = deps.users_repo.get_by_telegram_id(90704)
     assert user is not None
@@ -1327,7 +1334,7 @@ def test_pending_edit_percent_clears_on_calendar_navigation() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90705, text='Альфа, Владимир, Аптеки, 5%')
     listing = router.handle_text_message(telegram_user_id=90705, text='📋 Активные категории')
-    edit_cb = next(cb for label, cb in listing.buttons if label.startswith('Изменить % #1'))
+    edit_cb = next(cb for label, cb in _flatten_buttons(listing) if label.startswith('✏️ Изменить % #1'))
     router.handle_callback(telegram_user_id=90705, callback_data=edit_cb)
     user = deps.users_repo.get_by_telegram_id(90705)
     assert user is not None
