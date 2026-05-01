@@ -1016,7 +1016,7 @@ def test_cashback_active_categories_text_route_no_calendar_call() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90601, text="Альфа, Владимир, май, Супермаркеты, 5%")
     response = router.handle_text_message(telegram_user_id=90601, text="📋 Активные категории")
-    assert "Активные категории — май 2026" in response.text
+    assert "Активные кэшбек-категории — май 2026" in response.text
     buttons = _flatten_buttons(response)
     assert ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}all:month:2026-04") in buttons
     assert ("Текущий", CALLBACK_CASHBACK_LIST_CURRENT) in buttons
@@ -1030,7 +1030,7 @@ def test_cashback_active_categories_text_route_no_calendar_call() -> None:
 def test_cashback_active_categories_callback_empty() -> None:
     router, deps = _build_router()
     response = router.handle_callback(telegram_user_id=90602, callback_data=CALLBACK_CASHBACK_LIST_CURRENT)
-    assert "На май 2026 кэшбек-категорий пока нет." in response.text
+    assert "На май 2026 активных кэшбек-категорий пока нет." in response.text
     assert len(deps.calendar_service.requests) == 0
 
 
@@ -1041,7 +1041,7 @@ def test_cashback_active_categories_selected_month_callback() -> None:
         telegram_user_id=90603,
         callback_data=f"{CALLBACK_CASHBACK_LIST_MONTH_PREFIX}2026-06",
     )
-    assert "Активные категории — июнь 2026" in response.text
+    assert "Активные кэшбек-категории — июнь 2026" in response.text
     assert "АЗС" in response.text
     assert len(deps.calendar_service.requests) == 0
 
@@ -1062,23 +1062,23 @@ def test_cashback_delete_request_cancel_confirm_flow() -> None:
     listed = router.handle_text_message(telegram_user_id=90605, text="📋 Активные категории")
     delete_button = next(button for button in _flatten_buttons(listed) if button[0].startswith("🗑 Удалить #"))
     request = router.handle_callback(telegram_user_id=90605, callback_data=delete_button[1])
-    assert "Подтверди деактивацию" in request.text
+    assert "Удалить эту кэшбек-категорию из активных?" in request.text
     assert any(btn[1].startswith(CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX) for btn in request.buttons)
     cancel = router.handle_callback(
         telegram_user_id=90605,
         callback_data=f"{CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX}1",
     )
-    assert "Удаление отменено" in cancel.text
+    assert "Ок, ничего не удалил." in cancel.text
     query_before = router.handle_text_message(telegram_user_id=90605, text="Супермаркеты")
     assert "🏆 Кэшбек" in query_before.text
     confirm = router.handle_callback(
         telegram_user_id=90605,
         callback_data=f"{CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX}1",
     )
-    assert "Удалил запись." in confirm.text
-    assert "На май 2026 кэшбек-категорий пока нет." in confirm.text
+    assert "Готово, убрал категорию из активных." in confirm.text
+    assert "На май 2026 активных кэшбек-категорий пока нет." in confirm.text
     listed_after = router.handle_callback(telegram_user_id=90605, callback_data=CALLBACK_CASHBACK_LIST_CURRENT)
-    assert "кэшбек-категорий пока нет" in listed_after.text
+    assert "активных кэшбек-категорий пока нет" in listed_after.text
     assert len(deps.calendar_service.requests) == 0
 
 
@@ -1106,8 +1106,8 @@ def test_cashback_delete_buttons_are_unambiguous_with_global_list_numbering() ->
     request_second = router.handle_callback(telegram_user_id=90607, callback_data="cashback:delete:request:2")
     assert "Елена — Т-Банк — Супермаркеты — 7%" in request_second.text
     confirm = router.handle_callback(telegram_user_id=90607, callback_data="cashback:delete:confirm:2")
-    assert "Удалил запись." in confirm.text
-    assert "Активные категории — май 2026" in confirm.text
+    assert "Готово, убрал категорию из активных." in confirm.text
+    assert "Активные кэшбек-категории — май 2026" in confirm.text
     assert "#1 Владимир — Альфа — 2%" in confirm.text
     assert "#2" not in confirm.text
     confirm_delete_buttons = [button for button in _flatten_buttons(confirm) if button[0].startswith("🗑 Удалить #")]
@@ -1126,13 +1126,13 @@ def test_cashback_owner_filter_month_navigation_and_reset() -> None:
     router.handle_text_message(telegram_user_id=90608, text="Альфа, Владимир, июнь, АЗС, 5%")
 
     filtered = router.handle_callback(telegram_user_id=90608, callback_data=f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-05")
-    assert "Фильтр: Владимир" in filtered.text
+    assert "Владелец: Владимир" in filtered.text
     assert "Елена" not in filtered.text
     assert ("⬅️ Предыдущий", f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-04") in _flatten_buttons(filtered)
     june = router.handle_callback(telegram_user_id=90608, callback_data=f"{CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX}1:month:2026-06")
-    assert "Фильтр: Владимир" in june.text
+    assert "Владелец: Владимир" in june.text
     reset = router.handle_callback(telegram_user_id=90608, callback_data=f"{CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX}all")
-    assert "Активные категории — май 2026" in reset.text
+    assert "Активные кэшбек-категории — май 2026" in reset.text
     assert len(deps.calendar_service.requests) == 0
 
 
@@ -1278,11 +1278,11 @@ def test_edit_percent_flow_valid_invalid_cancel_and_no_calendar_calls() -> None:
     listing = router.handle_text_message(telegram_user_id=90702, text='📋 Активные категории')
     edit_cb = next(cb for label, cb in _flatten_buttons(listing) if label.startswith('✏️ Изменить % #1'))
     prompt = router.handle_callback(telegram_user_id=90702, callback_data=edit_cb)
-    assert 'Введи новый процент' in prompt.text
+    assert 'Введи новый процент для этой категории.' in prompt.text
     invalid = router.handle_text_message(telegram_user_id=90702, text='abc')
-    assert 'Некорректный процент' in invalid.text
+    assert 'Не получилось распознать процент.' in invalid.text
     valid = router.handle_text_message(telegram_user_id=90702, text='7%')
-    assert 'Обновил процент' in valid.text
+    assert 'Готово, обновил процент.' in valid.text
     assert '7%' in valid.text
     assert len(deps.calendar_service.requests) == 0
     user = deps.users_repo.get_by_telegram_id(90702)
@@ -1319,11 +1319,11 @@ def test_pending_edit_percent_blocks_add_query_and_calendar_routing() -> None:
     assert user.id in router.pending_cashback_percent_edit
 
     add_like = router.handle_text_message(telegram_user_id=90704, text='Альфа, Владимир, Аптеки, 7%')
-    assert 'Некорректный процент' in add_like.text
+    assert 'Не получилось распознать процент.' in add_like.text
     query_like = router.handle_text_message(telegram_user_id=90704, text='Аптеки')
-    assert 'Некорректный процент' in query_like.text
+    assert 'Не получилось распознать процент.' in query_like.text
     calendar_like = router.handle_text_message(telegram_user_id=90704, text='Созвон')
-    assert 'Некорректный процент' in calendar_like.text
+    assert 'Не получилось распознать процент.' in calendar_like.text
     assert len(deps.calendar_service.requests) == 0
     current_rows = router.list_active_cashback_categories.repo.list_active('2026-05')  # type: ignore[union-attr]
     assert len(current_rows) == 1

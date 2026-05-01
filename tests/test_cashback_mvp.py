@@ -313,12 +313,12 @@ def test_list_active_categories_owner_filter_and_invalid_owner():
     add.execute("Т-Банк, Елена, май, АЗС, 5%")
     filtered = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute(month="2026-05", owner_name="Владимир")
     assert filtered.status == "list_found"
-    assert "Фильтр: Владимир" in filtered.text
+    assert "Владелец: Владимир" in filtered.text
     assert "Елена" not in filtered.text
     assert len(filtered.records) == 1
     empty = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute(month="2026-06", owner_name="Владимир")
     assert empty.status == "list_empty"
-    assert "для владельца Владимир" in empty.text
+    assert "у Владимир" in empty.text
     invalid = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute(month="2026-05", owner_name="Иван")
     assert invalid.error_code == "invalid_owner_filter"
 

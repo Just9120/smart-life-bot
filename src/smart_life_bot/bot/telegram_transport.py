@@ -546,15 +546,15 @@ class TelegramTransportRouter:
                 return TelegramTransportResponse(text=result.text)
             record = result.records[0]
             self.pending_cashback_percent_edit[user.id] = PendingCashbackPercentEdit(record_id=record.id, target_month=record.target_month)
-            return TelegramTransportResponse(text=f"Введи новый процент для «{record.category_raw}» ({record.owner_name} — {record.bank_name}).\nФормат: 7, 7%, 7,5% или 7.5%.\n\nДля отмены отправь: cancel")
+            return TelegramTransportResponse(text=f"Введи новый процент для этой категории.\n{record.category_raw} ({record.owner_name} — {record.bank_name})\nНапример: 7%, 7,5% или 7.5%.\n\nДля отмены отправь: cancel")
         if callback_data.startswith(CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX):
-            return TelegramTransportResponse(text="Удаление отменено. Запись не изменена.")
+            return TelegramTransportResponse(text="Ок, ничего не удалил.")
         if callback_data.startswith(CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX) and self.soft_delete_cashback_category is not None:
             record_id = callback_data.removeprefix(CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX)
             result = self.soft_delete_cashback_category.execute(record_id)
             if result.target_month and self.list_active_cashback_categories is not None:
                 listing = self.list_active_cashback_categories.execute(month=result.target_month)
-                return TelegramTransportResponse(text=f"Удалил запись.\n\n{listing.text}", button_rows=self._build_cashback_action_button_rows(listing))
+                return TelegramTransportResponse(text=f"Готово, убрал категорию из активных.\n\n{listing.text}", button_rows=self._build_cashback_action_button_rows(listing))
             return TelegramTransportResponse(text=result.text)
         if callback_data == CALLBACK_CASHBACK_TRANSITION_CANCEL:
             self.pending_cashback_transitions.pop(user.id, None)

@@ -80,9 +80,9 @@ class RequestDeleteCashbackCategoryUseCase:
         return CashbackResult(
             status="delete_confirmation",
             text=(
-                "Подтверди деактивацию категории:\n"
+                "Удалить эту кэшбек-категорию из активных?\n"
                 f"{record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}\n\n"
-                "После подтверждения запись исчезнет из активных списков."
+                "После подтверждения категория исчезнет из активных."
             ),
             target_month=record.target_month,
             records=(record,),
@@ -141,7 +141,7 @@ class UpdateCashbackCategoryPercentUseCase:
         if percent is None:
             return CashbackResult(
                 status="edit_percent_invalid",
-                text="Некорректный процент. Введи число в формате 7, 7%, 7,5% или 7.5%.",
+                text="Не получилось распознать процент.\nНапиши, например: 7%, 7,5% или 7.5%.",
                 error_code="invalid_percent",
             )
         updated = self.repo.update_percent(int(record_id_raw), percent)
@@ -152,7 +152,7 @@ class UpdateCashbackCategoryPercentUseCase:
         if change == "no_change":
             return CashbackResult(
                 status="edit_percent_no_change",
-                text=f"Процент не изменился: {record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}",
+                text=f"Процент уже такой — ничего не изменил.\n{record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}",
                 target_month=record.target_month,
                 records=(record,),
                 old_percent=record.percent,
@@ -160,7 +160,7 @@ class UpdateCashbackCategoryPercentUseCase:
             )
         return CashbackResult(
             status="edit_percent_updated",
-            text=f"Обновил процент: {record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}",
+            text=f"Готово, обновил процент.\n{record.owner_name} — {record.bank_name} — {record.category_raw} — {record.percent:g}% — {month_label}",
             target_month=record.target_month,
             records=(record,),
             updated=True,
@@ -291,18 +291,18 @@ class ListActiveCashbackCategoriesUseCase:
             rows = tuple(self.repo.list_active_by_owner(target_month, owner_name))
         if not rows:
             if owner_name is None:
-                return CashbackResult(status="list_empty", target_month=target_month, owner_filter=None, records=(), text=f"На {month_label} кэшбек-категорий пока нет.\n\nДобавь первую категорию в формате:\nАльфа, Владимир, май, Супермаркеты, 5%")
+                return CashbackResult(status="list_empty", target_month=target_month, owner_filter=None, records=(), text=f"На {month_label} активных кэшбек-категорий пока нет.\nМожно выбрать другой месяц или добавить категорию.")
             return CashbackResult(
                 status="list_empty",
                 target_month=target_month,
                 owner_filter=owner_name,
                 records=(),
-                text=f"На {month_label} для владельца {owner_name} кэшбек-категорий пока нет.",
+                text=f"На {month_label} у {owner_name} пока нет активных кэшбек-категорий.\nМожно выбрать другого владельца, другой месяц или добавить категорию.",
             )
 
-        lines = [f"Активные категории — {month_label}"]
+        lines = [f"Активные кэшбек-категории — {month_label}"]
         if owner_name is not None:
-            lines.extend([f"Фильтр: {owner_name}", ""])
+            lines.extend([f"Владелец: {owner_name}", ""])
         else:
             lines.append("")
         current = None
