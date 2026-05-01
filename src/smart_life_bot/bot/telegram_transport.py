@@ -145,8 +145,8 @@ class TelegramTransportRouter:
     def handle_start(self) -> TelegramTransportResponse:
         return TelegramTransportResponse(
             text=(
-                "Привет! Можно сразу отправить текст события (например: Тест завтра в 15:00), и я покажу черновик.\n"
-                "Раздел календаря доступен через меню внизу: 📅 Календарь.\n"
+                "Привет!\n"
+                "Выбери режим: 📅 Календарь или 💳 Кэшбек.\n"
                 "Событие не будет создано, пока ты не нажмешь Confirm."
             ),
             reply_keyboard=(("📅 Календарь", "💳 Кэшбек"),),
@@ -166,18 +166,22 @@ class TelegramTransportRouter:
             return TelegramTransportResponse(text="Похоже, здесь несколько вариантов. Что сделать?")
 
         if normalized == "📅 Календарь":
+            self.pending_cashback_transitions.pop(user.id, None)
             self.pending_cashback_percent_edit.pop(user.id, None)
+            self.pending_calendar_recovery.pop(user.id, None)
             self.active_feature_context[user.id] = "calendar"
             return TelegramTransportResponse(
-                text="Выберите режим календаря:",
+                text="Текущий режим: 📅 Календарь\n\nВыберите режим календаря:",
                 buttons=(("⚡ Быстрый режим", "calendar:mode:quick"), ("🔐 Личный Google Calendar", "calendar:mode:personal")),
                 reply_keyboard=(("📅 Календарь", "💳 Кэшбек"),),
             )
 
         if normalized == "💳 Кэшбек":
+            self.pending_calendar_recovery.pop(user.id, None)
             self.active_feature_context[user.id] = "cashback"
             return TelegramTransportResponse(
                 text=(
+                    "Текущий режим: 💳 Кэшбек\n\n"
                     "💳 Кэшбек\n\n"
                     "Что можно сделать:\n\n"
                     "* добавить категорию: Альфа, Владимир, май, Супермаркеты, 5%\n"
@@ -282,6 +286,14 @@ class TelegramTransportRouter:
             cashback = self.query_cashback_category.execute(normalized)
             if cashback.status in {"query_found", "query_not_found"}:
                 return TelegramTransportResponse(text=cashback.text)
+
+        if self.active_feature_context.get(user.id) not in {"calendar", "cashback"} and self._looks_like_cashback_query(normalized):
+            return TelegramTransportResponse(
+                text="Выбери режим: 📅 Календарь или 💳 Кэшбек.",
+                reply_keyboard=(("📅 Календарь", "💳 Кэшбек"),),
+            )
+        if self.active_feature_context.get(user.id) == "cashback":
+            return TelegramTransportResponse(text="В режиме 💳 Кэшбек отправьте категорию или структурную строку.")
 
         result = self.process_incoming_message.execute(IncomingMessageInput(user_id=user.id, text=normalized))
         self.active_feature_context[user.id] = "calendar"

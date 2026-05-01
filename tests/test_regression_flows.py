@@ -66,6 +66,7 @@ def test_regression_start_footer_contains_calendar_and_cashback() -> None:
 
     response = router.handle_start()
 
+    assert "Выбери режим: 📅 Календарь или 💳 Кэшбек." in response.text
     assert ("📅 Календарь", "💳 Кэшбек") in response.reply_keyboard
 
 
@@ -102,7 +103,7 @@ def test_regression_cashback_add_query_never_calls_calendar() -> None:
     add = router.handle_text_message(telegram_user_id=92006, text="Альфа, Владимир, 2026-05, Супермаркеты, 5%")
     query = router.handle_text_message(telegram_user_id=92006, text="Супермаркеты")
 
-    assert "Что можно сделать" in menu.text
+    assert "Текущий режим: 💳 Кэшбек" in menu.text
     assert "Добавил кэшбек" in add.text
     listed = router.handle_text_message(telegram_user_id=92006, text="📋 Активные категории")
     assert "Активные категории — май 2026" in listed.text
@@ -138,6 +139,34 @@ def test_regression_cashback_query_not_found_does_not_fallthrough_to_calendar() 
     assert len(deps.calendar_service.requests) == 0
 
 
+def test_regression_unset_mode_ambiguous_text_requests_explicit_mode_choice() -> None:
+    router, deps = _build_router()
+
+    response = router.handle_text_message(telegram_user_id=92014, text="Аптеки")
+
+    assert response.text == "Выбери режим: 📅 Календарь или 💳 Кэшбек."
+    assert ("📅 Календарь", "💳 Кэшбек") in response.reply_keyboard
+    user = deps.users_repo.get_by_telegram_id(92014)
+    assert user is not None
+    assert deps.state_repo.get(user.id) is None
+
+
+def test_regression_switch_to_calendar_clears_pending_cashback_percent_edit() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=92015, text="💳 Кэшбек")
+    router.handle_text_message(telegram_user_id=92015, text="Альфа, Владимир, май, Супермаркеты, 5%")
+    listing = router.handle_text_message(telegram_user_id=92015, text="📋 Активные категории")
+    edit_button = next(button for button in listing.buttons if button[1].startswith("cashback:edit-percent:request:"))
+    router.handle_callback(telegram_user_id=92015, callback_data=edit_button[1])
+    user = deps.users_repo.get_by_telegram_id(92015)
+    assert user is not None
+    assert user.id in router.pending_cashback_percent_edit
+
+    switched = router.handle_text_message(telegram_user_id=92015, text="📅 Календарь")
+    assert "Текущий режим: 📅 Календарь" in switched.text
+    assert user.id not in router.pending_cashback_percent_edit
+
+
 def test_regression_missing_date_phrase_reaches_calendar_preview() -> None:
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()
@@ -162,16 +191,30 @@ def test_regression_simple_russian_phrase_not_swallowed_by_cashback_query() -> N
     assert len(deps.calendar_service.requests) == 0
 
 
-def test_regression_common_one_two_word_event_texts_stay_in_calendar_flow() -> None:
+def test_regression_common_one_two_word_event_texts_require_explicit_mode_when_unset() -> None:
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()
 
     for text in ("Созвон", "Тренировка", "Звонок маме"):
         response = router.handle_text_message(telegram_user_id=92013, text=text)
-        assert "Черновик события" in response.text
-        assert ("📅 Выбрать дату", "calendar:date:start") in response.buttons
-        assert "ничего не найдено" not in response.text
+        assert response.text == "Выбери режим: 📅 Календарь или 💳 Кэшбек."
+        assert ("📅 Календарь", "💳 Кэшбек") in response.reply_keyboard
         assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_switch_to_cashback_clears_pending_calendar_recovery() -> None:
+    router, deps = _build_router()
+    deps.parser = MissingStartAtParser()
+    router.handle_text_message(telegram_user_id=92016, text="📅 Календарь")
+    router.handle_text_message(telegram_user_id=92016, text="Созвон")
+    user = deps.users_repo.get_by_telegram_id(92016)
+    assert user is not None
+    router.handle_callback(telegram_user_id=92016, callback_data="calendar:date:start")
+    assert user.id in router.pending_calendar_recovery
+
+    switched = router.handle_text_message(telegram_user_id=92016, text="💳 Кэшбек")
+    assert "Текущий режим: 💳 Кэшбек" in switched.text
+    assert user.id not in router.pending_calendar_recovery
 
 
 def test_regression_cashback_conflict_clarification_does_not_mutate_states() -> None:

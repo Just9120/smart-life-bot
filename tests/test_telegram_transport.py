@@ -1282,7 +1282,7 @@ def test_edit_percent_flow_valid_invalid_cancel_and_no_calendar_calls() -> None:
     assert user.id not in router.pending_cashback_percent_edit
 
     after_success = router.handle_text_message(telegram_user_id=90702, text='7%')
-    assert 'Черновик события' in after_success.text
+    assert 'В режиме 💳 Кэшбек' in after_success.text
 
     listing2 = router.handle_text_message(telegram_user_id=90702, text='📋 Активные категории')
     assert '7%' in listing2.text
