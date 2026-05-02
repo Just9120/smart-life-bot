@@ -53,6 +53,13 @@ class ParsedAdd:
     percent: float
     month: str | None
 
+@dataclass(frozen=True, slots=True)
+class ParsedMultiAdd:
+    owner: str
+    bank: str
+    month: str | None
+    pairs: tuple[tuple[str, float], ...]
+
 
 def parse_structured_add(text: str, today: date) -> ParsedAdd | None:
     parts = [p.strip() for p in text.split(",") if p.strip()]
@@ -69,6 +76,38 @@ def parse_structured_add(text: str, today: date) -> ParsedAdd | None:
             return ParsedAdd(bank=bank, owner=owner, category=category, percent=percent, month=month)
 
     return _parse_space_fallback(text, today)
+
+
+def parse_owner_first_multi_add(text: str, today: date) -> ParsedMultiAdd | None:
+    if "," in text:
+        parts = [p.strip() for p in text.split(",") if p.strip()]
+        if len(parts) < 3:
+            return None
+        owner, bank = parts[0], parts[1]
+        tail_parts = parts[2:]
+        month = parse_month_token(tail_parts[0], today)
+        if month is not None:
+            tail_parts = tail_parts[1:]
+        pairs = _parse_pairs_segments(tail_parts)
+    else:
+        tokens = [t.strip() for t in re.split(r"\s+", text.strip()) if t.strip()]
+        if len(tokens) < 4:
+            return None
+        owner = tokens[0]
+        bank, consumed = _extract_bank_from_space_tokens(tokens[1:])
+        if bank is None:
+            return None
+        rest = tokens[1 + consumed :]
+        month = None
+        if rest:
+            maybe = parse_month_token(rest[0], today)
+            if maybe is not None:
+                month = maybe
+                rest = rest[1:]
+        pairs = _parse_pairs_tokens(rest)
+    if owner not in ALLOWED_OWNERS or not bank or not pairs:
+        return None
+    return ParsedMultiAdd(owner=owner, bank=bank, month=month, pairs=pairs)
 
 
 def _parse_space_fallback(text: str, today: date) -> ParsedAdd | None:
@@ -110,6 +149,51 @@ def _parse_space_fallback(text: str, today: date) -> ParsedAdd | None:
         percent=percent,
         month=month,
     )
+
+
+def _extract_bank_from_space_tokens(tokens: list[str]) -> tuple[str | None, int]:
+    if not tokens:
+        return None, 0
+    one = normalize_bank_name(tokens[0])
+    if len(tokens) > 1:
+        two = normalize_bank_name(f"{tokens[0]} {tokens[1]}")
+        if two == "Т-Банк":
+            return two, 2
+    return one, 1
+
+
+def _parse_pairs_tokens(tokens: list[str]) -> tuple[tuple[str, float], ...]:
+    pairs: list[tuple[str, float]] = []
+    chunk: list[str] = []
+    for token in tokens:
+        chunk.append(token)
+        percent = parse_percent_value(token)
+        if percent is None:
+            continue
+        category = " ".join(chunk[:-1]).strip()
+        if not category:
+            return ()
+        pairs.append((category, percent))
+        chunk = []
+    if chunk:
+        return ()
+    return tuple(pairs)
+
+
+def _parse_pairs_segments(parts: list[str]) -> tuple[tuple[str, float], ...]:
+    pairs: list[tuple[str, float]] = []
+    for part in parts:
+        tokens = [t for t in part.split() if t]
+        if len(tokens) < 2:
+            return ()
+        percent = parse_percent_value(tokens[-1])
+        if percent is None:
+            return ()
+        category = " ".join(tokens[:-1]).strip()
+        if not category:
+            return ()
+        pairs.append((category, percent))
+    return tuple(pairs)
 
 
 def parse_percent_value(raw: str) -> float | None:
