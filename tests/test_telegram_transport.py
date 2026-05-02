@@ -339,7 +339,7 @@ def test_plain_text_handler_maps_to_process_incoming_use_case() -> None:
     response = router.handle_text_message(telegram_user_id=90001, text="Team sync tomorrow at 10")
 
     assert "Проверь черновик события" in response.text
-    assert ("✅ Confirm", CALLBACK_CONFIRM) in response.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) in response.buttons
     user = deps.users_repo.get_by_telegram_id(90001)
     assert user is not None
     logs = deps.events_log_repo.list_for_user(user.id)
@@ -456,7 +456,7 @@ def test_reminder_preset_updates_draft_without_calendar_write() -> None:
 def test_service_account_mode_hides_reminders_and_keeps_duration() -> None:
     router, _ = _build_router_without_reminders()
     response = router.handle_text_message(telegram_user_id=90512, text="Team sync")
-    assert ("✅ Confirm", CALLBACK_CONFIRM) in response.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) in response.buttons
     assert ("⏱ Длительность", CALLBACK_DURATION) in response.buttons
     assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
     assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
@@ -614,7 +614,7 @@ def test_preview_buttons_hide_confirm_when_start_at_missing() -> None:
 
     response = router.handle_text_message(telegram_user_id=90010, text="Missing start_at")
 
-    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) not in response.buttons
     assert ("📅 Выбрать дату", CALLBACK_CALENDAR_DATE_START) in response.buttons
     assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
     assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
@@ -625,7 +625,7 @@ def test_missing_date_recovery_flow_keeps_confirm_gated_until_valid_time() -> No
     router, deps = _build_router()
     deps.parser = MissingStartAtParser()
     preview = router.handle_text_message(telegram_user_id=91001, text="Missing start_at")
-    assert ("✅ Confirm", CALLBACK_CONFIRM) not in preview.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) not in preview.buttons
     month = router.handle_callback(telegram_user_id=91001, callback_data=CALLBACK_CALENDAR_DATE_START)
     assert "Выбери дату" in month.text
     assert month.button_rows
@@ -638,7 +638,7 @@ def test_missing_date_recovery_flow_keeps_confirm_gated_until_valid_time() -> No
     bad_time = router.handle_text_message(telegram_user_id=91001, text="9pm")
     assert "Не получилось распознать время" in bad_time.text
     ok_time = router.handle_text_message(telegram_user_id=91001, text="09:45")
-    assert ("✅ Confirm", CALLBACK_CONFIRM) in ok_time.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) in ok_time.buttons
     assert "2026-06-15T09:45:00+00:00" in ok_time.text
     assert len(deps.calendar_service.requests) == 0
     confirmed = router.handle_callback(telegram_user_id=91001, callback_data=CALLBACK_CONFIRM)
@@ -682,7 +682,7 @@ def test_successful_edit_start_at_clears_pending_recovery_and_random_hhmm_does_n
     router.handle_text_message(telegram_user_id=91004, text="Missing start_at")
     router.handle_callback(telegram_user_id=91004, callback_data=CALLBACK_CALENDAR_DATE_START)
     edited = router.handle_text_message(telegram_user_id=91004, text="/edit start_at 2026-08-10T12:00:00+00:00")
-    assert ("✅ Confirm", CALLBACK_CONFIRM) in edited.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) in edited.buttons
     plain = router.handle_text_message(telegram_user_id=91004, text="09:15")
     assert "Проверь черновик события:" in plain.text
 
@@ -748,7 +748,7 @@ def test_preview_buttons_hide_confirm_when_timezone_invalid() -> None:
 
         response = router.handle_text_message(telegram_user_id=90013, text=text)
 
-        assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+        assert ("✅ Создать событие", CALLBACK_CONFIRM) not in response.buttons
         assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
         assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
         assert "Используйте /edit timezone Europe/Amsterdam." in response.text
@@ -760,7 +760,7 @@ def test_preview_buttons_hide_confirm_when_timezone_is_none() -> None:
 
     response = router.handle_text_message(telegram_user_id=90014, text="None timezone")
 
-    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) not in response.buttons
     assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
     assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
     assert "Используйте /edit timezone Europe/Amsterdam." in response.text
@@ -772,7 +772,7 @@ def test_preview_buttons_hide_confirm_when_time_range_invalid() -> None:
 
     response = router.handle_text_message(telegram_user_id=90015, text="Invalid range")
 
-    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) not in response.buttons
     assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
     assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
     assert "end_at должен быть позже start_at." in response.text
@@ -784,7 +784,7 @@ def test_preview_buttons_hide_confirm_when_datetime_awareness_mixed() -> None:
 
     response = router.handle_text_message(telegram_user_id=90016, text="Mixed awareness")
 
-    assert ("✅ Confirm", CALLBACK_CONFIRM) not in response.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) not in response.buttons
     assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
     assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
     assert "в одном формате timezone-awareness" in response.text
@@ -797,7 +797,7 @@ def test_edit_start_at_restores_confirm_button() -> None:
 
     response = router.handle_text_message(telegram_user_id=90011, text="/edit start_at 2026-02-14T11:30:00+00:00")
 
-    assert ("✅ Confirm", CALLBACK_CONFIRM) in response.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) in response.buttons
     assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
     assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
 

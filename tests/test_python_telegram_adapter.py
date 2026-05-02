@@ -151,7 +151,7 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
 def test_transport_response_buttons_convert_to_inline_keyboard_markup() -> None:
     markup = transport_buttons_to_inline_markup(
         (
-            ("✅ Confirm", CALLBACK_CONFIRM),
+            ("✅ Создать событие", CALLBACK_CONFIRM),
             ("✏️ Edit", CALLBACK_EDIT),
             ("❌ Cancel", CALLBACK_CANCEL),
         )
@@ -159,7 +159,7 @@ def test_transport_response_buttons_convert_to_inline_keyboard_markup() -> None:
 
     assert isinstance(markup, InlineKeyboardMarkup)
     assert [[button.text for button in row] for row in markup.inline_keyboard] == [
-        ["✅ Confirm"],
+        ["✅ Создать событие"],
         ["✏️ Edit"],
         ["❌ Cancel"],
     ]
