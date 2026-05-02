@@ -30,7 +30,7 @@ def test_regression_calendar_preview_confirm_gate_before_write() -> None:
     user = deps.users_repo.get_by_telegram_id(92001)
     assert user is not None
     assert deps.state_repo.get(user.id) is not None
-    assert ("✅ Confirm", CALLBACK_CONFIRM) in response.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) in response.buttons
 
 
 def test_regression_calendar_write_only_after_explicit_confirm() -> None:
@@ -52,7 +52,7 @@ def test_regression_missing_start_at_draft_cannot_be_confirmed() -> None:
     preview = router.handle_text_message(telegram_user_id=92003, text="Событие без даты")
     stale_confirm = router.handle_callback(telegram_user_id=92003, callback_data=CALLBACK_CONFIRM)
 
-    assert ("✅ Confirm", CALLBACK_CONFIRM) not in preview.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) not in preview.buttons
     assert len(deps.calendar_service.requests) == 0
     assert (
         "Cannot confirm event" in stale_confirm.text
@@ -89,7 +89,7 @@ def test_regression_service_account_reminder_gating_keeps_duration_controls() ->
 
     preview = router.handle_text_message(telegram_user_id=92005, text="Team sync")
 
-    assert ("✅ Confirm", CALLBACK_CONFIRM) in preview.buttons
+    assert ("✅ Создать событие", CALLBACK_CONFIRM) in preview.buttons
     assert ("⏱ Длительность", CALLBACK_DURATION) in preview.buttons
     assert ("✏️ Edit", CALLBACK_EDIT) in preview.buttons
     assert ("❌ Cancel", CALLBACK_CANCEL) in preview.buttons

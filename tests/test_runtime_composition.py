@@ -89,7 +89,7 @@ def test_runtime_on_text_returns_preview_response() -> None:
         response = container.runtime.on_text(telegram_user_id=1001, text="Team sync tomorrow at 10:00")
 
         assert "Проверь черновик события" in response.text
-        assert any(label == "✅ Confirm" for label, _ in response.buttons)
+        assert any(label == "✅ Создать событие" for label, _ in response.buttons)
 
         user = container.users_repo.get_by_telegram_id(telegram_user_id=1001)
         assert user is not None

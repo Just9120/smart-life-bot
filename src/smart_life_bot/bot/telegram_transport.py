@@ -479,7 +479,7 @@ class TelegramTransportRouter:
                 text=(
                     f"Дата выбрана: {selected_date}.\n"
                     "Теперь напиши время в формате HH:MM, например: 09:30.\n"
-                    "Это только обновит черновик — событие создастся после Confirm."
+                    "Это только обновит черновик — событие создастся после кнопки «Создать событие»."
                 )
             )
         if callback_data.startswith(CALLBACK_CALENDAR_DATE_NOOP_PREFIX):
@@ -813,7 +813,7 @@ def _build_draft_buttons(draft: EventDraft, *, supports_custom_reminders: bool =
             ("✏️ Edit", CALLBACK_EDIT),
             ("❌ Cancel", CALLBACK_CANCEL),
         )
-    buttons = [("✅ Confirm", CALLBACK_CONFIRM), ("⏱ Длительность", CALLBACK_DURATION)]
+    buttons = [("✅ Создать событие", CALLBACK_CONFIRM), ("⏱ Длительность", CALLBACK_DURATION)]
     if supports_custom_reminders:
         buttons.append(("🔔 Уведомления", CALLBACK_REMINDERS))
     buttons.extend([("✏️ Edit", CALLBACK_EDIT), ("❌ Cancel", CALLBACK_CANCEL)])
