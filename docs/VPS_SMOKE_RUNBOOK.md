@@ -164,17 +164,17 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 ### 10.1 Happy path (минимум)
 1. Отправьте `/start`.
 2. Отправьте `Тест завтра в 15:00`.
-3. В preview ожидайте `end_at: —` и кнопки draft-level действий (`⏱ Длительность`, Confirm/Edit/Cancel). Если reminder controls скрыты в текущем service-account режиме — это корректно.
+3. В preview ожидайте `end_at: —` и кнопки draft-level действий (`⏱ Длительность`, ✅ Создать событие/Edit/Cancel). Если reminder controls скрыты в текущем service-account режиме — это корректно.
 4. Отправьте `Тест завтра в 15:00 длительность 20 минут` и проверьте, что `end_at` не заполнился из free-text.
 5. Нажмите `⏱ Длительность` и задайте `20` → `end_at` должен стать `start_at + 20 минут`.
-6. Нажмите **Confirm**.
+6. Нажмите **✅ Создать событие**.
 7. Проверьте success-ответ и появление события в Google Calendar.
 8. Не используйте текущий service-account smoke как проверку user-visible custom reminders: по продуктовой политике это future OAuth-only capability.
 
 ### 10.2 Edit path
 1. Создайте preview.
 2. Выполните `/edit title ...` или `/edit start_at ...`.
-3. Проверьте обновлённый preview и Confirm.
+3. Проверьте обновлённый preview и кнопку `✅ Создать событие`.
 
 ### 10.3 Cancel path
 1. Создайте preview.
@@ -182,7 +182,7 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 3. Убедитесь, что событие не создано.
 
 ### 10.4 Validation / non-confirmable draft
-Проверьте кейсы, где Confirm скрыт:
+Проверьте кейсы, где кнопка `✅ Создать событие` скрыта:
 - draft без `start_at`;
 - invalid timezone;
 - invalid time range.
@@ -195,7 +195,7 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 2. Нажмите `📅 Календарь` и проверьте ответ с текущим режимом: `Текущий режим: 📅 Календарь`.
 3. Отправьте календарный free-text и проверьте новый preview draft-copy.
 4. Для текста без даты/времени проверьте non-confirmable preview + кнопку `📅 Выбрать дату`.
-5. Пройдите `📅 Выбрать дату` → введите `HH:MM` → убедитесь, что событие не создаётся до явного Confirm.
+5. Пройдите `📅 Выбрать дату` → введите `HH:MM` → убедитесь, что событие не создаётся до нажатия `✅ Создать событие`.
 6. Нажмите `💳 Кэшбек` и проверьте ответ с текущим режимом: `Текущий режим: 💳 Кэшбек`.
 7. Проверьте явные действия в меню cashback: `📋 Активные категории`, `➕ Добавить категорию`, `🔎 Найти категорию`.
 8. Нажмите `➕ Добавить категорию` и проверьте, что callback-действие работает в реальном Telegram (не только transport tests).
@@ -222,7 +222,7 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 - Mismatch пути `GOOGLE_SERVICE_ACCOUNT_JSON` и mounted file.
 - Нет прав на `./data` для SQLite.
 - Polling уже запущен в другом контейнере/сессии (duplicate consumer).
-- `Event creation failed` после Confirm: проверьте sharing calendar, calendar ID и service account key.
+- `Event creation failed` после нажатия `✅ Создать событие`: проверьте sharing calendar, calendar ID и service account key.
 
 
 ### 13.1 Stale runtime diagnostics (manual commands, safe)
@@ -288,7 +288,7 @@ Do not stop/remove unrelated containers or processes during diagnostics.
 - [ ] `📅 Календарь` устанавливает active mode и показывает `Текущий режим: 📅 Календарь`
 - [ ] calendar free-text показывает актуальный draft preview copy
 - [ ] missing-date preview non-confirmable и содержит `📅 Выбрать дату`
-- [ ] calendar event не создаётся до явного Confirm
+- [ ] calendar event не создаётся до нажатия `✅ Создать событие`
 - [ ] `💳 Кэшбек` устанавливает active mode и показывает `Текущий режим: 💳 Кэшбек`
 - [ ] меню cashback содержит `📋 Активные категории` / `➕ Добавить категорию` / `🔎 Найти категорию`
 - [ ] `➕ Добавить категорию` callback работает в реальном Telegram
@@ -301,7 +301,7 @@ Do not stop/remove unrelated containers or processes during diagnostics.
 - [ ] тестовые cashback-записи удалены через UI (без destructive DB cleanup)
 - [ ] Edit path works
 - [ ] Cancel path creates no event
-- [ ] non-confirmable draft hides Confirm
+- [ ] non-confirmable draft hides `✅ Создать событие`
 - [ ] в service-account режиме reminder controls не обязательны и не проверяются как рабочая user-visible фича
 - [ ] polling stopped
 
