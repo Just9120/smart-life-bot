@@ -29,6 +29,7 @@ from smart_life_bot.application.cashback_use_cases import (
     parse_year_month,
     shift_year_month,
 )
+from smart_life_bot.application.cashback_export import ExportCashbackCategoriesUseCase
 from smart_life_bot.cashback.models import ALLOWED_OWNERS
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
@@ -65,6 +66,7 @@ CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX = "cashback:transition:select:"
 CALLBACK_CASHBACK_TRANSITION_CANCEL = "cashback:transition:cancel"
 CALLBACK_CASHBACK_ADD_START = "cashback:add:start"
 CALLBACK_CASHBACK_SEARCH_HINT = "cashback:search:hint"
+CALLBACK_CASHBACK_EXPORT_CURRENT = "cashback:export:current"
 CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX = "cashback:edit-percent:request:"
 LABEL_CASHBACK_ADD = "➕ Добавить категорию"
 LABEL_CASHBACK_SEARCH = "🔎 Найти категорию"
@@ -101,6 +103,8 @@ class TelegramTransportResponse:
     buttons: tuple[tuple[str, str], ...] = ()
     button_rows: tuple[tuple[tuple[str, str], ...], ...] = ()
     reply_keyboard: tuple[tuple[str, ...], ...] = ()
+    document_name: str | None = None
+    document_bytes: bytes | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +128,7 @@ class TelegramTransportRouter:
     soft_delete_cashback_category: SoftDeleteCashbackCategoryUseCase | None = None
     complete_transition_cashback_category: CompleteTransitionCashbackCategoryUseCase | None = None
     update_cashback_category_percent: UpdateCashbackCategoryPercentUseCase | None = None
+    export_cashback_categories: ExportCashbackCategoriesUseCase | None = None
     pending_cashback_transitions: dict[int, PendingCashbackTransition] = field(default_factory=dict)
     pending_calendar_recovery: dict[int, PendingCalendarDateRecovery] = field(default_factory=dict)
     active_feature_context: dict[int, str] = field(default_factory=dict)
@@ -201,6 +206,7 @@ class TelegramTransportRouter:
                     ("📋 Активные категории", CALLBACK_CASHBACK_LIST_CURRENT),
                     (LABEL_CASHBACK_ADD, CALLBACK_CASHBACK_ADD_START),
                     (LABEL_CASHBACK_SEARCH, CALLBACK_CASHBACK_SEARCH_HINT),
+                    ("📤 Экспорт XLSX", CALLBACK_CASHBACK_EXPORT_CURRENT),
                 ),
             )
         if normalized == LABEL_CASHBACK_ADD:
@@ -561,6 +567,11 @@ class TelegramTransportRouter:
         if callback_data == CALLBACK_CASHBACK_SEARCH_HINT:
             self.active_feature_context[user.id] = "cashback"
             return TelegramTransportResponse(text="Напиши категорию, например: Аптеки.")
+        if callback_data == CALLBACK_CASHBACK_EXPORT_CURRENT and self.export_cashback_categories is not None:
+            result = self.export_cashback_categories.execute()
+            if result.status != "ok" or result.content is None or result.file_name is None:
+                return TelegramTransportResponse(text=result.text)
+            return TelegramTransportResponse(text=result.text, document_name=result.file_name, document_bytes=result.content)
         if callback_data.startswith(CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX) and self.list_active_cashback_categories is not None:
             owner_token = callback_data.removeprefix(CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX)
             owner_name = self._decode_owner_filter(owner_token)
