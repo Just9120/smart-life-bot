@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 from typing import Literal
 
 from smart_life_bot.cashback.models import ALLOWED_OWNERS, CashbackAddInput
-from smart_life_bot.cashback.parser import has_invalid_explicit_month_token, in_transition_period, looks_like_cashback_add_attempt, normalize_bank_name, normalize_category_key, parse_percent_value, parse_structured_add, validate_owner
+from smart_life_bot.cashback.parser import has_invalid_explicit_month_token, has_invalid_owner_first_explicit_month_token, in_transition_period, looks_like_cashback_add_attempt, normalize_bank_name, normalize_category_key, parse_owner_first_multi_add, parse_percent_value, parse_structured_add, validate_owner
 
 RU_MONTH_LABELS = {
     1: "январь", 2: "февраль", 3: "март", 4: "апрель", 5: "май", 6: "июнь",
@@ -175,6 +175,51 @@ class AddCashbackCategoryUseCase:
 
     def execute(self, text: str) -> CashbackResult | None:
         today = self.now_provider()
+        if has_invalid_owner_first_explicit_month_token(text, today):
+            return CashbackResult(status="invalid_month", text="Некорректный месяц.\nИспользуй русское название месяца или YYYY-MM, например: май или 2026-05.", error_code="invalid_month")
+        parsed_multi = parse_owner_first_multi_add(text, today)
+        if parsed_multi is not None:
+            if len(parsed_multi.pairs) > 5:
+                return CashbackResult(status="invalid_format", text="Можно добавить не больше 5 категорий за раз.", error_code="too_many_categories")
+            month = parsed_multi.month
+            if month is None and in_transition_period(today):
+                current_month = current_year_month(today)
+                next_month = shift_year_month(current_month, delta=1)
+                candidate_months = (current_month, next_month) if next_month is not None else (current_month,)
+                return CashbackResult(
+                    status="transition_month_required",
+                    text="Сейчас переходный период между месяцами. К какому месяцу отнести категории?",
+                    error_code="transition_month_required",
+                    candidate_months=candidate_months,
+                    pending_add=CashbackAddInput(normalize_bank_name(parsed_multi.bank), parsed_multi.owner, "\n".join(f"{c}|{p}" for c, p in parsed_multi.pairs), 0.0, current_month, text),
+                )
+            target_month = month or current_year_month(today)
+            lines = [f"Готово, обработал {len(parsed_multi.pairs)} категории за {format_month_label(target_month)}:"]
+            updated = created = False
+            records = []
+            for idx, (category, percent) in enumerate(parsed_multi.pairs, start=1):
+                record, change, _old = self.repo.upsert(CashbackAddInput(normalize_bank_name(parsed_multi.bank), parsed_multi.owner, category, percent, target_month, text))
+                records.append(record)
+                if change == "updated":
+                    updated = True
+                    lines.append(f"{idx}. {category} — обновлено до {record.percent:g}%")
+                elif change == "no_change":
+                    lines.append(f"{idx}. {category} — уже было {record.percent:g}%")
+                else:
+                    created = True
+                    lines.append(f"{idx}. {category} — добавлено {record.percent:g}%")
+            return CashbackResult(status="added", text="\n".join(lines), target_month=target_month, created=created, updated=updated, records=tuple(records))
+        normalized_tokens = [t for t in text.replace(",", " ").split() if t]
+        if normalized_tokens and normalized_tokens[0] in ALLOWED_OWNERS and "%" in text:
+            return CashbackResult(
+                status="invalid_format",
+                text=(
+                    "Не получилось распознать категории.\n"
+                    "Формат: Владимир, Т-Банк, май, Супермаркеты 5%, Аптеки 5%"
+                ),
+                error_code="invalid_format",
+            )
+
         if has_invalid_explicit_month_token(text, today):
             return CashbackResult(status="invalid_month", text="Некорректный месяц.\nИспользуй русское название месяца или YYYY-MM, например: май или 2026-05.", error_code="invalid_month")
         parsed = parse_structured_add(text, today)
@@ -230,6 +275,29 @@ class CompleteTransitionCashbackCategoryUseCase:
                 text="Некорректный месяц в кнопке. Открой «💳 Кэшбек» и попробуй снова.",
                 error_code="invalid_month",
             )
+        if payload.percent == 0.0 and "|" in payload.category_raw:
+            lines_raw = [line.strip() for line in payload.category_raw.splitlines() if line.strip()]
+            parsed_pairs: list[tuple[str, float]] = []
+            for line in lines_raw:
+                category, percent_raw = line.split("|", maxsplit=1)
+                parsed_pairs.append((category, float(percent_raw)))
+            if len(parsed_pairs) > 5:
+                return CashbackResult(status="invalid_format", text="Можно добавить не больше 5 категорий за раз.", error_code="too_many_categories")
+            lines = [f"Готово, обработал {len(parsed_pairs)} категории за {format_month_label(selected_month)}:"]
+            records = []
+            created = updated = False
+            for idx, (category, percent) in enumerate(parsed_pairs, start=1):
+                record, change, _old = self.repo.upsert(CashbackAddInput(payload.bank_name, payload.owner_name, category, percent, selected_month, payload.source_text))
+                records.append(record)
+                if change == "updated":
+                    updated = True
+                    lines.append(f"{idx}. {category} — обновлено до {record.percent:g}%")
+                elif change == "no_change":
+                    lines.append(f"{idx}. {category} — уже было {record.percent:g}%")
+                else:
+                    created = True
+                    lines.append(f"{idx}. {category} — добавлено {record.percent:g}%")
+            return CashbackResult(status="added", text="\n".join(lines), target_month=selected_month, created=created, updated=updated, records=tuple(records))
         record, change, old = self.repo.upsert(
             CashbackAddInput(
                 payload.bank_name,

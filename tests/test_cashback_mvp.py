@@ -1,7 +1,7 @@
 from datetime import date
 
 from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase, format_month_label
-from smart_life_bot.cashback.parser import normalize_bank_name, parse_structured_add
+from smart_life_bot.cashback.parser import normalize_bank_name, parse_owner_first_multi_add, parse_structured_add
 from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
 from smart_life_bot.storage.sqlite import create_sqlite_connection, init_sqlite_schema
 
@@ -55,6 +55,70 @@ def test_structured_add_space_separated_and_missing_final_comma():
     assert missing_final_comma.owner == 'Владимир'
     assert missing_final_comma.category == 'Аптеки'
     assert missing_final_comma.percent == 5
+
+
+def test_owner_first_multi_add_parsing_variants():
+    today = date(2026, 5, 3)
+    comma = parse_owner_first_multi_add("Владимир, Т-Банк, Супермаркеты 5%, Аптеки 5%", today)
+    assert comma is not None and comma.owner == "Владимир" and len(comma.pairs) == 2
+    with_ru_month = parse_owner_first_multi_add("Владимир Т-Банк май Супермаркеты 5% Аптеки 5%", today)
+    assert with_ru_month is not None and with_ru_month.month == "2026-05"
+    with_iso_month = parse_owner_first_multi_add("Владимир Т-Банк 2026-05 Дом и ремонт 7% Аптеки 5%", today)
+    assert with_iso_month is not None and with_iso_month.pairs[0][0] == "Дом и ремонт"
+
+
+def test_owner_first_multi_add_up_to_five_and_atomic_invalid():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    ok = add.execute("Владимир Т-Банк Супермаркеты 5% Аптеки 5% АЗС 3%")
+    assert ok is not None and "обработал 3 категории" in ok.text
+    too_many = add.execute("Владимир Т-Банк A 1% B 2% C 3% D 4% E 5% F 6%")
+    assert too_many is not None and too_many.error_code == "too_many_categories"
+    bad = add.execute("Владимир Т-Банк Аптеки 5% Кафе")
+    assert bad is not None and bad.status == "invalid_format"
+    assert len(repo.list_active("2026-05")) == 3
+
+
+def test_owner_first_multi_add_transition_batch_completes_for_selected_month() -> None:
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 4, 26))
+    transition = add.execute("Владимир Т-Банк Супермаркеты 5% Аптеки 5%")
+    assert transition is not None
+    assert transition.status == "transition_month_required"
+    assert transition.candidate_months == ("2026-04", "2026-05")
+    assert transition.pending_add is not None
+    assert repo.list_active("2026-04") == []
+    assert repo.list_active("2026-05") == []
+
+    complete = CompleteTransitionCashbackCategoryUseCase(repo).execute(transition.pending_add, "2026-05")
+    assert complete.status == "added"
+    assert "обработал 2 категории" in complete.text
+    assert "1. Супермаркеты" in complete.text
+    assert "2. Аптеки" in complete.text
+    active = repo.list_active("2026-05")
+    assert len(active) == 2
+
+
+def test_invalid_owner_first_iso_month_rejected_without_writes() -> None:
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    comma = add.execute("Владимир, Т-Банк, 2026-13, Супермаркеты 5%, Аптеки 5%")
+    assert comma is not None
+    assert comma.status == "invalid_month"
+    assert comma.error_code == "invalid_month"
+    space = add.execute("Владимир Т-Банк 2026-99 Супермаркеты 5% Аптеки 5%")
+    assert space is not None
+    assert space.status == "invalid_month"
+    assert space.error_code == "invalid_month"
+    space_multi_token_bank = add.execute("Владимир Т банк 2026-99 Супермаркеты 5% Аптеки 5%")
+    assert space_multi_token_bank is not None
+    assert space_multi_token_bank.status == "invalid_month"
+    assert space_multi_token_bank.error_code == "invalid_month"
+    space_multi_token_bank_zero = add.execute("Владимир Т банк 2026-00 Супермаркеты 5%")
+    assert space_multi_token_bank_zero is not None
+    assert space_multi_token_bank_zero.status == "invalid_month"
+    assert space_multi_token_bank_zero.error_code == "invalid_month"
+    assert repo.list_active("2026-05") == []
 def test_upsert_and_query_sorted():
     repo = _repo()
     add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026,5,3))
