@@ -161,10 +161,14 @@ jobs:
 
           from smart_life_bot.bot import telegram_transport as transport
           from smart_life_bot.bot.telegram_transport import (
+              CALLBACK_CASHBACK_ADD_START,
               CALLBACK_CASHBACK_DELETE_CANCEL_PREFIX,
               CALLBACK_CASHBACK_DELETE_CONFIRM_PREFIX,
               CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX,
+              CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX,
               CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
+              CALLBACK_CASHBACK_SEARCH_HINT,
+              CALLBACK_CONFIRM,
               CALLBACK_DURATION,
               CALLBACK_REMINDERS,
               format_preview_message,
@@ -186,6 +190,16 @@ jobs:
           assert getattr(transport, "CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX") == "cashback:list:owner-current:"
           assert getattr(transport, "CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX") == "cashback:transition:select:"
           assert getattr(transport, "CALLBACK_CASHBACK_TRANSITION_CANCEL") == "cashback:transition:cancel"
+          assert CALLBACK_CONFIRM == "draft:confirm"
+          assert CALLBACK_CASHBACK_ADD_START == "cashback:add:start"
+          assert CALLBACK_CASHBACK_SEARCH_HINT == "cashback:search:hint"
+          assert CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX == "cashback:edit-percent:request:"
+
+          def assert_contains(haystack: str, needle: str) -> None:
+              if needle not in haystack:
+                  raise AssertionError(
+                      f"missing expected preview fragment: {needle!r}; preview={haystack!r}"
+                  )
 
           parser = RuleBasedMessageParser(default_timezone="Europe/Amsterdam")
           parsed = parser.parse("Тест завтра в 15:00 длительность 20 минут", user_id=1)
@@ -204,7 +218,11 @@ jobs:
               },
           )
           preview = format_preview_message(draft)
-          assert "default popup 60 min, popup 30 min" in preview
+          assert_contains(preview, "Проверь черновик события")
+          assert_contains(preview, "Название: Тест")
+          assert_contains(preview, "Дата и время:")
+          assert_contains(preview, "Часовой пояс: Europe/Amsterdam")
+          assert_contains(preview, "Уведомления: по умолчанию (за 60 и 30 минут)")
 
           print("post_deploy_runtime_verification=ok")
           PY
