@@ -153,6 +153,6 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 
 ## 9. Ограничения текущего этапа
 
-Это initial manual CD foundation, а не полный production rollout platform.
+Это baseline deploy foundation (авто `push` в `main` + ручной `workflow_dispatch`), а не полный production rollout platform.
 
 По-прежнему out of scope: полноценные rollback playbooks, production monitoring/alerting stack, backups/restore automation и расширенная release orchestration.

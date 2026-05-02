@@ -161,7 +161,7 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 5. Проверьте, что runtime импортирует актуальные cashback callback markers (`cashback:list:month:`, `cashback:delete:request:`, `cashback:delete:confirm:`, `cashback:delete:cancel:`, `cashback:list:owner:`, `cashback:list:owner-current:`, `cashback:transition:select:`, `cashback:transition:cancel`).
 6. Только после этих проверок переходите к Telegram smoke-сценариям.
 
-### 10.1 Happy path (минимум)
+### 10.1 Базовый сценарий (минимум)
 1. Отправьте `/start`.
 2. Отправьте `Тест завтра в 15:00`.
 3. В preview ожидайте `end_at: —` и кнопки draft-level действий (`⏱ Длительность`, ✅ Создать событие/Edit/Cancel). Если reminder controls скрыты в текущем service-account режиме — это корректно.
@@ -171,17 +171,17 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 7. Проверьте success-ответ и появление события в Google Calendar.
 8. Не используйте текущий service-account smoke как проверку user-visible custom reminders: по продуктовой политике это future OAuth-only capability.
 
-### 10.2 Edit path
+### 10.2 Сценарий редактирования
 1. Создайте preview.
 2. Выполните `/edit title ...` или `/edit start_at ...`.
 3. Проверьте обновлённый preview и кнопку `✅ Создать событие`.
 
-### 10.3 Cancel path
+### 10.3 Сценарий отмены
 1. Создайте preview.
 2. Нажмите **Cancel**.
 3. Убедитесь, что событие не создано.
 
-### 10.4 Validation / non-confirmable draft
+### 10.4 Проверка валидации / non-confirmable draft
 Проверьте кейсы, где кнопка `✅ Создать событие` скрыта:
 - draft без `start_at`;
 - invalid timezone;
@@ -190,7 +190,7 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 ### 10.5 Parser settings checks (`/settings`)
 Проверьте parser modes (python/auto/llm) и безопасный fallback без LLM-конфига.
 
-### 10.6 Focused Telegram UX smoke (calendar + cashback)
+### 10.6 Фокусный smoke-чеклист Telegram UX (calendar + cashback)
 1. Отправьте `/start` и проверьте явный выбор режима: `Выбери режим: 📅 Календарь или 💳 Кэшбек.`
 2. Нажмите `📅 Календарь` и проверьте ответ с текущим режимом: `Текущий режим: 📅 Календарь`.
 3. Отправьте календарный free-text и проверьте новый preview draft-copy.
@@ -303,8 +303,8 @@ Do not stop/remove unrelated containers or processes during diagnostics.
 - [ ] owner reset `Все` / `✅ Все` снимает фильтр владельца
 - [ ] переключение режимов очищает несовместимые pending-состояния
 - [ ] тестовые cashback-записи удалены через UI (без destructive DB cleanup)
-- [ ] Edit path works
-- [ ] Cancel path creates no event
+- [ ] Сценарий редактирования работает
+- [ ] Сценарий отмены не создаёт событие
 - [ ] non-confirmable draft hides `✅ Создать событие`
 - [ ] в service-account режиме reminder controls не обязательны и не проверяются как рабочая user-visible фича
 - [ ] polling stopped
