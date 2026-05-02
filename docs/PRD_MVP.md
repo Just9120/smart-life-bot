@@ -54,7 +54,7 @@ Inline preview buttons остаются только для действий с 
 - `🔐 Личный Google Calendar` — будущий OAuth 2.0 user-authenticated путь.
 - Для будущего OAuth reminder UX используется multi-select popup presets (один или несколько одновременно, например `10 минут + 1 час`) через checkbox-style pattern с действием `Применить`; email reminders не используются.
 
-### 3.3 Missing-date recovery (MVP near-term)
+### 3.3 Missing-date recovery (текущее MVP-поведение)
 
 Если draft сформирован без даты/времени (`start_at: —`), в preview показывается явный recovery path:
 
@@ -67,7 +67,7 @@ Inline preview buttons остаются только для действий с 
 Ограничения этого MVP-шага:
 - inline picker выбирает только дату;
 - full inline time-picker не входит в first pass;
-- picker не создаёт событие в календаре и не заменяет `Confirm`;
+- picker не создаёт событие в календаре и не заменяет `✅ Создать событие`;
 - Telegram Web App / Mini App календарный UI — deep backlog, не near-term MVP.
 
 ## 4. Scope MVP

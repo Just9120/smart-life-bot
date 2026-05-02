@@ -41,7 +41,7 @@
 **Goal**
 - Сделать cashback-поток удобным для ежедневного использования.
 
-**Scope candidates**
+**Кандидаты в объём работ**
 - Полировка structured add/query ответов.
 - Улучшение сообщений об ошибках: invalid owner / invalid month / transition period.
 - Добавление или доработка `📋 Активные категории` (если текущее поведение недостаточно).
@@ -59,7 +59,7 @@
 **Goal**
 - Расширить управление и поддержку жизненного цикла cashback-записей.
 
-**Scope candidates**
+**Кандидаты в объём работ**
 - Списки категорий по выбранному месяцу. _(first slice delivered: Telegram inline month navigation for `📋 Активные категории`)_
 - Soft-delete/deactivation slice delivered: удаление активной cashback-записи через Telegram только с явным confirm/cancel, без физического удаления строки.
 - Owner-filtered slice delivered: `📋 Активные категории` поддерживает inline owner filter + reset `Все` c сохранением выбранного месяца.
@@ -82,7 +82,7 @@
 - Запрос времени текстом `HH:MM`.
 - Обновление draft `start_at`.
 - Повторный confirmable preview.
-- `Confirm` остаётся единственным calendar write-path.
+- `✅ Создать событие` (внутренний callback `draft:confirm`) остаётся единственным calendar write-path.
 - Stale callbacks завершаются fail-safe.
 
 **Out of scope**
@@ -113,7 +113,7 @@
 **Goal**
 - Улучшить matching категорий при сохранении предсказуемого поведения.
 
-**Scope candidates**
+**Кандидаты в объём работ**
 - Алиасы/синонимы (`продукты → супермаркеты`, `лекарства → аптеки`, `бензин → АЗС`).
 - Fuzzy matching в детерминированных границах.
 - LLM fallback только если deterministic matching реально недостаточен.
@@ -126,7 +126,7 @@
 **Goal**
 - Начать реализацию `🔐 Личный Google Calendar`.
 
-**Scope candidates**
+**Кандидаты в объём работ**
 - OAuth flow design.
 - Token storage policy.
 - Connect/disconnect account UX.
@@ -141,7 +141,7 @@
 **Goal**
 - Сначала discovery/design, затем потенциальная реализация.
 
-**Scope candidates**
+**Кандидаты в объём работ**
 - FastAPI adapter концепт.
 - API contracts/DTO.
 - PWA/Mini App UX prototype.
