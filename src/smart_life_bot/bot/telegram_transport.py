@@ -328,12 +328,20 @@ class TelegramTransportRouter:
                 self.state_repo.set(updated.__class__(user_id=updated.user_id, state=updated.state, draft=updated.draft, editing_field=None))
             return TelegramTransportResponse(text=self._get_pending_draft_text(user.id), buttons=self._build_draft_buttons_from_state(user.id))
 
-        if self.query_cashback_category is not None and self._is_cashback_query_in_context(user.id, normalized):
-            cashback = self.query_cashback_category.execute(normalized)
-            if cashback.status in {"query_found", "query_not_found"}:
-                return TelegramTransportResponse(text=cashback.text)
-
         active_mode = self.active_feature_context.get(user.id)
+        if active_mode == "cashback":
+            if self.query_cashback_category is not None:
+                cashback = self.query_cashback_category.execute(normalized)
+                if cashback.status in {"query_found", "query_not_found"}:
+                    self.active_feature_context[user.id] = "cashback"
+                    return TelegramTransportResponse(text=cashback.text)
+            return TelegramTransportResponse(
+                text=(
+                    "В режиме 💳 Кэшбек я ищу категории или добавляю их через «➕ Добавить категорию».\n"
+                    "Для календаря выбери 📅 Календарь."
+                )
+            )
+
         if active_mode is None and self._requires_mode_selection_when_unset(normalized):
             return TelegramTransportResponse(
                 text="Выбери режим: 📅 Календарь или 💳 Кэшбек.",

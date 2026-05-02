@@ -138,6 +138,22 @@ def test_regression_cashback_query_not_found_does_not_fallthrough_to_calendar() 
     user = deps.users_repo.get_by_telegram_id(92010)
     assert user is not None
     assert deps.state_repo.get(user.id) is None
+    assert router.active_feature_context.get(user.id) == "cashback"
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_cashback_mode_plain_text_stays_in_cashback_routing() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=92014, text="💳 Кэшбек")
+
+    response = router.handle_text_message(telegram_user_id=92014, text="Купить хлеб")
+
+    assert "Проверь черновик события" not in response.text
+    assert "ничего не найдено" in response.text
+    user = deps.users_repo.get_by_telegram_id(92014)
+    assert user is not None
+    assert deps.state_repo.get(user.id) is None
+    assert router.active_feature_context.get(user.id) == "cashback"
     assert len(deps.calendar_service.requests) == 0
 
 
