@@ -110,6 +110,14 @@ def test_invalid_owner_first_iso_month_rejected_without_writes() -> None:
     assert space is not None
     assert space.status == "invalid_month"
     assert space.error_code == "invalid_month"
+    space_multi_token_bank = add.execute("Владимир Т банк 2026-99 Супермаркеты 5% Аптеки 5%")
+    assert space_multi_token_bank is not None
+    assert space_multi_token_bank.status == "invalid_month"
+    assert space_multi_token_bank.error_code == "invalid_month"
+    space_multi_token_bank_zero = add.execute("Владимир Т банк 2026-00 Супермаркеты 5%")
+    assert space_multi_token_bank_zero is not None
+    assert space_multi_token_bank_zero.status == "invalid_month"
+    assert space_multi_token_bank_zero.error_code == "invalid_month"
     assert repo.list_active("2026-05") == []
 def test_upsert_and_query_sorted():
     repo = _repo()

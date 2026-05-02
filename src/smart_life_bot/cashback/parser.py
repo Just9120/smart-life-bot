@@ -258,7 +258,11 @@ def has_invalid_owner_first_explicit_month_token(text: str, today: date) -> bool
     tokens = [t.strip() for t in re.split(r"\s+", text.strip()) if t.strip()]
     if len(tokens) < 4 or tokens[0] not in ALLOWED_OWNERS:
         return False
-    month_token = tokens[2]
+    _bank, consumed = _extract_bank_from_space_tokens(tokens[1:])
+    month_idx = 1 + consumed
+    if month_idx >= len(tokens):
+        return False
+    month_token = tokens[month_idx]
     if re.fullmatch(r"\d{4}-\d{2}", normalize_category_key(month_token)):
         return parse_month_token(month_token, today) is None
     return False
