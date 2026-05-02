@@ -1,6 +1,9 @@
 from datetime import date
+from zipfile import ZipFile
+from io import BytesIO
 
 from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase, format_month_label
+from smart_life_bot.application.cashback_export import ExportCashbackCategoriesUseCase
 from smart_life_bot.cashback.parser import normalize_bank_name, parse_owner_first_multi_add, parse_structured_add
 from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
 from smart_life_bot.storage.sqlite import create_sqlite_connection, init_sqlite_schema
@@ -216,6 +219,31 @@ def test_changed_percent_with_normalized_bank_updates_existing_row():
     assert len(active) == 1
     assert active[0].bank_name == "Т-Банк"
     assert active[0].percent == 7
+
+
+def test_cashback_export_xlsx_is_structurally_valid_and_contains_expected_values() -> None:
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    add.execute("Тест & Банк, Владимир, 2026-05, Кафе <обед>, 7.5%")
+    result = ExportCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute("2026-05")
+    assert result.status == "ok"
+    assert result.content is not None
+
+    with ZipFile(BytesIO(result.content)) as archive:
+        names = set(archive.namelist())
+        assert "[Content_Types].xml" in names
+        assert "_rels/.rels" in names
+        assert "xl/workbook.xml" in names
+        assert "xl/_rels/workbook.xml.rels" in names
+        assert "xl/worksheets/sheet1.xml" in names
+        worksheet_xml = archive.read("xl/worksheets/sheet1.xml").decode("utf-8")
+
+    assert "Владимир" in worksheet_xml
+    assert "Тест &amp; Банк" in worksheet_xml
+    assert "Кафе &lt;обед&gt;" in worksheet_xml
+    assert "7.5%" in worksheet_xml
+    assert "2026-05" in worksheet_xml
+    assert "active" in worksheet_xml
 
 def test_explicit_month_parsing_variants():
     repo = _repo()

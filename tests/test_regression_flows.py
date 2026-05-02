@@ -299,4 +299,5 @@ def test_regression_cashback_export_is_read_only_and_no_calendar_calls() -> None
     after = router.list_active_cashback_categories.execute(month="2026-05")
     assert response.document_bytes is not None
     assert len(before.records) == len(after.records) == 1
+    assert before.records == after.records
     assert len(deps.calendar_service.requests) == 0
