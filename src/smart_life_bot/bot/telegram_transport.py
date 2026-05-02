@@ -705,8 +705,8 @@ class TelegramTransportRouter:
         for index, row in enumerate(result.records, start=1):
             rows.append(
                 (
-                    (f"✏️ Изменить % {index}.", f"{CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX}{row.id}"),
-                    (f"🗑 Удалить {index}.", f"{CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX}{row.id}"),
+                    (f"✏️ Изменить % №{index}", f"{CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX}{row.id}"),
+                    (f"🗑 Удалить №{index}", f"{CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX}{row.id}"),
                 )
             )
         return tuple(rows)
