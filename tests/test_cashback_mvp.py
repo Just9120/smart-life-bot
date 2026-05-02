@@ -77,6 +77,40 @@ def test_owner_first_multi_add_up_to_five_and_atomic_invalid():
     bad = add.execute("Владимир Т-Банк Аптеки 5% Кафе")
     assert bad is not None and bad.status == "invalid_format"
     assert len(repo.list_active("2026-05")) == 3
+
+
+def test_owner_first_multi_add_transition_batch_completes_for_selected_month() -> None:
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 4, 26))
+    transition = add.execute("Владимир Т-Банк Супермаркеты 5% Аптеки 5%")
+    assert transition is not None
+    assert transition.status == "transition_month_required"
+    assert transition.candidate_months == ("2026-04", "2026-05")
+    assert transition.pending_add is not None
+    assert repo.list_active("2026-04") == []
+    assert repo.list_active("2026-05") == []
+
+    complete = CompleteTransitionCashbackCategoryUseCase(repo).execute(transition.pending_add, "2026-05")
+    assert complete.status == "added"
+    assert "обработал 2 категории" in complete.text
+    assert "1. Супермаркеты" in complete.text
+    assert "2. Аптеки" in complete.text
+    active = repo.list_active("2026-05")
+    assert len(active) == 2
+
+
+def test_invalid_owner_first_iso_month_rejected_without_writes() -> None:
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    comma = add.execute("Владимир, Т-Банк, 2026-13, Супермаркеты 5%, Аптеки 5%")
+    assert comma is not None
+    assert comma.status == "invalid_month"
+    assert comma.error_code == "invalid_month"
+    space = add.execute("Владимир Т-Банк 2026-99 Супермаркеты 5% Аптеки 5%")
+    assert space is not None
+    assert space.status == "invalid_month"
+    assert space.error_code == "invalid_month"
+    assert repo.list_active("2026-05") == []
 def test_upsert_and_query_sorted():
     repo = _repo()
     add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026,5,3))

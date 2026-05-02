@@ -127,6 +127,23 @@ def test_regression_cashback_space_separated_add_never_calls_calendar() -> None:
     assert len(deps.calendar_service.requests) == 0
 
 
+def test_regression_owner_first_multi_add_in_cashback_mode_has_no_calendar_side_effects() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=92015, text="💳 Кэшбек")
+
+    response = router.handle_text_message(
+        telegram_user_id=92015,
+        text="Владимир Т-Банк Супермаркеты 5% Аптеки 5%",
+    )
+    assert "обработал 2 категории" in response.text
+    assert "Проверь черновик события" not in response.text
+    user = deps.users_repo.get_by_telegram_id(92015)
+    assert user is not None
+    assert deps.state_repo.get(user.id) is None
+    assert router.active_feature_context.get(user.id) == "cashback"
+    assert len(deps.calendar_service.requests) == 0
+
+
 def test_regression_cashback_query_not_found_does_not_fallthrough_to_calendar() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=92010, text="💳 Кэшбек")

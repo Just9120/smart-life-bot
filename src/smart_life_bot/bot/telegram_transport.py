@@ -206,7 +206,7 @@ class TelegramTransportRouter:
         if normalized == LABEL_CASHBACK_ADD:
             self.pending_cashback_add[user.id] = True
             self.active_feature_context[user.id] = "cashback"
-            return TelegramTransportResponse(text="Отправь категорию строкой в формате:\nАльфа, Владимир, май, Супермаркеты, 5%")
+            return TelegramTransportResponse(text="Одна категория: Альфа, Владимир, май, Аптеки, 5%\nНесколько категорий: Владимир, Т-Банк, май, Супермаркеты 5%, Аптеки 5%\nБыстро без запятых: Владимир Т-Банк Супермаркеты 5% Аптеки 5%")
         if normalized == LABEL_CASHBACK_SEARCH:
             self.active_feature_context[user.id] = "cashback"
             return TelegramTransportResponse(text="Напиши категорию, например: Аптеки.")
@@ -557,7 +557,7 @@ class TelegramTransportRouter:
         if callback_data == CALLBACK_CASHBACK_ADD_START:
             self.pending_cashback_add[user.id] = True
             self.active_feature_context[user.id] = "cashback"
-            return TelegramTransportResponse(text="Отправь категорию строкой в формате:\nАльфа, Владимир, май, Супермаркеты, 5%")
+            return TelegramTransportResponse(text="Одна категория: Альфа, Владимир, май, Аптеки, 5%\nНесколько категорий: Владимир, Т-Банк, май, Супермаркеты 5%, Аптеки 5%\nБыстро без запятых: Владимир Т-Банк Супермаркеты 5% Аптеки 5%")
         if callback_data == CALLBACK_CASHBACK_SEARCH_HINT:
             self.active_feature_context[user.id] = "cashback"
             return TelegramTransportResponse(text="Напиши категорию, например: Аптеки.")

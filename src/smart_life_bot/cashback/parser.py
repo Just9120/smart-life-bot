@@ -245,6 +245,25 @@ def has_invalid_explicit_month_token(text: str, today: date) -> bool:
     return False
 
 
+def has_invalid_owner_first_explicit_month_token(text: str, today: date) -> bool:
+    if "," in text:
+        parts = [p.strip() for p in text.split(",") if p.strip()]
+        if len(parts) < 3 or parts[0] not in ALLOWED_OWNERS:
+            return False
+        month_token = parts[2]
+        if re.fullmatch(r"\d{4}-\d{2}", normalize_category_key(month_token)):
+            return parse_month_token(month_token, today) is None
+        return False
+
+    tokens = [t.strip() for t in re.split(r"\s+", text.strip()) if t.strip()]
+    if len(tokens) < 4 or tokens[0] not in ALLOWED_OWNERS:
+        return False
+    month_token = tokens[2]
+    if re.fullmatch(r"\d{4}-\d{2}", normalize_category_key(month_token)):
+        return parse_month_token(month_token, today) is None
+    return False
+
+
 def _parse_year_month_token(value: str) -> tuple[int, int] | None:
     try:
         year_raw, month_raw = value.split("-", maxsplit=1)

@@ -23,6 +23,7 @@ from smart_life_bot.bot import (
     CALLBACK_REMINDERS_10,
     CALLBACK_REMINDERS_30,
     CALLBACK_CASHBACK_LIST_CURRENT,
+    CALLBACK_CASHBACK_ADD_START,
     CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
     CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
     CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX,
@@ -370,7 +371,8 @@ def test_cashback_explicit_add_flow_valid_invalid_and_cancel() -> None:
     router, deps = _build_router()
     router.handle_text_message(telegram_user_id=90640, text="💳 Кэшбек")
     prompt = router.handle_text_message(telegram_user_id=90640, text="➕ Добавить категорию")
-    assert "Отправь категорию строкой" in prompt.text
+    assert "Одна категория:" in prompt.text
+    assert "Несколько категорий:" in prompt.text
     user = deps.users_repo.get_by_telegram_id(90640)
     assert user is not None and router.pending_cashback_add.get(user.id) is True
     invalid = router.handle_text_message(telegram_user_id=90640, text="Аптеки")
@@ -1223,6 +1225,34 @@ def test_cashback_transition_period_shows_month_buttons_and_completes() -> None:
     completed = router.handle_callback(telegram_user_id=90610, callback_data=f"{CALLBACK_CASHBACK_TRANSITION_SELECT_PREFIX}{token}:2026-06")
     assert "июнь 2026" in completed.text
     assert len(deps.calendar_service.requests) == 0
+
+
+def test_pending_add_flow_accepts_owner_first_multi_add_and_clears_pending_state() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90615, text="💳 Кэшбек")
+    prompt = router.handle_callback(telegram_user_id=90615, callback_data=CALLBACK_CASHBACK_ADD_START)
+    assert "Одна категория:" in prompt.text
+    user = deps.users_repo.get_by_telegram_id(90615)
+    assert user is not None and router.pending_cashback_add.get(user.id) is True
+
+    added = router.handle_text_message(telegram_user_id=90615, text="Владимир Т-Банк Супермаркеты 5% Аптеки 5%")
+    assert "обработал 2 категории" in added.text
+    assert user.id not in router.pending_cashback_add
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_pending_add_invalid_owner_first_multi_add_keeps_pending_state() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90616, text="💳 Кэшбек")
+    router.handle_callback(telegram_user_id=90616, callback_data=CALLBACK_CASHBACK_ADD_START)
+    user = deps.users_repo.get_by_telegram_id(90616)
+    assert user is not None and router.pending_cashback_add.get(user.id) is True
+
+    invalid = router.handle_text_message(telegram_user_id=90616, text="Владимир Т-Банк Аптеки 5% Кафе")
+    assert "Не получилось распознать категории" in invalid.text
+    assert user.id in router.pending_cashback_add
+    listed = router.handle_text_message(telegram_user_id=90616, text="📋 Активные категории")
+    assert "активных кэшбек-категорий пока нет" in listed.text.lower()
 
 
 def test_cashback_transition_callback_malformed_or_stale_fails_safe() -> None:
