@@ -71,9 +71,14 @@ Inline preview buttons остаются только для действий с 
 - Telegram Web App / Mini App календарный UI — deep backlog, не near-term MVP.
 
 
-### 3.4 Planned OAuth personal calendar UX (`🔐 Личный Google Calendar`)
+### 3.4 OAuth personal calendar UX (`🔐 Личный Google Calendar`)
 
-Статус: **planned/pending** (не реализовано в текущем runtime).
+Статус на текущем runtime: **foundation stubs implemented** (Sprint 6.1), full OAuth flow pending.
+
+Что уже доступно пользователю в Telegram:
+- пользователь в разделе `📅 Календарь` может выбрать `🔐 Личный Google Calendar`;
+- бот показывает текущий connection status и действия `Подключить` / `Отключить` / `Статус`;
+- действия работают как подготовительные state/UX stubs и не запускают calendar write.
 
 Целевое UX-поведение после реализации Sprint 6:
 - пользователь в разделе `📅 Календарь` выбирает `🔐 Личный Google Calendar`;

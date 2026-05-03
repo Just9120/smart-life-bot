@@ -222,6 +222,26 @@ def test_callback_pattern_accepts_owner_all_and_rejects_invalid_owner_token() ->
         container.connection.close()
 
 
+def test_callback_pattern_allows_only_exact_oauth_stub_callbacks() -> None:
+    container = build_runtime(_settings())
+    try:
+        application = build_telegram_application(_settings(), container.runtime)
+        pattern = [
+            handler for handlers in application.handlers.values() for handler in handlers if isinstance(handler, CallbackQueryHandler)
+        ][0].pattern.pattern
+        assert re.fullmatch(pattern, "oauth:connect")
+        assert re.fullmatch(pattern, "oauth:disconnect")
+        assert re.fullmatch(pattern, "oauth:status")
+        assert re.fullmatch(pattern, "oauth:callback") is None
+        assert re.fullmatch(pattern, "oauth:connect:anything") is None
+        assert re.fullmatch(pattern, "oauth:token") is None
+        assert re.fullmatch(pattern, "oauth:status:extra") is None
+        assert re.fullmatch(pattern, "oauth:") is None
+        assert re.fullmatch(pattern, "oauth") is None
+    finally:
+        container.connection.close()
+
+
 def test_start_handler_delegates_to_runtime_on_start() -> None:
     runtime = Mock()
     runtime.on_start.return_value = TelegramTransportResponse(text="Welcome")
