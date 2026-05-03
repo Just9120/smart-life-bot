@@ -17,6 +17,9 @@ from smart_life_bot.bot import (
     CALLBACK_CASHBACK_ADD_START,
     CALLBACK_CASHBACK_SEARCH_HINT,
     CALLBACK_CASHBACK_EXPORT_CURRENT,
+    CALLBACK_CASHBACK_EXPORT_PICKER_PREFIX,
+    CALLBACK_CASHBACK_EXPORT_SELECT_PREFIX,
+    CALLBACK_CASHBACK_EXPORT_CANCEL,
     CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX,
     CALLBACK_CASHBACK_LIST_CURRENT,
     CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
@@ -113,7 +116,7 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
         assert len(callback_handlers) == 1
         assert (
             callback_handlers[0].pattern.pattern
-            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal|calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|cashback:list:current|cashback:add:start|cashback:search:hint|cashback:export:current|cashback:list:month:\d{4}-\d{2}|cashback:list:owner:(?:\d+|all):month:\d{4}-\d{2}|cashback:list:owner-current:(?:\d+|all)|cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:edit-percent:request:\d+|cashback:transition:select:(?:[a-f0-9]{6}:)?\d{4}-\d{2}|cashback:transition:cancel)$"
+            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal|calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|cashback:list:current|cashback:add:start|cashback:search:hint|cashback:export:current|cashback:export:picker:\d{4}-\d{2}|cashback:export:select:\d{4}-\d{2}|cashback:export:cancel|cashback:list:month:\d{4}-\d{2}|cashback:list:owner:(?:\d+|all):month:\d{4}-\d{2}|cashback:list:owner-current:(?:\d+|all)|cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:edit-percent:request:\d+|cashback:transition:select:(?:[a-f0-9]{6}:)?\d{4}-\d{2}|cashback:transition:cancel)$"
         )
         assert tuple(application.bot_data["allowed_callback_data"]) == (
             CALLBACK_CONFIRM,
@@ -134,6 +137,9 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
             CALLBACK_CASHBACK_ADD_START,
             CALLBACK_CASHBACK_SEARCH_HINT,
             CALLBACK_CASHBACK_EXPORT_CURRENT,
+    CALLBACK_CASHBACK_EXPORT_PICKER_PREFIX,
+    CALLBACK_CASHBACK_EXPORT_SELECT_PREFIX,
+    CALLBACK_CASHBACK_EXPORT_CANCEL,
             CALLBACK_CASHBACK_TRANSITION_CANCEL,
             CALLBACK_CALENDAR_DATE_START,
             CALLBACK_CALENDAR_DATE_CANCEL,

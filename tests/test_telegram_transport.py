@@ -26,6 +26,9 @@ from smart_life_bot.bot import (
     CALLBACK_CASHBACK_LIST_CURRENT,
     CALLBACK_CASHBACK_ADD_START,
     CALLBACK_CASHBACK_EXPORT_CURRENT,
+    CALLBACK_CASHBACK_EXPORT_PICKER_PREFIX,
+    CALLBACK_CASHBACK_EXPORT_SELECT_PREFIX,
+    CALLBACK_CASHBACK_EXPORT_CANCEL,
     CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
     CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
     CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX,
@@ -1416,14 +1419,19 @@ def test_cashback_export_callback_returns_xlsx_document() -> None:
 
     response = router.handle_callback(telegram_user_id=93001, callback_data=CALLBACK_CASHBACK_EXPORT_CURRENT)
 
-    assert response.document_name is not None and response.document_name.endswith(".xlsx")
-    assert response.document_bytes is not None and len(response.document_bytes) > 0
+    assert "Выбери месяц для экспорта XLSX" in response.text
+    assert response.button_rows
+    select_cb = response.button_rows[1][0][1]
+    export = router.handle_callback(telegram_user_id=93001, callback_data=select_cb)
+    assert export.document_name is not None and export.document_name.endswith(".xlsx")
+    assert export.document_bytes is not None and len(export.document_bytes) > 0
 
 
 def test_cashback_export_callback_no_data_returns_friendly_message() -> None:
     router, _ = _build_router()
 
     response = router.handle_callback(telegram_user_id=93002, callback_data=CALLBACK_CASHBACK_EXPORT_CURRENT)
-
-    assert "активных кэшбек-категорий пока нет" in response.text
-    assert response.document_bytes is None
+    select_cb = response.button_rows[1][0][1]
+    exported = router.handle_callback(telegram_user_id=93002, callback_data=select_cb)
+    assert "активных кэшбек-категорий пока нет" in exported.text
+    assert exported.document_bytes is None
