@@ -479,12 +479,31 @@ def test_cashback_query_aliases_are_deterministic_for_known_categories():
     add.execute('Т-Банк, Владимир, Аптеки, 7%')
     add.execute('Альфа, Елена, АЗС, 3%')
 
-    assert query.execute('продукты').status == 'query_found'
-    assert query.execute('еда').status == 'query_found'
-    assert query.execute('лекарства').status == 'query_found'
-    assert query.execute('медицина').status == 'query_found'
-    assert query.execute('бензин').status == 'query_found'
-    assert query.execute('топливо').status == 'query_found'
+    products = query.execute('продукты')
+    food = query.execute('еда')
+    medicines = query.execute('лекарства')
+    medicine = query.execute('медицина')
+    petrol = query.execute('бензин')
+    fuel = query.execute('топливо')
+
+    assert products.status == 'query_found'
+    assert '🏆 Кэшбек' in products.text
+    assert 'Супермаркеты' in products.text
+    assert food.status == 'query_found'
+    assert '🏆 Кэшбек' in food.text
+    assert 'Супермаркеты' in food.text
+    assert medicines.status == 'query_found'
+    assert '🏆 Кэшбек' in medicines.text
+    assert 'Аптеки' in medicines.text
+    assert medicine.status == 'query_found'
+    assert '🏆 Кэшбек' in medicine.text
+    assert 'Аптеки' in medicine.text
+    assert petrol.status == 'query_found'
+    assert '🏆 Кэшбек' in petrol.text
+    assert 'АЗС' in petrol.text
+    assert fuel.status == 'query_found'
+    assert '🏆 Кэшбек' in fuel.text
+    assert 'АЗС' in fuel.text
 
 
 def test_cashback_query_aliases_keep_direct_queries_and_unrelated_not_found():
