@@ -61,7 +61,7 @@ def _normalize_bank_alias_key(value: str) -> str:
     if base == "банк":
         return ""
     tokens = [t for t in base.split() if t]
-    if len(tokens) > 1 and tokens[-1] == "банк":
+    if len(tokens) > 1 and tokens[-1] in {"банк", "bank"}:
         tokens = tokens[:-1]
     return " ".join(tokens)
 
@@ -250,7 +250,10 @@ def _extract_bank_from_space_tokens(tokens: list[str]) -> tuple[str | None, int]
         candidate = normalize_bank_name(raw)
         if candidate in known or candidate != raw.strip():
             return candidate, take
-    return normalize_bank_name(tokens[0]), 1
+    fallback = normalize_bank_name(tokens[0])
+    if not fallback or _normalize_bank_alias_key(fallback) == "":
+        return None, 0
+    return fallback, 1
 
 
 def _parse_pairs_tokens(tokens: list[str]) -> tuple[tuple[str, float], ...]:
