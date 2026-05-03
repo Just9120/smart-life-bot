@@ -61,7 +61,7 @@ def _normalize_bank_alias_key(value: str) -> str:
     if base == "банк":
         return ""
     tokens = [t for t in base.split() if t]
-    if len(tokens) > 1 and tokens[-1] == "банк":
+    if len(tokens) > 1 and tokens[-1] in {"банк", "bank"}:
         tokens = tokens[:-1]
     return " ".join(tokens)
 
@@ -73,6 +73,7 @@ def normalize_bank_name(value: str) -> str:
     aliases = {
         "альфа": "Альфа-Банк",
         "т": "Т-Банк",
+        "т банк": "Т-Банк",
         "тинькофф": "Т-Банк",
         "сбер": "Сбербанк",
         "сбербанк": "Сбербанк",
@@ -249,7 +250,10 @@ def _extract_bank_from_space_tokens(tokens: list[str]) -> tuple[str | None, int]
         candidate = normalize_bank_name(raw)
         if candidate in known or candidate != raw.strip():
             return candidate, take
-    return normalize_bank_name(tokens[0]), 1
+    fallback = normalize_bank_name(tokens[0])
+    if not fallback or _normalize_bank_alias_key(fallback) == "":
+        return None, 0
+    return fallback, 1
 
 
 def _parse_pairs_tokens(tokens: list[str]) -> tuple[tuple[str, float], ...]:
@@ -307,9 +311,9 @@ def looks_like_cashback_add_attempt(text: str) -> bool:
     tokens = [t for t in re.split(r"[\s,]+", text.strip()) if t]
     if len(tokens) < 4:
         return False
-    if not re.match(r"^\d+(?:[\.,]\d+)?%$", tokens[-1]):
+    if not any(re.match(r"^\d+(?:[\.,]\d+)?%$", token) for token in tokens):
         return False
-    return any(token in ALLOWED_OWNERS for token in tokens[:-1])
+    return True
 
 
 def has_invalid_explicit_month_token(text: str, today: date) -> bool:

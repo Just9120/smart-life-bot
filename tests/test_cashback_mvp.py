@@ -35,6 +35,14 @@ def test_bank_name_normalization_t_bank_variants_and_unknown_cleanup():
     assert normalize_bank_name("Альфа") == "Альфа-Банк"
     assert normalize_bank_name("Альфа банк") == "Альфа-Банк"
     assert normalize_bank_name("Альфа-банк") == "Альфа-Банк"
+    assert normalize_bank_name("ozon bank") == "Озон Банк"
+    assert normalize_bank_name("Ozon Bank") == "Озон Банк"
+    assert normalize_bank_name("yandex bank") == "Яндекс Банк"
+    assert normalize_bank_name("Yandex Bank") == "Яндекс Банк"
+    assert normalize_bank_name("озон банк") == "Озон Банк"
+    assert normalize_bank_name("яндекс банк") == "Яндекс Банк"
+    assert normalize_bank_name("мтс банк") == "МТС Банк"
+    assert normalize_bank_name("райф") == "Райффайзенбанк"
 
 
 
@@ -108,6 +116,32 @@ def test_owner_first_multi_add_up_to_five_and_atomic_invalid():
     bad = add.execute("Владимир Т-Банк Аптеки 5% Кафе")
     assert bad is not None and bad.status == "invalid_format"
     assert len(repo.list_active("2026-05")) == 3
+
+
+def test_owner_first_multi_add_live_smoke_t_bank_lowercase_and_variants() -> None:
+    for text in (
+        "Владимир т банк одежда и обувь 5% цветы 5%",
+        "Владимир Т-Банк Одежда и обувь 5% Цветы 5%",
+        "Владимир Т банк Одежда и обувь 5% Цветы 5%",
+    ):
+        repo = _repo()
+        add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+        result = add.execute(text)
+        assert result is not None and result.status == "added"
+        active = repo.list_active("2026-05")
+        assert len(active) == 2
+        assert all(row.owner_name == "Владимир" for row in active)
+        assert all(row.bank_name == "Т-Банк" for row in active)
+        assert {row.category_raw for row in active} == {"Одежда и обувь", "Цветы"}
+        assert {row.percent for row in active} == {5.0}
+
+
+def test_owner_first_multi_add_lone_bank_word_is_rejected() -> None:
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    result = add.execute("Владимир банк одежда и обувь 5% цветы 5%")
+    assert result is not None and result.status == "invalid_format"
+    assert repo.list_active("2026-05") == []
 
 
 def test_owner_first_multi_add_transition_batch_completes_for_selected_month() -> None:
