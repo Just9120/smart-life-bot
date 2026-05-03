@@ -115,4 +115,5 @@ pytest -q
 - Voice input (STT flow).
 - Отдельный app-контур (PWA/Mini App/API/offline-first) как реализованный runtime.
 - Broad fuzzy matching и LLM fallback для cashback search.
+- Vision LLM parser для кэшбек-скриншотов (future backlog, не реализован).
 - Автоматизация schema migrations и backup/restore orchestration.
