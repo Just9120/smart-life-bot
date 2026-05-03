@@ -349,3 +349,21 @@ def test_regression_cashback_variant_query_in_cashback_mode_has_no_calendar_side
     assert router.active_feature_context.get(user.id) == "cashback"
     assert len(deps.calendar_service.requests) == 0
 
+
+
+def test_regression_cashback_exact_azs_separator_query_in_active_mode_has_no_calendar_side_effects() -> None:
+    router, deps = _build_router()
+
+    router.handle_text_message(telegram_user_id=92019, text="Альфа, Елена, 2026-05, АЗС, 3%")
+    router.handle_text_message(telegram_user_id=92019, text="💳 Кэшбек")
+    response = router.handle_text_message(telegram_user_id=92019, text="а-з-с")
+
+    assert "🏆 Кэшбек" in response.text
+    assert "АЗС" in response.text
+    assert "Проверь черновик события" not in response.text
+
+    user = deps.users_repo.get_by_telegram_id(92019)
+    assert user is not None
+    assert deps.state_repo.get(user.id) is None
+    assert router.active_feature_context.get(user.id) == "cashback"
+    assert len(deps.calendar_service.requests) == 0

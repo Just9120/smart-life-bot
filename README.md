@@ -148,17 +148,21 @@ Telegram voice input добавлен только в backlog и не входи
 Реализован foundation-адаптер записи событий Google Calendar для `service_account_shared_calendar_mode` (через service account + shared calendar). `oauth_user_mode` остаётся pending и в runtime пока использует fake/dev calendar adapter. После успешного confirm бот также показывает ссылку на созданное событие, если календарный провайдер вернул `html_link`. Это позволяет подготовить будущий VPS smoke-сценарий `Telegram message → preview → confirm → Google Calendar create event` без добавления OAuth callback/user-consent flow в текущем PR.
 
 
-## Cashback search aliases (Sprint 5 slice 1)
+## Cashback search aliases and deterministic variants (Sprint 5 slices 1–2)
 
-Реализован первый узкий детерминированный шаг Sprint 5 для поиска категорий в режиме `💳 Кэшбек`:
-- `продукты`/`еда` → `Супермаркеты`
-- `лекарства`/`медицина` → `Аптеки`
-- `бензин`/`топливо` → `АЗС`
+Для поиска категорий в режиме `💳 Кэшбек` реализован узкий детерминированный слой (только query/search path):
 
-Границы этого шага:
-- алиасы применяются только в query/search path;
-- broad fuzzy matching не добавлялся;
-- LLM fallback не добавлялся.
+- Slice 1 aliases:
+  - `продукты`/`еда` → `Супермаркеты`
+  - `лекарства`/`медицина` → `Аптеки`
+  - `бензин`/`топливо` → `АЗС`
+- Slice 2 variants:
+  - `супермаркет`/`магазины продуктов` → `Супермаркеты`
+  - `аптека` → `Аптеки`
+  - `заправка`/`заправки`/`а-з-с` → `АЗС`
+  - separator normalization в search key (hyphen/dash/slash/backslash variants) применяется только для поиска.
+
+Guardrails: add/upsert/storage semantics не меняются, сохранённые названия категорий не переписываются, broad fuzzy matching не добавлялся, LLM fallback не добавлялся. Детали product behavior и границ остаются в `docs/PRD_MVP.md`.
 
 ## Cashback XLSX export (Sprint 4 slice)
 
