@@ -274,3 +274,13 @@
   - выявленных регрессий в CI;
   - изменения продуктовых приоритетов.
 - Корректировки должны фиксироваться в документации (roadmap/testing/runbook) вместе с PR.
+
+
+## Tooling — Context Bundle Builder
+
+**Status:** Implemented (local/devtool-only).
+
+- Repo-local Context Bundle Builder: `scripts/build_prompt_bundle.py` + `context_bundles.toml` + `docs/CONTEXT_BUNDLES.md`.
+- Presets: `full_project`, `docs_only`, `docs_vs_code`, `docs_consistency`, `calendar`, `cashback`, `oauth`, `deployment`.
+- Generates `context_bundles/*.md` locally; outputs are gitignored.
+- Не интегрирован в runtime, GitHub Actions artifact flow или централизованный CLI package.

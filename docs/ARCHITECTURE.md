@@ -122,6 +122,7 @@ Confirm-gate обязателен: запись в календарь допус
 
 Google Calendar — первая реальная реализация провайдера для `service_account_shared_calendar_mode` (текущий рабочий runtime path).
 OAuth runtime-адаптер остается pending и пока не реализуется (`oauth_user_mode`).
+Реализованы только boundary-срезы: Slice 6.2 (callback boundary skeleton) и Slice 6.3a (token exchange/persistence boundary skeleton) без callback-сервера и без реального Google token exchange/persistence.
 
 Reminder controls — capability-gated behavior: в `service_account_shared_calendar_mode` нельзя считать custom reminders надежным user-visible capability; в будущем `oauth_user_mode` можно включать reminders после отдельной верификации.
 
