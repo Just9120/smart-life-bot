@@ -13,6 +13,7 @@ from smart_life_bot.domain.models import ConversationStateSnapshot, EventDraft
 from smart_life_bot.storage.interfaces import (
     EventLogEntry,
     ProviderCredentialsRecord,
+    UserOAuthConnectionStateRecord,
     UserRecord,
     UserPreferencesRecord,
 )
@@ -120,6 +121,18 @@ def init_sqlite_schema(connection: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL,
             is_deleted INTEGER NOT NULL DEFAULT 0,
             UNIQUE (target_month, owner_name, bank_name, category_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS user_oauth_connection_state (
+            user_id INTEGER PRIMARY KEY,
+            status TEXT NOT NULL,
+            state_token_hash TEXT,
+            error_code TEXT,
+            connected_at TEXT,
+            revoked_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
         );
         """
     )
@@ -487,3 +500,88 @@ class SQLiteEventsLogRepository:
             (user_id,),
         ).fetchall()
         return [_row_to_event_log_entry(row) for row in rows]
+
+
+def _row_to_oauth_state_record(row: sqlite3.Row) -> UserOAuthConnectionStateRecord:
+    return UserOAuthConnectionStateRecord(
+        user_id=row["user_id"],
+        status=row["status"],
+        state_token_hash=row["state_token_hash"],
+        error_code=row["error_code"],
+        connected_at=_parse_iso_datetime(row["connected_at"]) if row["connected_at"] else None,
+        revoked_at=_parse_iso_datetime(row["revoked_at"]) if row["revoked_at"] else None,
+        created_at=_parse_iso_datetime(row["created_at"]),
+        updated_at=_parse_iso_datetime(row["updated_at"]),
+    )
+
+
+class SQLiteUserOAuthConnectionStateRepository:
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+
+    def get_for_user(self, user_id: int) -> UserOAuthConnectionStateRecord | None:
+        row = self._connection.execute(
+            "SELECT * FROM user_oauth_connection_state WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        return _row_to_oauth_state_record(row) if row is not None else None
+
+    def get_or_create_for_user(self, user_id: int) -> UserOAuthConnectionStateRecord:
+        existing = self.get_for_user(user_id)
+        if existing is not None:
+            return existing
+        now_iso = utcnow_iso()
+        self._connection.execute(
+            """
+            INSERT INTO user_oauth_connection_state (user_id, status, created_at, updated_at)
+            VALUES (?, 'not_connected', ?, ?)
+            """,
+            (user_id, now_iso, now_iso),
+        )
+        self._connection.commit()
+        record = self.get_for_user(user_id)
+        if record is None:
+            raise LookupError("OAuth state not found after create.")
+        return record
+
+    def mark_pending(self, user_id: int, state_token_hash: str) -> UserOAuthConnectionStateRecord:
+        base = self.get_or_create_for_user(user_id)
+        now_iso = utcnow_iso()
+        self._connection.execute(
+            """
+            UPDATE user_oauth_connection_state
+            SET status = 'pending', state_token_hash = ?, error_code = NULL, revoked_at = NULL, updated_at = ?
+            WHERE user_id = ?
+            """,
+            (state_token_hash, now_iso, base.user_id),
+        )
+        self._connection.commit()
+        return self.get_or_create_for_user(user_id)
+
+    def mark_disconnected(self, user_id: int) -> UserOAuthConnectionStateRecord:
+        base = self.get_or_create_for_user(user_id)
+        now_iso = utcnow_iso()
+        self._connection.execute(
+            """
+            UPDATE user_oauth_connection_state
+            SET status = 'not_connected', state_token_hash = NULL, error_code = NULL, revoked_at = ?, updated_at = ?
+            WHERE user_id = ?
+            """,
+            (now_iso, now_iso, base.user_id),
+        )
+        self._connection.commit()
+        return self.get_or_create_for_user(user_id)
+
+    def mark_error(self, user_id: int, error_code: str) -> UserOAuthConnectionStateRecord:
+        base = self.get_or_create_for_user(user_id)
+        now_iso = utcnow_iso()
+        self._connection.execute(
+            """
+            UPDATE user_oauth_connection_state
+            SET status = 'error', error_code = ?, updated_at = ?
+            WHERE user_id = ?
+            """,
+            (error_code, now_iso, base.user_id),
+        )
+        self._connection.commit()
+        return self.get_or_create_for_user(user_id)

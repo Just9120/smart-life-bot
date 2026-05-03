@@ -9,6 +9,7 @@ from smart_life_bot.storage.interfaces import (
     ConversationStateRepository,
     EventsLogRepository,
     ProviderCredentialsRepository,
+    UserOAuthConnectionStateRepository,
     UserPreferencesRepository,
     UsersRepository,
 )
@@ -29,6 +30,7 @@ class ApplicationDependencies(Protocol):
     users_repo: UsersRepository
     user_preferences_repo: UserPreferencesRepository
     credentials_repo: ProviderCredentialsRepository
+    oauth_state_repo: UserOAuthConnectionStateRepository
     state_repo: ConversationStateRepository
     events_log_repo: EventsLogRepository
     logger: ObservabilityLogger

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
+import hashlib
+import secrets
 
 from smart_life_bot.calendar.models import CalendarEventCreateRequest
 from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus, ParserMode
@@ -393,3 +395,41 @@ class SetParserModeUseCase:
             return UseCaseResult(status="success", message="LLM parser mode is active (Claude)."), updated
 
         return UseCaseResult(status="success", message="Python/rule-based parser is active."), updated
+
+
+@dataclass(slots=True)
+class RequestOAuthConnectionUseCase:
+    deps: ApplicationDependencies
+
+    def execute(self, *, user_id: int) -> UseCaseResult:
+        state_token = secrets.token_urlsafe(24)
+        state_token_hash = hashlib.sha256(state_token.encode("utf-8")).hexdigest()
+        self.deps.oauth_state_repo.mark_pending(user_id=user_id, state_token_hash=state_token_hash)
+        return UseCaseResult(
+            status="pending",
+            message="Подключение личного Google Calendar пока в режиме подготовки. Статус переведён в ожидание подключения.",
+        )
+
+
+@dataclass(slots=True)
+class DisconnectOAuthConnectionUseCase:
+    deps: ApplicationDependencies
+
+    def execute(self, *, user_id: int) -> UseCaseResult:
+        self.deps.oauth_state_repo.mark_disconnected(user_id=user_id)
+        return UseCaseResult(status="disconnected", message="Личный Google Calendar отключен (заглушка Sprint 6.1).")
+
+
+@dataclass(slots=True)
+class GetOAuthConnectionStatusUseCase:
+    deps: ApplicationDependencies
+
+    def execute(self, *, user_id: int) -> UseCaseResult:
+        record = self.deps.oauth_state_repo.get_or_create_for_user(user_id=user_id)
+        status_text = {
+            "not_connected": "Статус личного Google Calendar: не подключен.",
+            "pending": "Статус личного Google Calendar: ожидает завершения подключения (stub).",
+            "connected": "Статус личного Google Calendar: подключен (stub-state).",
+            "error": "Статус личного Google Calendar: ошибка, требуется переподключение.",
+        }.get(record.status, "Статус личного Google Calendar: неизвестный.")
+        return UseCaseResult(status=record.status, message=status_text)

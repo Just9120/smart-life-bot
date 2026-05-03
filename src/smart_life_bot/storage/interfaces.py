@@ -52,6 +52,18 @@ class EventLogEntry:
     updated_at: datetime | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class UserOAuthConnectionStateRecord:
+    user_id: int
+    status: str
+    state_token_hash: str | None
+    error_code: str | None
+    connected_at: datetime | None
+    revoked_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class UsersRepository(Protocol):
     def get_by_telegram_id(self, telegram_user_id: int) -> UserRecord | None: ...
 
@@ -117,3 +129,15 @@ class EventsLogRepository(Protocol):
     def get_by_id(self, entry_id: int) -> EventLogEntry | None: ...
 
     def list_for_user(self, user_id: int) -> list[EventLogEntry]: ...
+
+
+class UserOAuthConnectionStateRepository(Protocol):
+    def get_for_user(self, user_id: int) -> UserOAuthConnectionStateRecord | None: ...
+
+    def get_or_create_for_user(self, user_id: int) -> UserOAuthConnectionStateRecord: ...
+
+    def mark_pending(self, user_id: int, state_token_hash: str) -> UserOAuthConnectionStateRecord: ...
+
+    def mark_disconnected(self, user_id: int) -> UserOAuthConnectionStateRecord: ...
+
+    def mark_error(self, user_id: int, error_code: str) -> UserOAuthConnectionStateRecord: ...
