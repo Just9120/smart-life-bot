@@ -73,6 +73,7 @@ def normalize_bank_name(value: str) -> str:
     aliases = {
         "альфа": "Альфа-Банк",
         "т": "Т-Банк",
+        "т банк": "Т-Банк",
         "тинькофф": "Т-Банк",
         "сбер": "Сбербанк",
         "сбербанк": "Сбербанк",
@@ -307,9 +308,9 @@ def looks_like_cashback_add_attempt(text: str) -> bool:
     tokens = [t for t in re.split(r"[\s,]+", text.strip()) if t]
     if len(tokens) < 4:
         return False
-    if not re.match(r"^\d+(?:[\.,]\d+)?%$", tokens[-1]):
+    if not any(re.match(r"^\d+(?:[\.,]\d+)?%$", token) for token in tokens):
         return False
-    return any(token in ALLOWED_OWNERS for token in tokens[:-1])
+    return True
 
 
 def has_invalid_explicit_month_token(text: str, today: date) -> bool:
