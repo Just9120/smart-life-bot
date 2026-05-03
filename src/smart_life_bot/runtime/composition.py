@@ -26,6 +26,7 @@ from smart_life_bot.application.use_cases import (
     RequestOAuthConnectionUseCase,
     DisconnectOAuthConnectionUseCase,
     GetOAuthConnectionStatusUseCase,
+    HandleOAuthCallbackUseCase,
 )
 from smart_life_bot.bot import TelegramBotRuntime, TelegramTransportRouter
 from smart_life_bot.calendar.interfaces import CalendarService
@@ -60,6 +61,7 @@ class RuntimeContainer:
     user_preferences_repo: SQLiteUserPreferencesRepository
     state_repo: SQLiteConversationStateRepository
     events_log_repo: SQLiteEventsLogRepository
+    handle_oauth_callback: HandleOAuthCallbackUseCase
     runtime: TelegramBotRuntime
 
 
@@ -165,5 +167,6 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         user_preferences_repo=user_preferences_repo,
         state_repo=state_repo,
         events_log_repo=events_log_repo,
+        handle_oauth_callback=HandleOAuthCallbackUseCase(deps=deps),
         runtime=TelegramBotRuntime(router=router),
     )

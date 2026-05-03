@@ -162,6 +162,8 @@
 
 ### Slice 6.2 — Callback adapter boundary skeleton
 
+**Status:** Implemented (application/storage boundary only, no callback server).
+
 **Scope**
 - Ввести отдельную adapter boundary для OAuth callback handling (transport-independent контракт).
 - Определить input/output контракт callback handler (state validation, error mapping, success mapping).
@@ -170,6 +172,7 @@
 **Guardrails**
 - Callback HTTP server не включается в рабочий runtime.
 - Google token exchange остается mock/stub.
+- Raw OAuth code/token material не сохраняется; state validation опирается на hashed state token lookup.
 
 ### Slice 6.3 — Google OAuth exchange + token persistence behind interface
 

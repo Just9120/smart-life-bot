@@ -8,6 +8,7 @@ import hashlib
 import secrets
 
 from smart_life_bot.calendar.models import CalendarEventCreateRequest
+from smart_life_bot.auth.callback_models import OAuthCallbackRequest, OAuthCallbackResult, OAuthCallbackResultCode
 from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus, ParserMode
 from smart_life_bot.domain.models import ConversationStateSnapshot, EventDraft
 from smart_life_bot.storage.interfaces import EventLogEntry, UserPreferencesRecord
@@ -433,3 +434,41 @@ class GetOAuthConnectionStatusUseCase:
             "error": "Статус личного Google Calendar: ошибка, требуется переподключение.",
         }.get(record.status, "Статус личного Google Calendar: неизвестный.")
         return UseCaseResult(status=record.status, message=status_text)
+
+
+@dataclass(slots=True)
+class HandleOAuthCallbackUseCase:
+    deps: ApplicationDependencies
+
+    def execute(self, request: OAuthCallbackRequest) -> OAuthCallbackResult:
+        if request.state is None or not request.state.strip():
+            return OAuthCallbackResult(OAuthCallbackResultCode.MISSING_STATE, "OAuth callback отклонён: отсутствует параметр state.")
+
+        state_token_hash = hashlib.sha256(request.state.encode("utf-8")).hexdigest()
+        record = self.deps.oauth_state_repo.get_by_state_token_hash(state_token_hash)
+        if record is None or record.status != "pending":
+            return OAuthCallbackResult(OAuthCallbackResultCode.INVALID_STATE, "OAuth callback отклонён: state недействителен или устарел.")
+
+        if request.error:
+            self.deps.oauth_state_repo.mark_error(user_id=record.user_id, error_code="provider_error")
+            return OAuthCallbackResult(
+                code=OAuthCallbackResultCode.PROVIDER_ERROR,
+                message="Подключение личного Google Calendar не завершено: провайдер вернул ошибку.",
+                user_id=record.user_id,
+                redirect_hint="oauth-status",
+            )
+
+        if request.code:
+            return OAuthCallbackResult(
+                code=OAuthCallbackResultCode.TOKEN_EXCHANGE_PENDING,
+                message="OAuth callback принят: обмен code->token будет реализован в следующем срезе.",
+                user_id=record.user_id,
+                redirect_hint="oauth-status",
+            )
+
+        return OAuthCallbackResult(
+            code=OAuthCallbackResultCode.SUCCESS,
+            message="OAuth callback обработан без code/error; состояние подключения не изменено.",
+            user_id=record.user_id,
+            redirect_hint="oauth-status",
+        )
