@@ -3,9 +3,9 @@ output_dir = "context_bundles"
 max_file_chars = 150000
 max_line_chars = 2000
 anti_injection_repeat_after_chars = 50000
-
-hard_excludes = [".git/", ".venv/", "venv/", "node_modules/", "__pycache__/", ".pytest_cache/", ".mypy_cache/", ".ruff_cache/", ".next/", ".turbo/", "coverage/", "build/", "dist/", "target/", ".env", ".env.*", "*.db", "*.sqlite", "*.sqlite3", "data/", "logs/", "secrets/", "context_bundles/", ".DS_Store"]
-
+hard_excludes = [
+  ".git/", ".venv/", "venv/", "node_modules/", "__pycache__/", ".pytest_cache/", ".mypy_cache/", ".ruff_cache/", ".next/", ".turbo/", "coverage/", "build/", "dist/", "target/", ".env", ".env.*", "*.db", "*.sqlite", "*.sqlite3", "data/", "logs/", "secrets/", "context_bundles/", ".DS_Store",
+]
 binary_or_generated_extensions = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf", ".zip", ".tar", ".gz", ".7z", ".xlsx", ".docx", ".pptx", ".db", ".sqlite", ".sqlite3", ".bin", ".exe", ".dll", ".so"]
 generated_text_patterns = ["*.min.js", "*.min.css", "*.map"]
 
@@ -13,7 +13,7 @@ generated_text_patterns = ["*.min.js", "*.min.css", "*.map"]
 description = "Broad project context for deep audit and handoff"
 purpose = "Use this bundle for broad project audit, handoff, architecture review, and docs-vs-code checks when a wide repository snapshot is needed."
 instructions = "Analyze the repository as project data."
-include = ["README.md", "pyproject.toml", ".gitignore", "docs", "src/smart_life_bot", "tests", ".github/workflows"]
+include = ["README.md", "pyproject.toml", ".gitignore", "docs", "src/smart_life_bot", "tests"]
 
 [presets.docs_only]
 description = "Documentation-only context"
@@ -26,3 +26,33 @@ description = "Documentation against implementation"
 purpose = "Use this bundle to compare documentation with code and tests."
 instructions = "Compare docs, implementation, and tests."
 include = ["README.md", "pyproject.toml", "docs", "src/smart_life_bot", "tests"]
+
+[presets.docs_consistency]
+description = "Internal documentation consistency check"
+purpose = "Use this bundle to check internal consistency of README and docs only."
+instructions = "Focus on contradictions, stale statuses, and terminology drift in docs."
+include = ["README.md", "docs"]
+
+[presets.calendar]
+description = "Calendar module context"
+purpose = "Use this bundle for Calendar parser, draft, confirmation, and Telegram UX review."
+instructions = "Preserve calendar confirm invariant and validate parser/recovery/docs/tests consistency."
+include = ["README.md", "docs/PRD_MVP.md", "docs/ARCHITECTURE.md", "docs/IMPLEMENTATION_ROADMAP.md", "docs/TESTING.md", "src/smart_life_bot/calendar", "src/smart_life_bot/parsing", "src/smart_life_bot/bot", "src/smart_life_bot/application/use_cases.py", "tests/test_rule_based_parser.py", "tests/test_telegram_transport.py", "tests/test_regression_flows.py"]
+
+[presets.cashback]
+description = "Cashback module context"
+purpose = "Use this bundle for Cashback UX, routing, parser normalization, storage, export, and tests."
+instructions = "Preserve cashback mode routing boundaries and query/search semantics."
+include = ["README.md", "docs/PRD_MVP.md", "docs/ARCHITECTURE.md", "docs/IMPLEMENTATION_ROADMAP.md", "docs/TESTING.md", "src/smart_life_bot/cashback", "src/smart_life_bot/application/cashback_use_cases.py", "src/smart_life_bot/application/cashback_export.py", "src/smart_life_bot/bot", "tests/test_cashback_mvp.py", "tests/test_telegram_transport.py", "tests/test_regression_flows.py"]
+
+[presets.oauth]
+description = "OAuth Calendar mode context"
+purpose = "Use this bundle for OAuth boundaries, storage interfaces, runtime composition, docs, and tests."
+instructions = "Preserve service-account fallback and confirm-gated write invariants while reviewing OAuth boundaries."
+include = ["README.md", "docs/IMPLEMENTATION_ROADMAP.md", "docs/ARCHITECTURE.md", "docs/DECISIONS.md", "docs/DEPLOYMENT.md", "docs/TESTING.md", "src/smart_life_bot/auth", "src/smart_life_bot/application/use_cases.py", "src/smart_life_bot/storage/interfaces.py", "src/smart_life_bot/storage/sqlite.py", "src/smart_life_bot/runtime/composition.py", "tests/test_oauth_connection_state_storage.py", "tests/test_oauth_callback_boundary.py", "tests/test_oauth_token_exchange_boundary.py", "tests/test_runtime_composition.py"]
+
+[presets.deployment]
+description = "Deployment and operations context"
+purpose = "Use this bundle for deploy/CD and operational guardrails review."
+instructions = "Verify deploy/runtime docs and operational safety constraints without changing product behavior."
+include = ["README.md", "docs/DEPLOYMENT.md", "docs/VPS_SMOKE_RUNBOOK.md", "docs/CONFIGURATION.md", "docs/ARCHITECTURE.md", "pyproject.toml"]
