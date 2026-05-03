@@ -470,3 +470,32 @@ def test_update_percent_same_value_is_noop():
     from smart_life_bot.application.cashback_use_cases import UpdateCashbackCategoryPercentUseCase
     result = UpdateCashbackCategoryPercentUseCase(repo).execute(str(row.id), '5%')
     assert result.status == 'edit_percent_no_change'
+
+def test_cashback_query_aliases_are_deterministic_for_known_categories():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    query = QueryCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    add.execute('Альфа, Владимир, Супермаркеты, 5%')
+    add.execute('Т-Банк, Владимир, Аптеки, 7%')
+    add.execute('Альфа, Елена, АЗС, 3%')
+
+    assert query.execute('продукты').status == 'query_found'
+    assert query.execute('еда').status == 'query_found'
+    assert query.execute('лекарства').status == 'query_found'
+    assert query.execute('медицина').status == 'query_found'
+    assert query.execute('бензин').status == 'query_found'
+    assert query.execute('топливо').status == 'query_found'
+
+
+def test_cashback_query_aliases_keep_direct_queries_and_unrelated_not_found():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    query = QueryCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    add.execute('Альфа, Владимир, Супермаркеты, 5%')
+    add.execute('Т-Банк, Владимир, Аптеки, 7%')
+    add.execute('Альфа, Елена, АЗС, 3%')
+
+    assert query.execute('Супермаркеты').status == 'query_found'
+    assert query.execute('Аптеки').status == 'query_found'
+    assert query.execute('АЗС').status == 'query_found'
+    assert query.execute('купить хлеб').status == 'query_not_found'

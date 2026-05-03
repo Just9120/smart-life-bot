@@ -305,3 +305,29 @@ def test_regression_cashback_export_is_read_only_and_no_calendar_calls() -> None
     assert len(before.records) == len(after.records) == 1
     assert before.records == after.records
     assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_cashback_alias_query_in_cashback_mode_has_no_calendar_side_effects() -> None:
+    router, deps = _build_router()
+
+    router.handle_text_message(telegram_user_id=92016, text="Альфа, Владимир, 2026-05, Супермаркеты, 5%")
+    router.handle_text_message(telegram_user_id=92016, text="💳 Кэшбек")
+    response = router.handle_text_message(telegram_user_id=92016, text="продукты")
+
+    assert "🏆 Кэшбек" in response.text
+    assert "Супермаркеты" in response.text
+    assert "Владимир — Альфа — 5%" in response.text
+    assert "Проверь черновик события" not in response.text
+
+    user = deps.users_repo.get_by_telegram_id(92016)
+    assert user is not None
+    assert deps.state_repo.get(user.id) is None
+    assert router.active_feature_context.get(user.id) == "cashback"
+    assert len(deps.calendar_service.requests) == 0
+
+    second = router.handle_text_message(telegram_user_id=92016, text="лекарства")
+    assert "ничего не найдено" in second.text
+    assert "Проверь черновик события" not in second.text
+    assert deps.state_repo.get(user.id) is None
+    assert router.active_feature_context.get(user.id) == "cashback"
+    assert len(deps.calendar_service.requests) == 0
