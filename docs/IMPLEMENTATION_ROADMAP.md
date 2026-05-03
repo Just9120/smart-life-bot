@@ -116,6 +116,7 @@
 **Кандидаты в объём работ**
 - Алиасы/синонимы (`продукты/еда → супермаркеты`, `лекарства/медицина → аптеки`, `бензин/топливо → АЗС`) — first deterministic slice implemented.
 - Fuzzy matching в детерминированных границах.
+- Sprint 5 slice 2 delivered: controlled deterministic search variants + separator normalization (query-only, no broad fuzzy).
 - LLM fallback только если deterministic matching реально недостаточен.
 - При LLM-подходе передавать минимально необходимый набор опций, а не полные семейные/банковские данные без необходимости.
 

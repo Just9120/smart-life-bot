@@ -518,3 +518,36 @@ def test_cashback_query_aliases_keep_direct_queries_and_unrelated_not_found():
     assert query.execute('Аптеки').status == 'query_found'
     assert query.execute('АЗС').status == 'query_found'
     assert query.execute('купить хлеб').status == 'query_not_found'
+
+
+def test_cashback_query_deterministic_variants_and_boundaries():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    query = QueryCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+
+    add.execute('Альфа, Владимир, Супермаркеты, 5%')
+    add.execute('Т-Банк, Владимир, Аптеки, 7%')
+    add.execute('Альфа, Елена, АЗС, 3%')
+
+    assert query.execute('супермаркет').status == 'query_found'
+    assert query.execute('магазины продуктов').status == 'query_found'
+    assert query.execute('аптека').status == 'query_found'
+    assert query.execute('заправка').status == 'query_found'
+    assert query.execute('заправки').status == 'query_found'
+    assert query.execute('АЗС').status == 'query_found'
+    assert query.execute('аЗс').status == 'query_found'
+    assert query.execute('а-з-с').status == 'query_found'
+    assert query.execute('аптека/медицина').status == 'query_not_found'
+
+
+def test_cashback_search_variants_do_not_rewrite_stored_categories():
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    query = QueryCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+
+    add.execute('Альфа, Владимир, Супермаркеты, 5%')
+    query.execute('супермаркет')
+
+    active = repo.list_active('2026-05')
+    assert len(active) == 1
+    assert active[0].category_raw == 'Супермаркеты'

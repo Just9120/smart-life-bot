@@ -16,21 +16,33 @@ RU_MONTHS = {
 CATEGORY_SEARCH_ALIASES = {
     "продукты": "супермаркеты",
     "еда": "супермаркеты",
+    "супермаркет": "супермаркеты",
+    "магазины продуктов": "супермаркеты",
     "лекарства": "аптеки",
     "медицина": "аптеки",
+    "аптека": "аптеки",
     "бензин": "азс",
     "топливо": "азс",
+    "заправка": "азс",
+    "заправки": "азс",
+    "а з с": "азс",
 }
 
 
 def normalize_category_search_key(value: str) -> str:
-    key = normalize_category_key(value)
+    key = normalize_category_search_base(value)
     return CATEGORY_SEARCH_ALIASES.get(key, key)
 
 
 def normalize_category_key(value: str) -> str:
     value = value.strip().lower().replace("ё", "е")
     return re.sub(r"\s+", " ", value)
+
+
+def normalize_category_search_base(value: str) -> str:
+    key = normalize_category_key(value)
+    key = re.sub(r"[\-–—/\\]+", " ", key)
+    return re.sub(r"\s+", " ", key).strip()
 
 def normalize_bank_name(value: str) -> str:
     cleaned = re.sub(r"\s+", " ", value.strip())
