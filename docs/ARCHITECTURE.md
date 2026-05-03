@@ -227,6 +227,8 @@ Dependency rule:
 - при refresh-failure credentials помечаются как invalid/reconnect-required;
 - user получает missing-auth/provider-auth guidance без утечки причин, требующих секрета.
 
+Sprint 6.3a реализует только boundary skeleton: redaction-safe token models + provider/repository contracts + use-case skeleton. Реальный Google code→token exchange и реальное хранение user tokens пока не реализованы.
+
 Текущий `provider_credentials.credentials_encrypted` можно использовать как placeholder-контракт хранения, но перед productionization нужны явные решения по:
 - алгоритму шифрования at rest;
 - управлению ключами (KMS/host-managed key rotation policy);

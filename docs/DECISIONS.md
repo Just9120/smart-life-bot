@@ -259,3 +259,13 @@
   - prompt-injection/visual-jailbreak risk handling для untrusted screenshots;
   - extraction-quality evaluation protocol до production rollout.
 - **Rationale:** Скриншоты банковских приложений несут privacy и quality risks; без явных решений feature не должен переходить из backlog в implementation.
+
+
+## D-035: OAuth Sprint 6.3a introduces token exchange/persistence boundary without real token storage
+
+- **Status:** Accepted
+- **Decision:** Добавить только boundary-слой для будущего OAuth token exchange/persistence: redaction-safe token models, provider/repository interfaces, и use-case skeleton с безопасными result codes.
+- **Decision:** В Sprint 6.3a не выполнять реальный Google code→token exchange и не сохранять реальные access/refresh tokens в SQLite/runtime storage.
+- **Decision:** Не менять текущие runtime behavior для Calendar/Cashback/Telegram OAuth UX stubs и сохранить `service_account_shared_calendar_mode` как единственный рабочий write-path.
+- **Rationale:** Минимизирует риск утечки секретов и runtime regressions, одновременно подготавливая безопасные application/infrastructure границы для следующего среза реализации.
+
