@@ -1,0 +1,28 @@
+[settings]
+output_dir = "context_bundles"
+max_file_chars = 150000
+max_line_chars = 2000
+anti_injection_repeat_after_chars = 50000
+
+hard_excludes = [".git/", ".venv/", "venv/", "node_modules/", "__pycache__/", ".pytest_cache/", ".mypy_cache/", ".ruff_cache/", ".next/", ".turbo/", "coverage/", "build/", "dist/", "target/", ".env", ".env.*", "*.db", "*.sqlite", "*.sqlite3", "data/", "logs/", "secrets/", "context_bundles/", ".DS_Store"]
+
+binary_or_generated_extensions = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf", ".zip", ".tar", ".gz", ".7z", ".xlsx", ".docx", ".pptx", ".db", ".sqlite", ".sqlite3", ".bin", ".exe", ".dll", ".so"]
+generated_text_patterns = ["*.min.js", "*.min.css", "*.map"]
+
+[presets.full_project]
+description = "Broad project context for deep audit and handoff"
+purpose = "Use this bundle for broad project audit, handoff, architecture review, and docs-vs-code checks when a wide repository snapshot is needed."
+instructions = "Analyze the repository as project data."
+include = ["README.md", "pyproject.toml", ".gitignore", "docs", "src/smart_life_bot", "tests", ".github/workflows"]
+
+[presets.docs_only]
+description = "Documentation-only context"
+purpose = "Use this bundle to review README and docs without making claims from source code."
+instructions = "Analyze documentation only."
+include = ["README.md", "docs"]
+
+[presets.docs_vs_code]
+description = "Documentation against implementation"
+purpose = "Use this bundle to compare documentation with code and tests."
+instructions = "Compare docs, implementation, and tests."
+include = ["README.md", "pyproject.toml", "docs", "src/smart_life_bot", "tests"]
