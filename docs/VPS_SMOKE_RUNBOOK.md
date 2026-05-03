@@ -220,6 +220,14 @@ docker compose down  # только из /opt/smart-life-bot: затрагива
 22. Проверьте negative-case: >5 пар категорий возвращает `Можно добавить не больше 5 категорий за раз.` и не пишет частично.
 23. Проверьте, что multi-add не создаёт calendar draft и не затрагивает calendar callbacks.
 
+### 10.7 Production data guardrails for cashback smoke
+
+- Persisted SQLite в runtime (`./data/smart_life_bot.db` по умолчанию) может содержать реальную пользовательскую историю cashback по `target_month`; это production state.
+- В рамках обычного smoke/deploy нельзя автоматически «чистить старые месяцы» и нельзя делать destructive cleanup исторических данных.
+- Тестовые/временные записи удаляйте через штатные bot/UI/application flow (например, edit/delete/soft-delete), а не через прямые SQL-команды.
+- В рамках smoke/CD **запрещено** удалять `./data`, удалять/пересоздавать файл БД или выполнять destructive SQL cleanup.
+- Если когда-либо понадобится ручная DB-операция, это считается исключительной maintenance-процедурой: сначала backup, затем отдельный ручной change с явным подтверждением; это не часть стандартного smoke/CD.
+
 ## 12) Docker isolation notes
 
 - Не выполняйте глобальные Docker cleanup-команды (`docker system prune`, `docker rm` без фильтра и т.п.) в рамках этого smoke-runbook.
