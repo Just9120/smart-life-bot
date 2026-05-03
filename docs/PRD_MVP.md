@@ -70,6 +70,21 @@ Inline preview buttons остаются только для действий с 
 - picker не создаёт событие в календаре и не заменяет `✅ Создать событие`;
 - Telegram Web App / Mini App календарный UI — deep backlog, не near-term MVP.
 
+
+### 3.4 Planned OAuth personal calendar UX (`🔐 Личный Google Calendar`)
+
+Статус: **planned/pending** (не реализовано в текущем runtime).
+
+Целевое UX-поведение после реализации Sprint 6:
+- пользователь в разделе `📅 Календарь` выбирает `🔐 Личный Google Calendar`;
+- бот показывает статус подключения (`не подключен` / `подключен`) и явные действия (`Подключить`, `Отключить`, `Проверить статус`);
+- при `Подключить` бот отправляет безопасную инструкцию/ссылку на OAuth consent flow;
+- после успешного consent бот подтверждает, что личный календарь подключен;
+- `Отключить` удаляет/деактивирует личную OAuth-связь и бот подтверждает отключение;
+- пока личный OAuth не подключен, попытка personal-mode confirm должна давать понятную подсказку, как подключиться (missing-auth guidance);
+- даже в personal mode событие создается только через обычный preview и явный `✅ Создать событие` (внутренний callback `draft:confirm`).
+
+Non-goal для текущего этапа документации: не заявлять, что OAuth уже работает в production/runtime.
 ## 4. Scope MVP
 
 - Telegram message → draft preview → confirm/cancel flow.

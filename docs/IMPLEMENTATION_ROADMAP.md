@@ -122,20 +122,94 @@
 
 ---
 
-## Sprint 6 — OAuth calendar mode
+## Sprint 6 — OAuth calendar mode (discovery → incremental implementation)
 
 **Goal**
-- Начать реализацию `🔐 Личный Google Calendar`.
+- Подготовить и безопасно внедрить `🔐 Личный Google Calendar` без регресса текущего `service_account_shared_calendar_mode`.
+- Сохранить единый confirm-gated calendar flow: запись в Google Calendar только после `✅ Создать событие` (callback `draft:confirm`).
 
-**Кандидаты в объём работ**
-- OAuth flow design.
-- Token storage policy.
-- Connect/disconnect account UX.
-- User-authenticated calendar write-path.
-- Capability-based reminder controls.
-- Future multi-select popup reminder UI.
+**Current status (as of this roadmap update)**
+- Реально работает только `service_account_shared_calendar_mode`.
+- `oauth_user_mode` остается target architecture и pending runtime implementation.
+- Sprint 6 начинается с docs/discovery и не меняет runtime-поведение.
 
----
+### Slice 6.0 — Discovery/spec freeze (docs-only)
+
+**Scope**
+- Зафиксировать target UX `🔐 Личный Google Calendar`: connect/disconnect/status/missing-auth guidance.
+- Зафиксировать архитектурные границы OAuth callback/auth state/token storage.
+- Зафиксировать deploy/domain/env prerequisites (HTTPS + stable redirect URI).
+- Зафиксировать будущую тест-стратегию и open decisions.
+
+**Out of scope**
+- OAuth callback server.
+- Google OAuth token exchange.
+- Runtime behavior changes.
+
+### Slice 6.1 — OAuth state model + UX stubs (no token exchange)
+
+**Scope**
+- Добавить application/storage model для user OAuth connection state (`not_connected`/`pending`/`connected`/`error`) и безопасных state tokens.
+- Добавить transport-level UX команды/кнопки для `Подключить` / `Отключить` / `Статус` с текстами-заглушками.
+- Missing-auth response для calendar confirms в personal mode: явный guidance to connect.
+
+**Guardrails**
+- Без реального обмена code→token.
+- Без callback endpoint runtime.
+- Без изменений confirm invariant.
+
+### Slice 6.2 — Callback adapter boundary skeleton
+
+**Scope**
+- Ввести отдельную adapter boundary для OAuth callback handling (transport-independent контракт).
+- Определить input/output контракт callback handler (state validation, error mapping, success mapping).
+- Подготовить integration points для будущего web adapter (FastAPI/другой), без включения в default polling runtime.
+
+**Guardrails**
+- Callback HTTP server не включается в рабочий runtime.
+- Google token exchange остается mock/stub.
+
+### Slice 6.3 — Google OAuth exchange + token persistence behind interface
+
+**Scope**
+- Реализовать provider adapter для code exchange/refresh behind auth interfaces.
+- Сохранение token material в persistence layer по согласованной policy (без утечек в логи).
+- Error mapping на `missing_auth` / `provider_auth_failure`.
+
+**Guardrails**
+- Сервис-аккаунт путь не меняется и остается доступным fallback.
+- Confirm-gated flow остается неизменным.
+
+### Slice 6.4 — Personal calendar writes behind existing confirm flow
+
+**Scope**
+- Подключить user-authenticated Google Calendar client resolution для `oauth_user_mode` в confirm-use-case.
+- Сохранить общий application flow для обоих auth modes; различие только в credential/client resolution.
+- Добавить/обновить smoke и regression coverage для personal-mode write path.
+
+**Guardrails**
+- До `✅ Создать событие` никаких calendar writes.
+- Existing shared-calendar mode не деградирует.
+
+### Slice 6.5 — Reminder controls capability in OAuth mode
+
+**Scope**
+- Включить user-visible reminder controls только для реализованного/проверенного OAuth write path.
+- Реализовать multi-select popup presets UX (`10 минут + 1 час` и т.п.) в пределах confirm flow.
+
+**Guardrails**
+- Service-account mode продолжает скрывать/не обещать custom reminders.
+- Email reminders остаются out of scope.
+
+### Slice 6.6 — Deploy hardening + smoke/runbook updates
+
+**Scope**
+- Подготовить production-ready deployment contour для OAuth prerequisites: HTTPS endpoint, stable domain, redirect URI ops.
+- Обновить runbook/checklists для connect/disconnect/callback/refresh-failure smoke сценариев.
+- Обновить incident/troubleshooting notes для auth failures.
+
+**Guardrails**
+- Не смешивать с webhook migration, если это не обязательно для выбранного callback hosting.
 
 ## Sprint 7+ — App/API/PWA/offline-first discovery
 
