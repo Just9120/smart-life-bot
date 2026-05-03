@@ -26,7 +26,6 @@ from smart_life_bot.application.cashback_use_cases import (
     CompleteTransitionCashbackCategoryUseCase,
     UpdateCashbackCategoryPercentUseCase,
     format_month_label,
-    current_year_month,
     parse_year_month,
     shift_year_month,
 )
@@ -572,7 +571,7 @@ class TelegramTransportRouter:
             self.active_feature_context[user.id] = "cashback"
             return TelegramTransportResponse(text="Напиши категорию, например: Аптеки.")
         if callback_data == CALLBACK_CASHBACK_EXPORT_CURRENT and self.export_cashback_categories is not None:
-            selected_month = current_year_month(date.today())
+            selected_month = self.export_cashback_categories.default_month()
             return TelegramTransportResponse(
                 text=f"Выбери месяц для экспорта XLSX. Текущий выбор: {format_month_label(selected_month)}.",
                 button_rows=self._build_cashback_export_picker_rows(selected_month),

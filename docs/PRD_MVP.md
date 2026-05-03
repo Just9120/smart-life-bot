@@ -151,7 +151,8 @@ Inline preview buttons остаются только для действий с 
 
 ### 8.3 Cashback XLSX export (implemented MVP slice)
 
-- В `💳 Кэшбек` доступен экспорт `📤 Экспорт XLSX` за текущий месяц.
+- В `💳 Кэшбек` доступен экспорт `📤 Экспорт XLSX` с выбором месяца: кнопка открывает picker c навигацией по месяцам и явным действием `✅ Выгрузить этот месяц`.
 - Экспорт read-only: не изменяет записи cashback и не вызывает calendar flows.
 - Источник данных — текущие persisted записи SQLite (по умолчанию активные/non-deleted).
 - При отсутствии данных бот возвращает дружелюбный текст без отправки пустого файла.
+- Формат отчёта `.xlsx`: title `Кэшбек — <месяц>`, distinct header row, frozen header pane, autofilter, readable column widths, deterministic sorting (`category -> owner -> bank`).

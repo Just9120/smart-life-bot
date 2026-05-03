@@ -24,7 +24,7 @@ class ExportCashbackCategoriesUseCase:
         self.now_provider = now_provider or (lambda: datetime.now(UTC).date())
 
     def execute(self, month: str | None = None) -> CashbackExportResult:
-        target_month = month or current_year_month(self.now_provider())
+        target_month = month or self.default_month()
         records = self.repo.list_active(target_month)
         if not records:
             return CashbackExportResult("no_data", f"За {format_month_label(target_month)} активных кэшбек-категорий пока нет.", target_month=target_month)
@@ -36,6 +36,9 @@ class ExportCashbackCategoriesUseCase:
         content = _build_xlsx(rows)
         file_name = f"cashback_{target_month}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.xlsx"
         return CashbackExportResult("ok", f"Готово. Выгрузил XLSX за {format_month_label(target_month)}.", file_name=file_name, content=content, target_month=target_month)
+
+    def default_month(self) -> str:
+        return current_year_month(self.now_provider())
 
 
 def _build_xlsx(rows: list[list[str]]) -> bytes:

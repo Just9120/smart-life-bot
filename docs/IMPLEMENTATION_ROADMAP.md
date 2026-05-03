@@ -100,10 +100,10 @@
 
 **Scope**
 - `📤 Экспорт XLSX` (implemented).
-- Выбор месяца.
-- Форматированный `.xlsx` отчёт.
+- Выбор месяца (implemented): picker + month navigation + `✅ Выгрузить этот месяц`.
+- Форматированный `.xlsx` отчёт (implemented).
 - Read-only `ExportCashbackCategoriesUseCase`.
-- Форматирование: title, bold headers, frozen header, autofilter, readable widths, сортировка/группировка категорий.
+- Форматирование (implemented): title, bold headers, frozen header, autofilter, readable widths, deterministic sorting `category -> owner -> bank`.
 - Отправка файла через Telegram document.
 
 ---

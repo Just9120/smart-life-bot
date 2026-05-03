@@ -1427,6 +1427,13 @@ def test_cashback_export_callback_returns_xlsx_document() -> None:
     assert export.document_bytes is not None and len(export.document_bytes) > 0
 
 
+def test_cashback_export_picker_uses_export_use_case_default_month() -> None:
+    router, _ = _build_router()
+    response = router.handle_callback(telegram_user_id=93003, callback_data=CALLBACK_CASHBACK_EXPORT_CURRENT)
+    assert "май 2026" in response.text
+    assert response.button_rows[0][1][1].endswith("2026-05")
+
+
 def test_cashback_export_callback_no_data_returns_friendly_message() -> None:
     router, _ = _build_router()
 
