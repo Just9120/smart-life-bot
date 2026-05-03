@@ -16,6 +16,7 @@ from smart_life_bot.bot import (
     CALLBACK_CASHBACK_DELETE_REQUEST_PREFIX,
     CALLBACK_CASHBACK_ADD_START,
     CALLBACK_CASHBACK_SEARCH_HINT,
+    CALLBACK_CASHBACK_EXPORT_CURRENT,
     CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX,
     CALLBACK_CASHBACK_LIST_CURRENT,
     CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
@@ -65,6 +66,11 @@ class FakeMessage:
         self.calls.append("reply_text")
         self.reply_calls.append({"text": text, "reply_markup": reply_markup})
 
+    async def reply_document(self, document: object, filename: str) -> None:
+        self.calls.append("reply_document")
+        payload = document.read() if hasattr(document, "read") else b""
+        self.reply_calls.append({"document_bytes": payload, "filename": filename})
+
 
 class FakeCallbackQuery:
     def __init__(self, data: str, user_id: int, message: FakeMessage, calls: list[str]) -> None:
@@ -107,7 +113,7 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
         assert len(callback_handlers) == 1
         assert (
             callback_handlers[0].pattern.pattern
-            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal|calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|cashback:list:current|cashback:add:start|cashback:search:hint|cashback:list:month:\d{4}-\d{2}|cashback:list:owner:(?:\d+|all):month:\d{4}-\d{2}|cashback:list:owner-current:(?:\d+|all)|cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:edit-percent:request:\d+|cashback:transition:select:(?:[a-f0-9]{6}:)?\d{4}-\d{2}|cashback:transition:cancel)$"
+            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal|calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|cashback:list:current|cashback:add:start|cashback:search:hint|cashback:export:current|cashback:list:month:\d{4}-\d{2}|cashback:list:owner:(?:\d+|all):month:\d{4}-\d{2}|cashback:list:owner-current:(?:\d+|all)|cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:edit-percent:request:\d+|cashback:transition:select:(?:[a-f0-9]{6}:)?\d{4}-\d{2}|cashback:transition:cancel)$"
         )
         assert tuple(application.bot_data["allowed_callback_data"]) == (
             CALLBACK_CONFIRM,
@@ -127,6 +133,7 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
             CALLBACK_CASHBACK_LIST_CURRENT,
             CALLBACK_CASHBACK_ADD_START,
             CALLBACK_CASHBACK_SEARCH_HINT,
+            CALLBACK_CASHBACK_EXPORT_CURRENT,
             CALLBACK_CASHBACK_TRANSITION_CANCEL,
             CALLBACK_CALENDAR_DATE_START,
             CALLBACK_CALENDAR_DATE_CANCEL,
@@ -239,6 +246,26 @@ def test_text_handler_delegates_to_runtime_on_text() -> None:
 
     runtime.on_text.assert_called_once_with(telegram_user_id=777, text="Team sync at 10")
     assert message.reply_calls[0]["text"] == "Preview"
+
+
+def test_text_handler_sends_document_when_transport_response_has_document() -> None:
+    runtime = Mock()
+    runtime.on_text.return_value = TelegramTransportResponse(
+        text="Готово, выгружаю файл.",
+        document_name="cashback_2026-05.xlsx",
+        document_bytes=b"fake-xlsx-bytes",
+    )
+    adapter = TelegramSDKAdapter(runtime=runtime)
+    message = FakeMessage(text="📤 Экспорт XLSX")
+    update = SimpleNamespace(message=message, effective_user=SimpleNamespace(id=779))
+
+    asyncio.run(adapter.handle_text_message(update, context=None))
+
+    runtime.on_text.assert_called_once_with(telegram_user_id=779, text="📤 Экспорт XLSX")
+    assert message.calls == ["reply_text", "reply_document"]
+    assert message.reply_calls[0]["text"] == "Готово, выгружаю файл."
+    assert message.reply_calls[1]["filename"] == "cashback_2026-05.xlsx"
+    assert message.reply_calls[1]["document_bytes"] == b"fake-xlsx-bytes"
 
 
 def test_settings_handler_delegates_to_runtime_on_text_settings() -> None:

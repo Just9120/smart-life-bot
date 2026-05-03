@@ -9,6 +9,7 @@ from smart_life_bot.bot import (
     CALLBACK_CANCEL,
     CALLBACK_REMINDERS,
     CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
+    CALLBACK_CASHBACK_EXPORT_CURRENT,
 )
 from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase
 from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
@@ -277,4 +278,26 @@ def test_regression_cashback_selected_empty_month_has_safe_navigation() -> None:
     assert "На июль 2026 активных кэшбек-категорий пока нет." in response.text
     buttons = [button for row in response.button_rows for button in row] if response.button_rows else list(response.buttons)
     assert ("Текущий", "cashback:list:current") in buttons
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_regression_cashback_menu_contains_export_button() -> None:
+    router, _ = _build_router()
+
+    menu = router.handle_text_message(telegram_user_id=92016, text="💳 Кэшбек")
+
+    assert any(label == "📤 Экспорт XLSX" and cb == CALLBACK_CASHBACK_EXPORT_CURRENT for label, cb in menu.buttons)
+
+
+def test_regression_cashback_export_is_read_only_and_no_calendar_calls() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=92017, text="Альфа, Владимир, 2026-05, Супермаркеты, 5%")
+    before = router.list_active_cashback_categories.execute(month="2026-05")
+
+    response = router.handle_callback(telegram_user_id=92017, callback_data=CALLBACK_CASHBACK_EXPORT_CURRENT)
+
+    after = router.list_active_cashback_categories.execute(month="2026-05")
+    assert response.document_bytes is not None
+    assert len(before.records) == len(after.records) == 1
+    assert before.records == after.records
     assert len(deps.calendar_service.requests) == 0

@@ -13,6 +13,7 @@ from smart_life_bot.application.use_cases import (
     SetParserModeUseCase,
 )
 from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, RequestEditCashbackCategoryPercentUseCase, SoftDeleteCashbackCategoryUseCase, UpdateCashbackCategoryPercentUseCase
+from smart_life_bot.application.cashback_export import ExportCashbackCategoriesUseCase
 from smart_life_bot.auth.models import AuthContext
 from smart_life_bot.bot import (
     CALLBACK_CANCEL,
@@ -24,6 +25,7 @@ from smart_life_bot.bot import (
     CALLBACK_REMINDERS_30,
     CALLBACK_CASHBACK_LIST_CURRENT,
     CALLBACK_CASHBACK_ADD_START,
+    CALLBACK_CASHBACK_EXPORT_CURRENT,
     CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
     CALLBACK_CASHBACK_LIST_OWNER_MONTH_PREFIX,
     CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX,
@@ -277,6 +279,7 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         soft_delete_cashback_category=SoftDeleteCashbackCategoryUseCase(cashback_repo),
         update_cashback_category_percent=UpdateCashbackCategoryPercentUseCase(cashback_repo),
         complete_transition_cashback_category=CompleteTransitionCashbackCategoryUseCase(cashback_repo),
+        export_cashback_categories=ExportCashbackCategoriesUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
     )
     return router, deps
 
@@ -1405,3 +1408,22 @@ def test_pending_edit_percent_clears_on_calendar_navigation() -> None:
     nav = router.handle_text_message(telegram_user_id=90705, text='📅 Календарь')
     assert 'Текущий режим: 📅 Календарь' in nav.text
     assert user.id not in router.pending_cashback_percent_edit
+
+
+def test_cashback_export_callback_returns_xlsx_document() -> None:
+    router, _ = _build_router()
+    router.handle_text_message(telegram_user_id=93001, text="Альфа, Владимир, 2026-05, Аптеки, 5%")
+
+    response = router.handle_callback(telegram_user_id=93001, callback_data=CALLBACK_CASHBACK_EXPORT_CURRENT)
+
+    assert response.document_name is not None and response.document_name.endswith(".xlsx")
+    assert response.document_bytes is not None and len(response.document_bytes) > 0
+
+
+def test_cashback_export_callback_no_data_returns_friendly_message() -> None:
+    router, _ = _build_router()
+
+    response = router.handle_callback(telegram_user_id=93002, callback_data=CALLBACK_CASHBACK_EXPORT_CURRENT)
+
+    assert "активных кэшбек-категорий пока нет" in response.text
+    assert response.document_bytes is None

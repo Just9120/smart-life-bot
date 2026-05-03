@@ -99,7 +99,7 @@
 - Дать визуальный monthly-report по cashback.
 
 **Scope**
-- `📤 Выгрузить таблицу`.
+- `📤 Экспорт XLSX` (implemented).
 - Выбор месяца.
 - Форматированный `.xlsx` отчёт.
 - Read-only `ExportCashbackCategoriesUseCase`.

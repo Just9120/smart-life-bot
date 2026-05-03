@@ -146,3 +146,8 @@ Telegram voice input добавлен только в backlog и не входи
   - API keys/credentials не логируются.
 
 Реализован foundation-адаптер записи событий Google Calendar для `service_account_shared_calendar_mode` (через service account + shared calendar). `oauth_user_mode` остаётся pending и в runtime пока использует fake/dev calendar adapter. После успешного confirm бот также показывает ссылку на созданное событие, если календарный провайдер вернул `html_link`. Это позволяет подготовить будущий VPS smoke-сценарий `Telegram message → preview → confirm → Google Calendar create event` без добавления OAuth callback/user-consent flow в текущем PR.
+
+
+## Cashback XLSX export (Sprint 4 slice)
+
+В разделе `💳 Кэшбек` доступна кнопка `📤 Экспорт XLSX` для read-only выгрузки активных категорий за текущий месяц из persisted SQLite данных. Если данных нет, бот отправляет дружелюбное сообщение без пустого файла.
