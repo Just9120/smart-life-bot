@@ -92,6 +92,37 @@ def test_parses_relative_day_after_tomorrow() -> None:
     assert result.draft.start_at == datetime(2026, 4, 27, 10, 0, tzinfo=UTC)
 
 
+def test_parses_weekday_to_next_future_date_on_sunday_moscow() -> None:
+    parser = RuleBasedMessageParser(
+        default_timezone="Europe/Moscow",
+        now_provider=lambda: datetime(2026, 5, 3, 12, 0, tzinfo=UTC),
+    )
+    result = parser.parse("Созвон вторник 10:30", user_id=42)
+    assert result.draft.title == "Созвон"
+    assert result.draft.start_at is not None
+    assert result.draft.start_at.isoformat() == "2026-05-05T10:30:00+03:00"
+
+
+def test_parses_same_weekday_as_next_week_when_today_matches() -> None:
+    parser = RuleBasedMessageParser(
+        default_timezone="Europe/Moscow",
+        now_provider=lambda: datetime(2026, 5, 5, 6, 0, tzinfo=UTC),
+    )
+    result = parser.parse("Созвон вторник 10:30", user_id=42)
+    assert result.draft.start_at is not None
+    assert result.draft.start_at.isoformat() == "2026-05-12T10:30:00+03:00"
+
+
+def test_today_token_has_priority_over_weekday() -> None:
+    parser = RuleBasedMessageParser(
+        default_timezone="Europe/Moscow",
+        now_provider=lambda: datetime(2026, 5, 5, 6, 0, tzinfo=UTC),
+    )
+    result = parser.parse("Созвон сегодня 10:30", user_id=42)
+    assert result.draft.start_at is not None
+    assert result.draft.start_at.isoformat() == "2026-05-05T10:30:00+03:00"
+
+
 def test_parses_relative_tomorrow_with_spaced_time() -> None:
     result = _parser().parse("завтра в 15 00 психотерапевт", user_id=42)
 

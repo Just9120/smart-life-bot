@@ -95,8 +95,8 @@ def test_regression_service_account_reminder_gating_keeps_duration_controls() ->
 
     assert ("✅ Создать событие", CALLBACK_CONFIRM) in preview.buttons
     assert ("⏱ Длительность", CALLBACK_DURATION) in preview.buttons
-    assert ("✏️ Edit", CALLBACK_EDIT) in preview.buttons
-    assert ("❌ Cancel", CALLBACK_CANCEL) in preview.buttons
+    assert ("✏️ Изменить", CALLBACK_EDIT) in preview.buttons
+    assert ("❌ Отменить", CALLBACK_CANCEL) in preview.buttons
     assert ("🔔 Уведомления", CALLBACK_REMINDERS) not in preview.buttons
 
 
@@ -114,7 +114,7 @@ def test_regression_cashback_add_query_never_calls_calendar() -> None:
     listed = router.handle_text_message(telegram_user_id=92006, text="📋 Активные категории")
     assert "Активные кэшбек-категории — май 2026" in listed.text
     assert "🏆 Кэшбек" in query.text
-    assert "Владимир — Альфа — 5%" in query.text
+    assert "Владимир — Альфа-Банк — 5%" in query.text
     assert len(deps.calendar_service.requests) == 0
 
 
@@ -316,7 +316,7 @@ def test_regression_cashback_alias_query_in_cashback_mode_has_no_calendar_side_e
 
     assert "🏆 Кэшбек" in response.text
     assert "Супермаркеты" in response.text
-    assert "Владимир — Альфа — 5%" in response.text
+    assert "Владимир — Альфа-Банк — 5%" in response.text
     assert "Проверь черновик события" not in response.text
 
     user = deps.users_repo.get_by_telegram_id(92016)

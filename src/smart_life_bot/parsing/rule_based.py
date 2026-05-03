@@ -43,6 +43,35 @@ _MONTH_ALIASES: dict[str, int] = {
     "дек": 12,
 }
 
+_WEEKDAY_ALIASES: dict[str, int] = {
+    "пн": 0,
+    "понедельник": 0,
+    "в понедельник": 0,
+    "вт": 1,
+    "вторник": 1,
+    "во вторник": 1,
+    "ср": 2,
+    "среда": 2,
+    "в среду": 2,
+    "чт": 3,
+    "четверг": 3,
+    "в четверг": 3,
+    "пт": 4,
+    "пятница": 4,
+    "в пятницу": 4,
+    "сб": 5,
+    "суббота": 5,
+    "в субботу": 5,
+    "вс": 6,
+    "воскресенье": 6,
+    "в воскресенье": 6,
+}
+
+_WEEKDAY_PATTERN = re.compile(
+    r"\b(во\s+вторник|в\s+понедельник|в\s+среду|в\s+четверг|в\s+пятницу|в\s+субботу|в\s+воскресенье|понедельник|вторник|среда|четверг|пятница|суббота|воскресенье|пн|вт|ср|чт|пт|сб|вс)\b",
+    flags=re.IGNORECASE,
+)
+
 
 @dataclass(slots=True)
 class RuleBasedMessageParser:
@@ -60,6 +89,8 @@ class RuleBasedMessageParser:
         start_at, explicit_datetime_seen = _extract_explicit_datetime(normalized, timezone, now, consumed_spans)
 
         relative_day_offset: int | None = None
+        weekday_target: int | None = None
+        today_explicit = False
         if start_at is None and not explicit_datetime_seen:
             relative_match = re.search(r"\b(послезавтра|завтра|сегодня)\b", normalized, flags=re.IGNORECASE)
             if relative_match:
@@ -67,10 +98,17 @@ class RuleBasedMessageParser:
                 token = relative_match.group(1).lower()
                 if token == "сегодня":
                     relative_day_offset = 0
+                    today_explicit = True
                 elif token == "завтра":
                     relative_day_offset = 1
                 elif token == "послезавтра":
                     relative_day_offset = 2
+
+            if not today_explicit:
+                weekday_match = _WEEKDAY_PATTERN.search(normalized)
+                if weekday_match:
+                    consumed_spans.append(weekday_match.span())
+                    weekday_target = _WEEKDAY_ALIASES.get(weekday_match.group(1).lower())
 
             time_match = re.search(r"\b(?:в\s*)?(\d{1,2})(?::|\s)(\d{2})\b", normalized, flags=re.IGNORECASE)
             if time_match:
@@ -81,6 +119,11 @@ class RuleBasedMessageParser:
                     date = now.date()
                     if relative_day_offset is not None:
                         date = date + timedelta(days=relative_day_offset)
+                    elif weekday_target is not None:
+                        delta = (weekday_target - date.weekday()) % 7
+                        if delta == 0:
+                            delta = 7
+                        date = date + timedelta(days=delta)
                     start_at = datetime(
                         date.year,
                         date.month,

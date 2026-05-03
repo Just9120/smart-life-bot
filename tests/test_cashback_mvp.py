@@ -4,7 +4,7 @@ from io import BytesIO
 
 from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, SoftDeleteCashbackCategoryUseCase, format_month_label
 from smart_life_bot.application.cashback_export import ExportCashbackCategoriesUseCase
-from smart_life_bot.cashback.parser import normalize_bank_name, parse_owner_first_multi_add, parse_structured_add
+from smart_life_bot.cashback.parser import normalize_bank_name, normalize_category_display, parse_owner_first_multi_add, parse_structured_add
 from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
 from smart_life_bot.storage.sqlite import create_sqlite_connection, init_sqlite_schema
 
@@ -32,6 +32,9 @@ def test_bank_name_normalization_t_bank_variants_and_unknown_cleanup():
     assert normalize_bank_name("тбанк") == "Т-Банк"
     assert normalize_bank_name("  My   Bank  ") == "My Bank"
     assert normalize_bank_name("  My -  Bank  ") == "My-Bank"
+    assert normalize_bank_name("Альфа") == "Альфа-Банк"
+    assert normalize_bank_name("Альфа банк") == "Альфа-Банк"
+    assert normalize_bank_name("Альфа-банк") == "Альфа-Банк"
 
 
 
@@ -58,6 +61,31 @@ def test_structured_add_space_separated_and_missing_final_comma():
     assert missing_final_comma.owner == 'Владимир'
     assert missing_final_comma.category == 'Аптеки'
     assert missing_final_comma.percent == 5
+
+
+def test_alfa_bank_variants_parse_and_save_percent_and_category() -> None:
+    repo = _repo()
+    add = AddCashbackCategoryUseCase(repo, now_provider=lambda: date(2026, 5, 3))
+    for text in (
+        "Владимир Альфа банк одежда и обувь 5%",
+        "Владимир Альфа-банк одежда и обувь 5%",
+        "Владимир Альфа одежда и обувь 5%",
+    ):
+        result = add.execute(text)
+        assert result is not None and result.status in {"added", "already_exists"}
+    active = repo.list_active("2026-05")
+    assert len(active) == 1
+    assert active[0].owner_name == "Владимир"
+    assert active[0].bank_name == "Альфа-Банк"
+    assert active[0].category_raw == "Одежда и обувь"
+    assert active[0].percent == 5
+
+
+def test_category_display_normalization_examples() -> None:
+    assert normalize_category_display("одежда и обувь") == "Одежда и обувь"
+    assert normalize_category_display("  цветы ") == "Цветы"
+    assert normalize_category_display("аптеки") == "Аптеки"
+    assert normalize_category_display("АЗС") == "АЗС"
 
 
 def test_owner_first_multi_add_parsing_variants():
@@ -328,7 +356,7 @@ def test_list_active_categories_found_and_empty():
     assert found.status == "list_found"
     assert found.target_month == "2026-05"
     assert "май 2026" in found.text
-    assert "1. Владимир — Альфа — 5%" in found.text
+    assert "1. Владимир — Альфа-Банк — 5%" in found.text
     assert "2. Елена — Т-Банк — 3%" in found.text
     assert "#1" not in found.text
 
@@ -358,7 +386,7 @@ def test_list_active_categories_uses_global_numbering_across_categories():
     add.execute("Т-Банк, Елена, Супермаркеты, 7%")
     result = ListActiveCashbackCategoriesUseCase(repo, now_provider=lambda: date(2026, 5, 3)).execute()
     assert result.status == "list_found"
-    assert "1. Владимир — Альфа — 2%" in result.text
+    assert "1. Владимир — Альфа-Банк — 2%" in result.text
     assert "2. Елена — Т-Банк — 7%" in result.text
 
 
