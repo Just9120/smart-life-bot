@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 from typing import Literal
 
 from smart_life_bot.cashback.models import ALLOWED_OWNERS, CashbackAddInput
-from smart_life_bot.cashback.parser import has_invalid_explicit_month_token, has_invalid_owner_first_explicit_month_token, in_transition_period, looks_like_cashback_add_attempt, normalize_bank_name, normalize_category_key, parse_owner_first_multi_add, parse_percent_value, parse_structured_add, validate_owner
+from smart_life_bot.cashback.parser import has_invalid_explicit_month_token, has_invalid_owner_first_explicit_month_token, in_transition_period, looks_like_cashback_add_attempt, normalize_bank_name, normalize_category_key, normalize_category_search_key, parse_owner_first_multi_add, parse_percent_value, parse_structured_add, validate_owner
 
 RU_MONTH_LABELS = {
     1: "январь", 2: "февраль", 3: "март", 4: "апрель", 5: "май", 6: "июнь",
@@ -325,7 +325,7 @@ class QueryCashbackCategoryUseCase:
         today = self.now_provider()
         month = current_year_month(today)
         month_label = format_month_label(month)
-        key = normalize_category_key(text)
+        key = normalize_category_search_key(text)
         rows = self.repo.query(key, month)
         if not rows:
             return CashbackResult(status="query_not_found", text=f"На {month_label} по категории «{text.strip()}» ничего не найдено.\n\nПроверь название категории или открой 📋 Активные категории.", target_month=month)

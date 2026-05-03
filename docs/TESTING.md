@@ -74,6 +74,7 @@ Regression testing — это не отдельный «магический и�
 - cashback transition callback safety (tokenized month selection, stale callback rejection);
 - cashback edit-percent flow (кнопка из active list, pending state, invalid input retry, cancel);
 - cashback query;
+- deterministic cashback query aliases (`продукты/еда`, `лекарства/медицина`, `бензин/топливо`) с проверкой отсутствия calendar side effects;
 - conflict clarification;
 - direct calendar text возвращает preview;
 - reminder controls скрыты в service-account mode;

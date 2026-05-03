@@ -13,6 +13,20 @@ RU_MONTHS = {
     "октябрь": 10, "октября": 10, "ноябрь": 11, "ноября": 11, "декабрь": 12, "декабря": 12,
 }
 
+CATEGORY_SEARCH_ALIASES = {
+    "продукты": "супермаркеты",
+    "еда": "супермаркеты",
+    "лекарства": "аптеки",
+    "медицина": "аптеки",
+    "бензин": "азс",
+    "топливо": "азс",
+}
+
+
+def normalize_category_search_key(value: str) -> str:
+    key = normalize_category_key(value)
+    return CATEGORY_SEARCH_ALIASES.get(key, key)
+
 
 def normalize_category_key(value: str) -> str:
     value = value.strip().lower().replace("ё", "е")

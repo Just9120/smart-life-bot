@@ -148,6 +148,18 @@ Telegram voice input добавлен только в backlog и не входи
 Реализован foundation-адаптер записи событий Google Calendar для `service_account_shared_calendar_mode` (через service account + shared calendar). `oauth_user_mode` остаётся pending и в runtime пока использует fake/dev calendar adapter. После успешного confirm бот также показывает ссылку на созданное событие, если календарный провайдер вернул `html_link`. Это позволяет подготовить будущий VPS smoke-сценарий `Telegram message → preview → confirm → Google Calendar create event` без добавления OAuth callback/user-consent flow в текущем PR.
 
 
+## Cashback search aliases (Sprint 5 slice 1)
+
+Реализован первый узкий детерминированный шаг Sprint 5 для поиска категорий в режиме `💳 Кэшбек`:
+- `продукты`/`еда` → `Супермаркеты`
+- `лекарства`/`медицина` → `Аптеки`
+- `бензин`/`топливо` → `АЗС`
+
+Границы этого шага:
+- алиасы применяются только в query/search path;
+- broad fuzzy matching не добавлялся;
+- LLM fallback не добавлялся.
+
 ## Cashback XLSX export (Sprint 4 slice)
 
 В разделе `💳 Кэшбек` доступна кнопка `📤 Экспорт XLSX` для read-only выгрузки активных категорий из persisted SQLite данных с выбором месяца (текущий/соседние через навигацию). Если данных за выбранный месяц нет, бот отправляет дружелюбное сообщение без пустого файла.
