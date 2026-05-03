@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Protocol
 
 from smart_life_bot.domain.enums import EventLogErrorCategory, EventLogStatus, ParserMode
+from smart_life_bot.domain.enums import OAuthConnectionStatus
 from smart_life_bot.domain.models import ConversationStateSnapshot
 
 
@@ -117,3 +118,29 @@ class EventsLogRepository(Protocol):
     def get_by_id(self, entry_id: int) -> EventLogEntry | None: ...
 
     def list_for_user(self, user_id: int) -> list[EventLogEntry]: ...
+
+
+@dataclass(frozen=True, slots=True)
+class OAuthConnectionStateRecord:
+    user_id: int
+    status: OAuthConnectionStatus
+    state_token_hash: str | None
+    created_at: datetime
+    updated_at: datetime
+    connected_at: datetime | None
+    revoked_at: datetime | None
+    error_code: str | None
+
+
+class OAuthConnectionStateRepository(Protocol):
+    def get_for_user(self, user_id: int) -> OAuthConnectionStateRecord | None: ...
+
+    def get_or_create_for_user(self, user_id: int) -> OAuthConnectionStateRecord: ...
+
+    def start_pending(self, user_id: int, state_token_hash: str) -> OAuthConnectionStateRecord: ...
+
+    def mark_connected(self, user_id: int) -> OAuthConnectionStateRecord: ...
+
+    def disconnect(self, user_id: int) -> OAuthConnectionStateRecord: ...
+
+    def mark_error(self, user_id: int, error_code: str) -> OAuthConnectionStateRecord: ...

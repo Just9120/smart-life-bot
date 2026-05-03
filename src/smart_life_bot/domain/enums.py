@@ -38,3 +38,10 @@ class EventLogErrorCategory(str, Enum):
     CALENDAR_WRITE_FAILURE = "calendar_write_failure"
     STATE_INCONSISTENCY = "state_inconsistency"
     INTERNAL_ERROR = "internal_error"
+
+
+class OAuthConnectionStatus(str, Enum):
+    NOT_CONNECTED = "not_connected"
+    PENDING = "pending"
+    CONNECTED = "connected"
+    ERROR = "error"

@@ -146,7 +146,7 @@
 - Google OAuth token exchange.
 - Runtime behavior changes.
 
-### Slice 6.1 — OAuth state model + UX stubs (no token exchange)
+### Slice 6.1 — OAuth state model + UX stubs (no token exchange) ✅ implemented
 
 **Scope**
 - Добавить application/storage model для user OAuth connection state (`not_connected`/`pending`/`connected`/`error`) и безопасных state tokens.

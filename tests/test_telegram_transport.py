@@ -11,6 +11,9 @@ from smart_life_bot.application.use_cases import (
     GetUserSettingsUseCase,
     ProcessIncomingMessageUseCase,
     SetParserModeUseCase,
+    RequestOAuthConnectUseCase,
+    DisconnectOAuthUseCase,
+    GetOAuthStatusUseCase,
 )
 from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, RequestEditCashbackCategoryPercentUseCase, SoftDeleteCashbackCategoryUseCase, UpdateCashbackCategoryPercentUseCase
 from smart_life_bot.application.cashback_export import ExportCashbackCategoriesUseCase
@@ -58,6 +61,7 @@ from smart_life_bot.storage.sqlite import (
     SQLiteProviderCredentialsRepository,
     SQLiteUserPreferencesRepository,
     SQLiteUsersRepository,
+    SQLiteOAuthConnectionStateRepository,
     create_sqlite_connection,
     init_sqlite_schema,
 )
@@ -244,6 +248,7 @@ class Deps:
     state_repo: SQLiteConversationStateRepository
     events_log_repo: SQLiteEventsLogRepository
     logger: SilentLogger
+    oauth_connection_state_repo: SQLiteOAuthConnectionStateRepository
 
 
 def _build_router() -> tuple[TelegramTransportRouter, Deps]:
@@ -260,6 +265,7 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         state_repo=SQLiteConversationStateRepository(connection),
         events_log_repo=SQLiteEventsLogRepository(connection),
         logger=SilentLogger(),
+        oauth_connection_state_repo=SQLiteOAuthConnectionStateRepository(connection),
     )
 
     cashback_repo = SQLiteCashbackCategoriesRepository(connection)
@@ -283,6 +289,9 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         update_cashback_category_percent=UpdateCashbackCategoryPercentUseCase(cashback_repo),
         complete_transition_cashback_category=CompleteTransitionCashbackCategoryUseCase(cashback_repo),
         export_cashback_categories=ExportCashbackCategoriesUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
+        request_oauth_connect=RequestOAuthConnectUseCase(deps),
+        disconnect_oauth=DisconnectOAuthUseCase(deps),
+        get_oauth_status=GetOAuthStatusUseCase(deps),
     )
     return router, deps
 
@@ -318,6 +327,7 @@ def _build_router_no_html_link() -> tuple[TelegramTransportRouter, Deps]:
         state_repo=SQLiteConversationStateRepository(connection),
         events_log_repo=SQLiteEventsLogRepository(connection),
         logger=SilentLogger(),
+        oauth_connection_state_repo=SQLiteOAuthConnectionStateRepository(connection),
     )
 
     router = TelegramTransportRouter(
@@ -441,7 +451,7 @@ def test_calendar_mode_callbacks_are_informational_only() -> None:
     quick = router.handle_callback(telegram_user_id=90501, callback_data="calendar:mode:quick")
     personal = router.handle_callback(telegram_user_id=90501, callback_data="calendar:mode:personal")
     assert "Быстрый режим" in quick.text
-    assert "пока недоступен" in personal.text
+    assert "foundation-режим" in personal.text
     assert len(deps.calendar_service.requests) == 0
 
 
@@ -1442,3 +1452,20 @@ def test_cashback_export_callback_no_data_returns_friendly_message() -> None:
     exported = router.handle_callback(telegram_user_id=93002, callback_data=select_cb)
     assert "активных кэшбек-категорий пока нет" in exported.text
     assert exported.document_bytes is None
+
+
+def test_oauth_stub_callbacks_change_state_without_calendar_write() -> None:
+    router, deps = _build_router()
+    router.handle_text_message(telegram_user_id=90555, text="📅 Календарь")
+    personal = router.handle_callback(telegram_user_id=90555, callback_data="calendar:mode:personal")
+    assert ("Подключить", "oauth:connect") in personal.buttons
+
+    connect = router.handle_callback(telegram_user_id=90555, callback_data="oauth:connect")
+    assert "ожидание" in connect.text
+
+    status = router.handle_callback(telegram_user_id=90555, callback_data="oauth:status")
+    assert "ожидает" in status.text
+
+    disconnect = router.handle_callback(telegram_user_id=90555, callback_data="oauth:disconnect")
+    assert "отключён" in disconnect.text
+    assert len(deps.calendar_service.requests) == 0

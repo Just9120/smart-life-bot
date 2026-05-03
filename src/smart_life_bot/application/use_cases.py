@@ -393,3 +393,42 @@ class SetParserModeUseCase:
             return UseCaseResult(status="success", message="LLM parser mode is active (Claude)."), updated
 
         return UseCaseResult(status="success", message="Python/rule-based parser is active."), updated
+
+
+@dataclass(frozen=True, slots=True)
+class OAuthStatusResult:
+    status: str
+    message: str
+
+
+@dataclass(slots=True)
+class RequestOAuthConnectUseCase:
+    deps: ApplicationDependencies
+
+    def execute(self, user_id: int, state_token_hash: str) -> OAuthStatusResult:
+        state = self.deps.oauth_connection_state_repo.start_pending(user_id=user_id, state_token_hash=state_token_hash)
+        return OAuthStatusResult(status=state.status.value, message="Подключение личного календаря подготовлено (статус: ожидание). OAuth-обмен пока не включён.")
+
+
+@dataclass(slots=True)
+class DisconnectOAuthUseCase:
+    deps: ApplicationDependencies
+
+    def execute(self, user_id: int) -> OAuthStatusResult:
+        state = self.deps.oauth_connection_state_repo.disconnect(user_id=user_id)
+        return OAuthStatusResult(status=state.status.value, message="Личный календарь отключён. Можно снова нажать «Подключить», когда flow будет доступен.")
+
+
+@dataclass(slots=True)
+class GetOAuthStatusUseCase:
+    deps: ApplicationDependencies
+
+    def execute(self, user_id: int) -> OAuthStatusResult:
+        state = self.deps.oauth_connection_state_repo.get_or_create_for_user(user_id=user_id)
+        mapping = {
+            "not_connected": "Статус личного календаря: не подключен.",
+            "pending": "Статус личного календаря: ожидает завершения подключения (stub).",
+            "connected": "Статус личного календаря: подключен (stub-состояние без token exchange).",
+            "error": "Статус личного календаря: ошибка подключения, попробуйте переподключить.",
+        }
+        return OAuthStatusResult(status=state.status.value, message=mapping[state.status.value])

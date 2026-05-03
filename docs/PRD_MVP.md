@@ -73,7 +73,7 @@ Inline preview buttons остаются только для действий с 
 
 ### 3.4 Planned OAuth personal calendar UX (`🔐 Личный Google Calendar`)
 
-Статус: **planned/pending** (не реализовано в текущем runtime).
+Статус: **partially implemented (Sprint 6.1 foundation)**: UX `Подключить/Отключить/Статус` и state-stub доступны; реальный OAuth consent/token exchange и callback runtime остаются pending.
 
 Целевое UX-поведение после реализации Sprint 6:
 - пользователь в разделе `📅 Календарь` выбирает `🔐 Личный Google Calendar`;

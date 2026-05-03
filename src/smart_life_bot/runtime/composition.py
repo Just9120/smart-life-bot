@@ -23,6 +23,9 @@ from smart_life_bot.application.use_cases import (
     GetUserSettingsUseCase,
     ProcessIncomingMessageUseCase,
     SetParserModeUseCase,
+    RequestOAuthConnectUseCase,
+    DisconnectOAuthUseCase,
+    GetOAuthStatusUseCase,
 )
 from smart_life_bot.bot import TelegramBotRuntime, TelegramTransportRouter
 from smart_life_bot.calendar.interfaces import CalendarService
@@ -41,6 +44,7 @@ from smart_life_bot.storage.sqlite import (
     SQLiteProviderCredentialsRepository,
     SQLiteUserPreferencesRepository,
     SQLiteUsersRepository,
+    SQLiteOAuthConnectionStateRepository,
     create_sqlite_connection,
     init_sqlite_schema,
 )
@@ -70,6 +74,7 @@ class _Dependencies:
     state_repo: SQLiteConversationStateRepository
     events_log_repo: SQLiteEventsLogRepository
     logger: ContextLoggerAdapter
+    oauth_connection_state_repo: SQLiteOAuthConnectionStateRepository
 
 
 def build_runtime(settings: Settings) -> RuntimeContainer:
@@ -82,6 +87,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
     user_preferences_repo = SQLiteUserPreferencesRepository(connection)
     state_repo = SQLiteConversationStateRepository(connection)
     events_log_repo = SQLiteEventsLogRepository(connection)
+    oauth_connection_state_repo = SQLiteOAuthConnectionStateRepository(connection)
     cashback_repo = SQLiteCashbackCategoriesRepository(connection)
 
     calendar_service: CalendarService = DevFakeCalendarService()
@@ -122,6 +128,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         credentials_repo=credentials_repo,
         state_repo=state_repo,
         events_log_repo=events_log_repo,
+        oauth_connection_state_repo=oauth_connection_state_repo,
         logger=get_context_logger(),
     )
 
@@ -146,6 +153,9 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         update_cashback_category_percent=UpdateCashbackCategoryPercentUseCase(cashback_repo),
         complete_transition_cashback_category=CompleteTransitionCashbackCategoryUseCase(cashback_repo),
         export_cashback_categories=ExportCashbackCategoriesUseCase(cashback_repo),
+        request_oauth_connect=RequestOAuthConnectUseCase(deps=deps),
+        disconnect_oauth=DisconnectOAuthUseCase(deps=deps),
+        get_oauth_status=GetOAuthStatusUseCase(deps=deps),
     )
 
     return RuntimeContainer(

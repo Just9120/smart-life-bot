@@ -192,3 +192,6 @@ Regression testing — это не отдельный «магический и�
 - service-account path unaffected (no regressions in shared-calendar writes);
 - reminder controls capability-gated по auth mode (OAuth-only when enabled);
 - no token/secrets leakage in logs/telemetry/asserted snapshots.
+
+
+Sprint 6.1 adds regression checks for Telegram OAuth stub callbacks (`oauth:connect` / `oauth:status` / `oauth:disconnect`) and storage default state transitions without any real OAuth network exchange.

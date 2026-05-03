@@ -38,6 +38,9 @@ from smart_life_bot.application.use_cases import (
     GetUserSettingsUseCase,
     ProcessIncomingMessageUseCase,
     SetParserModeUseCase,
+    RequestOAuthConnectUseCase,
+    DisconnectOAuthUseCase,
+    GetOAuthStatusUseCase,
 )
 from smart_life_bot.domain.enums import ParserMode
 from smart_life_bot.domain.models import EventDraft
@@ -78,6 +81,9 @@ CALLBACK_CALENDAR_DATE_MONTH_PREFIX = "calendar:date:month:"
 CALLBACK_CALENDAR_DATE_SELECT_PREFIX = "calendar:date:select:"
 CALLBACK_CALENDAR_DATE_CANCEL = "calendar:date:cancel"
 CALLBACK_CALENDAR_DATE_NOOP_PREFIX = "calendar:date:noop:"
+CALLBACK_OAUTH_CONNECT = "oauth:connect"
+CALLBACK_OAUTH_DISCONNECT = "oauth:disconnect"
+CALLBACK_OAUTH_STATUS = "oauth:status"
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +143,9 @@ class TelegramTransportRouter:
     active_feature_context: dict[int, str] = field(default_factory=dict)
     pending_cashback_percent_edit: dict[int, PendingCashbackPercentEdit] = field(default_factory=dict)
     pending_cashback_add: dict[int, bool] = field(default_factory=dict)
+    request_oauth_connect: RequestOAuthConnectUseCase | None = None
+    disconnect_oauth: DisconnectOAuthUseCase | None = None
+    get_oauth_status: GetOAuthStatusUseCase | None = None
 
     @staticmethod
     def _owner_filter_index(owner_name: str | None) -> str:
@@ -417,6 +426,20 @@ class TelegramTransportRouter:
             timezone=self.default_timezone,
         )
 
+        
+        if callback_data == CALLBACK_OAUTH_CONNECT and self.request_oauth_connect is not None:
+            state_token = secrets.token_urlsafe(12)
+            marker = hashlib.sha256(state_token.encode("utf-8")).hexdigest()
+            result = self.request_oauth_connect.execute(user.id, marker)
+            return TelegramTransportResponse(text=result.message)
+
+        if callback_data == CALLBACK_OAUTH_DISCONNECT and self.disconnect_oauth is not None:
+            result = self.disconnect_oauth.execute(user.id)
+            return TelegramTransportResponse(text=result.message)
+
+        if callback_data == CALLBACK_OAUTH_STATUS and self.get_oauth_status is not None:
+            result = self.get_oauth_status.execute(user.id)
+            return TelegramTransportResponse(text=result.message)
         if callback_data == CALLBACK_CONFIRM:
             snapshot = self.state_repo.get(user.id)
             if snapshot is not None and snapshot.editing_field == "duration_minutes":
@@ -439,7 +462,7 @@ class TelegramTransportRouter:
         if callback_data == "calendar:mode:quick":
             return TelegramTransportResponse(text="⚡ Быстрый режим: события создаются в подключенном общем календаре. Просто отправьте текст события. Уведомления в этом режиме настраиваются в Google Calendar; кастомные уведомления через бота пока недоступны.")
         if callback_data == "calendar:mode:personal":
-            return TelegramTransportResponse(text="🔐 Личный Google Calendar (OAuth) пока недоступен. Мы планируем добавить подключение личного календаря позже; после реализации и проверки это даст более гибкое персональное управление, включая кастомные уведомления.")
+            return TelegramTransportResponse(text="🔐 Личный Google Calendar: foundation-режим. Выберите действие.", buttons=(("Подключить", CALLBACK_OAUTH_CONNECT), ("Отключить", CALLBACK_OAUTH_DISCONNECT), ("Статус", CALLBACK_OAUTH_STATUS)))
 
         if callback_data == CALLBACK_DURATION:
             snapshot = self.state_repo.get(user.id)
