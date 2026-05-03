@@ -129,9 +129,9 @@
 - Сохранить единый confirm-gated calendar flow: запись в Google Calendar только после `✅ Создать событие` (callback `draft:confirm`).
 
 **Current status (as of this roadmap update)**
-- Реально работает только `service_account_shared_calendar_mode`.
-- `oauth_user_mode` остается target architecture и pending runtime implementation.
-- Sprint 6 начинается с docs/discovery и не меняет runtime-поведение.
+- Реально работает `service_account_shared_calendar_mode` (calendar writes after explicit confirm).
+- Slice 6.1 delivered foundation for `oauth_user_mode`: persisted OAuth connection-state model + Telegram personal calendar UX stubs (`Подключить` / `Отключить` / `Статус`) + strict adapter callback routing for `oauth:connect` / `oauth:disconnect` / `oauth:status`.
+- `oauth_user_mode` runtime write-path remains pending: no callback endpoint runtime, no Google code→token exchange, no personal-calendar writes yet.
 
 ### Slice 6.0 — Discovery/spec freeze (docs-only)
 
@@ -148,10 +148,12 @@
 
 ### Slice 6.1 — OAuth state model + UX stubs (no token exchange)
 
+**Status:** Implemented (foundation only).
+
 **Scope**
 - Добавить application/storage model для user OAuth connection state (`not_connected`/`pending`/`connected`/`error`) и безопасных state tokens.
 - Добавить transport-level UX команды/кнопки для `Подключить` / `Отключить` / `Статус` с текстами-заглушками.
-- Missing-auth response для calendar confirms в personal mode: явный guidance to connect.
+- Missing-auth response для calendar confirms в personal mode: pending next slice.
 
 **Guardrails**
 - Без реального обмена code→token.

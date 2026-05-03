@@ -44,6 +44,9 @@ from smart_life_bot.bot import (
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
+    CALLBACK_OAUTH_CONNECT,
+    CALLBACK_OAUTH_DISCONNECT,
+    CALLBACK_OAUTH_STATUS,
     TelegramTransportResponse,
 )
 from smart_life_bot.bot.python_telegram_adapter import (
@@ -116,7 +119,7 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
         assert len(callback_handlers) == 1
         assert (
             callback_handlers[0].pattern.pattern
-            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal|calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|cashback:list:current|cashback:add:start|cashback:search:hint|cashback:export:current|cashback:export:picker:\d{4}-\d{2}|cashback:export:select:\d{4}-\d{2}|cashback:export:cancel|cashback:list:month:\d{4}-\d{2}|cashback:list:owner:(?:\d+|all):month:\d{4}-\d{2}|cashback:list:owner-current:(?:\d+|all)|cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:edit-percent:request:\d+|cashback:transition:select:(?:[a-f0-9]{6}:)?\d{4}-\d{2}|cashback:transition:cancel)$"
+            == r"^(draft:confirm|draft:edit|draft:cancel|draft:duration|draft:reminders|draft:reminders:10|draft:reminders:30|draft:reminders:60|draft:reminders:120|settings:parser:python|settings:parser:auto|settings:parser:llm|calendar:mode:quick|calendar:mode:personal|oauth:connect|oauth:disconnect|oauth:status|calendar:date:start|calendar:date:month:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:select:[a-f0-9]{6}:\d{4}-\d{2}-\d{2}|calendar:date:noop:[a-f0-9]{6}:\d{4}-\d{2}|calendar:date:cancel|cashback:list:current|cashback:add:start|cashback:search:hint|cashback:export:current|cashback:export:picker:\d{4}-\d{2}|cashback:export:select:\d{4}-\d{2}|cashback:export:cancel|cashback:list:month:\d{4}-\d{2}|cashback:list:owner:(?:\d+|all):month:\d{4}-\d{2}|cashback:list:owner-current:(?:\d+|all)|cashback:delete:request:\d+|cashback:delete:confirm:\d+|cashback:delete:cancel:\d+|cashback:edit-percent:request:\d+|cashback:transition:select:(?:[a-f0-9]{6}:)?\d{4}-\d{2}|cashback:transition:cancel)$"
         )
         assert tuple(application.bot_data["allowed_callback_data"]) == (
             CALLBACK_CONFIRM,
@@ -143,6 +146,9 @@ def test_build_telegram_application_registers_handlers_without_network_calls() -
             CALLBACK_CASHBACK_TRANSITION_CANCEL,
             CALLBACK_CALENDAR_DATE_START,
             CALLBACK_CALENDAR_DATE_CANCEL,
+            CALLBACK_OAUTH_CONNECT,
+            CALLBACK_OAUTH_DISCONNECT,
+            CALLBACK_OAUTH_STATUS,
         )
         assert tuple(application.bot_data["allowed_callback_prefixes"]) == (
             CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
@@ -212,6 +218,26 @@ def test_callback_pattern_accepts_owner_all_and_rejects_invalid_owner_token() ->
         assert re.fullmatch(pattern, "cashback:add:start:extra") is None
         assert re.fullmatch(pattern, "cashback:search") is None
         assert re.fullmatch(pattern, "cashback:search:hint:extra") is None
+    finally:
+        container.connection.close()
+
+
+def test_callback_pattern_allows_only_exact_oauth_stub_callbacks() -> None:
+    container = build_runtime(_settings())
+    try:
+        application = build_telegram_application(_settings(), container.runtime)
+        pattern = [
+            handler for handlers in application.handlers.values() for handler in handlers if isinstance(handler, CallbackQueryHandler)
+        ][0].pattern.pattern
+        assert re.fullmatch(pattern, "oauth:connect")
+        assert re.fullmatch(pattern, "oauth:disconnect")
+        assert re.fullmatch(pattern, "oauth:status")
+        assert re.fullmatch(pattern, "oauth:callback") is None
+        assert re.fullmatch(pattern, "oauth:connect:anything") is None
+        assert re.fullmatch(pattern, "oauth:token") is None
+        assert re.fullmatch(pattern, "oauth:status:extra") is None
+        assert re.fullmatch(pattern, "oauth:") is None
+        assert re.fullmatch(pattern, "oauth") is None
     finally:
         container.connection.close()
 

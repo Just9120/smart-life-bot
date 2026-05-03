@@ -38,6 +38,9 @@ from smart_life_bot.application.use_cases import (
     GetUserSettingsUseCase,
     ProcessIncomingMessageUseCase,
     SetParserModeUseCase,
+    RequestOAuthConnectionUseCase,
+    DisconnectOAuthConnectionUseCase,
+    GetOAuthConnectionStatusUseCase,
 )
 from smart_life_bot.domain.enums import ParserMode
 from smart_life_bot.domain.models import EventDraft
@@ -78,6 +81,9 @@ CALLBACK_CALENDAR_DATE_MONTH_PREFIX = "calendar:date:month:"
 CALLBACK_CALENDAR_DATE_SELECT_PREFIX = "calendar:date:select:"
 CALLBACK_CALENDAR_DATE_CANCEL = "calendar:date:cancel"
 CALLBACK_CALENDAR_DATE_NOOP_PREFIX = "calendar:date:noop:"
+CALLBACK_OAUTH_CONNECT = "oauth:connect"
+CALLBACK_OAUTH_DISCONNECT = "oauth:disconnect"
+CALLBACK_OAUTH_STATUS = "oauth:status"
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +127,9 @@ class TelegramTransportRouter:
     get_user_settings: GetUserSettingsUseCase
     set_parser_mode: SetParserModeUseCase
     default_timezone: str
+    request_oauth_connection: RequestOAuthConnectionUseCase | None = None
+    disconnect_oauth_connection: DisconnectOAuthConnectionUseCase | None = None
+    get_oauth_connection_status: GetOAuthConnectionStatusUseCase | None = None
     llm_available: bool = False
     supports_custom_reminders: bool = True
     add_cashback_category: AddCashbackCategoryUseCase | None = None
@@ -439,7 +448,19 @@ class TelegramTransportRouter:
         if callback_data == "calendar:mode:quick":
             return TelegramTransportResponse(text="⚡ Быстрый режим: события создаются в подключенном общем календаре. Просто отправьте текст события. Уведомления в этом режиме настраиваются в Google Calendar; кастомные уведомления через бота пока недоступны.")
         if callback_data == "calendar:mode:personal":
-            return TelegramTransportResponse(text="🔐 Личный Google Calendar (OAuth) пока недоступен. Мы планируем добавить подключение личного календаря позже; после реализации и проверки это даст более гибкое персональное управление, включая кастомные уведомления.")
+            status_text = "Статус личного Google Calendar: не подключен."
+            if self.get_oauth_connection_status is not None:
+                status_text = self.get_oauth_connection_status.execute(user_id=user.id).message
+            return TelegramTransportResponse(
+                text=f"🔐 Личный Google Calendar\n{status_text}\nВыбери действие:",
+                buttons=(("Подключить", CALLBACK_OAUTH_CONNECT), ("Отключить", CALLBACK_OAUTH_DISCONNECT), ("Статус", CALLBACK_OAUTH_STATUS)),
+            )
+        if callback_data == CALLBACK_OAUTH_CONNECT and self.request_oauth_connection is not None:
+            return TelegramTransportResponse(text=self.request_oauth_connection.execute(user_id=user.id).message)
+        if callback_data == CALLBACK_OAUTH_DISCONNECT and self.disconnect_oauth_connection is not None:
+            return TelegramTransportResponse(text=self.disconnect_oauth_connection.execute(user_id=user.id).message)
+        if callback_data == CALLBACK_OAUTH_STATUS and self.get_oauth_connection_status is not None:
+            return TelegramTransportResponse(text=self.get_oauth_connection_status.execute(user_id=user.id).message)
 
         if callback_data == CALLBACK_DURATION:
             snapshot = self.state_repo.get(user.id)

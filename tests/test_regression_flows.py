@@ -84,7 +84,7 @@ def test_regression_calendar_menu_navigation_never_creates_events() -> None:
     assert ("⚡ Быстрый режим", "calendar:mode:quick") in menu.buttons
     assert ("🔐 Личный Google Calendar", "calendar:mode:personal") in menu.buttons
     assert "Быстрый режим" in quick.text
-    assert "пока недоступен" in personal.text
+    assert "Статус личного Google Calendar: не подключен." in personal.text
     assert len(deps.calendar_service.requests) == 0
 
 

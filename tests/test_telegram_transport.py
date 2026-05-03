@@ -7,9 +7,12 @@ import pytest
 from smart_life_bot.application.use_cases import (
     CancelEventDraftUseCase,
     ConfirmEventDraftUseCase,
+    DisconnectOAuthConnectionUseCase,
     EditEventDraftFieldUseCase,
+    GetOAuthConnectionStatusUseCase,
     GetUserSettingsUseCase,
     ProcessIncomingMessageUseCase,
+    RequestOAuthConnectionUseCase,
     SetParserModeUseCase,
 )
 from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase, CompleteTransitionCashbackCategoryUseCase, ListActiveCashbackCategoriesUseCase, QueryCashbackCategoryUseCase, RequestDeleteCashbackCategoryUseCase, RequestEditCashbackCategoryPercentUseCase, SoftDeleteCashbackCategoryUseCase, UpdateCashbackCategoryPercentUseCase
@@ -45,6 +48,9 @@ from smart_life_bot.bot import (
     CALLBACK_SETTINGS_PARSER_AUTO,
     CALLBACK_SETTINGS_PARSER_LLM,
     CALLBACK_SETTINGS_PARSER_PYTHON,
+    CALLBACK_OAUTH_CONNECT,
+    CALLBACK_OAUTH_DISCONNECT,
+    CALLBACK_OAUTH_STATUS,
     TelegramTransportRouter,
     format_preview_message,
 )
@@ -56,6 +62,7 @@ from smart_life_bot.storage.sqlite import (
     SQLiteConversationStateRepository,
     SQLiteEventsLogRepository,
     SQLiteProviderCredentialsRepository,
+    SQLiteUserOAuthConnectionStateRepository,
     SQLiteUserPreferencesRepository,
     SQLiteUsersRepository,
     create_sqlite_connection,
@@ -241,6 +248,7 @@ class Deps:
     users_repo: SQLiteUsersRepository
     user_preferences_repo: SQLiteUserPreferencesRepository
     credentials_repo: SQLiteProviderCredentialsRepository
+    oauth_state_repo: SQLiteUserOAuthConnectionStateRepository
     state_repo: SQLiteConversationStateRepository
     events_log_repo: SQLiteEventsLogRepository
     logger: SilentLogger
@@ -257,6 +265,7 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         users_repo=SQLiteUsersRepository(connection),
         user_preferences_repo=SQLiteUserPreferencesRepository(connection),
         credentials_repo=SQLiteProviderCredentialsRepository(connection),
+        oauth_state_repo=SQLiteUserOAuthConnectionStateRepository(connection),
         state_repo=SQLiteConversationStateRepository(connection),
         events_log_repo=SQLiteEventsLogRepository(connection),
         logger=SilentLogger(),
@@ -272,6 +281,9 @@ def _build_router() -> tuple[TelegramTransportRouter, Deps]:
         edit_draft_field=EditEventDraftFieldUseCase(deps),
         get_user_settings=GetUserSettingsUseCase(deps),
         set_parser_mode=SetParserModeUseCase(deps),
+        request_oauth_connection=RequestOAuthConnectionUseCase(deps),
+        disconnect_oauth_connection=DisconnectOAuthConnectionUseCase(deps),
+        get_oauth_connection_status=GetOAuthConnectionStatusUseCase(deps),
         default_timezone="UTC",
         supports_custom_reminders=True,
         add_cashback_category=AddCashbackCategoryUseCase(cashback_repo, now_provider=lambda: datetime(2026, 5, 3, tzinfo=UTC).date()),
@@ -298,6 +310,9 @@ def _build_router_without_reminders() -> tuple[TelegramTransportRouter, Deps]:
         edit_draft_field=EditEventDraftFieldUseCase(deps),
         get_user_settings=GetUserSettingsUseCase(deps),
         set_parser_mode=SetParserModeUseCase(deps),
+        request_oauth_connection=RequestOAuthConnectionUseCase(deps),
+        disconnect_oauth_connection=DisconnectOAuthConnectionUseCase(deps),
+        get_oauth_connection_status=GetOAuthConnectionStatusUseCase(deps),
         default_timezone="UTC",
         supports_custom_reminders=False,
     )
@@ -315,6 +330,7 @@ def _build_router_no_html_link() -> tuple[TelegramTransportRouter, Deps]:
         users_repo=SQLiteUsersRepository(connection),
         user_preferences_repo=SQLiteUserPreferencesRepository(connection),
         credentials_repo=SQLiteProviderCredentialsRepository(connection),
+        oauth_state_repo=SQLiteUserOAuthConnectionStateRepository(connection),
         state_repo=SQLiteConversationStateRepository(connection),
         events_log_repo=SQLiteEventsLogRepository(connection),
         logger=SilentLogger(),
@@ -329,6 +345,9 @@ def _build_router_no_html_link() -> tuple[TelegramTransportRouter, Deps]:
         edit_draft_field=EditEventDraftFieldUseCase(deps),
         get_user_settings=GetUserSettingsUseCase(deps),
         set_parser_mode=SetParserModeUseCase(deps),
+        request_oauth_connection=RequestOAuthConnectionUseCase(deps),
+        disconnect_oauth_connection=DisconnectOAuthConnectionUseCase(deps),
+        get_oauth_connection_status=GetOAuthConnectionStatusUseCase(deps),
         default_timezone="UTC",
     )
     return router, deps
@@ -441,7 +460,18 @@ def test_calendar_mode_callbacks_are_informational_only() -> None:
     quick = router.handle_callback(telegram_user_id=90501, callback_data="calendar:mode:quick")
     personal = router.handle_callback(telegram_user_id=90501, callback_data="calendar:mode:personal")
     assert "Быстрый режим" in quick.text
-    assert "пока недоступен" in personal.text
+    assert "Выбери действие" in personal.text
+    assert ("Подключить", CALLBACK_OAUTH_CONNECT) in personal.buttons
+    assert len(deps.calendar_service.requests) == 0
+
+
+def test_oauth_stub_callbacks_update_state_without_calendar_write() -> None:
+    router, deps = _build_router()
+    router.handle_callback(telegram_user_id=90521, callback_data=CALLBACK_OAUTH_CONNECT)
+    status = router.handle_callback(telegram_user_id=90521, callback_data=CALLBACK_OAUTH_STATUS)
+    disconnect = router.handle_callback(telegram_user_id=90521, callback_data=CALLBACK_OAUTH_DISCONNECT)
+    assert "ожидает завершения подключения" in status.text
+    assert "отключен" in disconnect.text
     assert len(deps.calendar_service.requests) == 0
 
 

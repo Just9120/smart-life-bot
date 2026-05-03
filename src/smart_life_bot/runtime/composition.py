@@ -23,6 +23,9 @@ from smart_life_bot.application.use_cases import (
     GetUserSettingsUseCase,
     ProcessIncomingMessageUseCase,
     SetParserModeUseCase,
+    RequestOAuthConnectionUseCase,
+    DisconnectOAuthConnectionUseCase,
+    GetOAuthConnectionStatusUseCase,
 )
 from smart_life_bot.bot import TelegramBotRuntime, TelegramTransportRouter
 from smart_life_bot.calendar.interfaces import CalendarService
@@ -41,6 +44,7 @@ from smart_life_bot.storage.sqlite import (
     SQLiteProviderCredentialsRepository,
     SQLiteUserPreferencesRepository,
     SQLiteUsersRepository,
+    SQLiteUserOAuthConnectionStateRepository,
     create_sqlite_connection,
     init_sqlite_schema,
 )
@@ -67,6 +71,7 @@ class _Dependencies:
     users_repo: SQLiteUsersRepository
     user_preferences_repo: SQLiteUserPreferencesRepository
     credentials_repo: SQLiteProviderCredentialsRepository
+    oauth_state_repo: SQLiteUserOAuthConnectionStateRepository
     state_repo: SQLiteConversationStateRepository
     events_log_repo: SQLiteEventsLogRepository
     logger: ContextLoggerAdapter
@@ -79,6 +84,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
 
     users_repo = SQLiteUsersRepository(connection)
     credentials_repo = SQLiteProviderCredentialsRepository(connection)
+    oauth_state_repo = SQLiteUserOAuthConnectionStateRepository(connection)
     user_preferences_repo = SQLiteUserPreferencesRepository(connection)
     state_repo = SQLiteConversationStateRepository(connection)
     events_log_repo = SQLiteEventsLogRepository(connection)
@@ -120,6 +126,7 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         users_repo=users_repo,
         user_preferences_repo=user_preferences_repo,
         credentials_repo=credentials_repo,
+        oauth_state_repo=oauth_state_repo,
         state_repo=state_repo,
         events_log_repo=events_log_repo,
         logger=get_context_logger(),
@@ -134,6 +141,9 @@ def build_runtime(settings: Settings) -> RuntimeContainer:
         edit_draft_field=EditEventDraftFieldUseCase(deps=deps),
         get_user_settings=GetUserSettingsUseCase(deps=deps),
         set_parser_mode=SetParserModeUseCase(deps=deps, llm_available=llm_parser is not None),
+        request_oauth_connection=RequestOAuthConnectionUseCase(deps=deps),
+        disconnect_oauth_connection=DisconnectOAuthConnectionUseCase(deps=deps),
+        get_oauth_connection_status=GetOAuthConnectionStatusUseCase(deps=deps),
         default_timezone=settings.default_timezone,
         llm_available=llm_parser is not None,
         supports_custom_reminders=settings.google_auth_mode is not GoogleAuthMode.SERVICE_ACCOUNT_SHARED_CALENDAR_MODE,
