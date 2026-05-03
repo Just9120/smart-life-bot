@@ -227,6 +227,34 @@
 - Sync/conflict strategy.
 - APK/native wrapper — deep backlog.
 
+## Future candidate — Cashback screenshot parser via Vision LLM
+
+**Status**
+- Backlog candidate only (**not implemented**).
+- Не входит в текущий MVP и не входит в near-term Sprint 6 OAuth scope.
+- Кандидат к старту только после стабилизации text-first Cashback MVP на реальном usage (VPS smoke + production-like usage без частых regressions).
+
+**Product intent (future)**
+- Пользователь отправляет screenshot из банковского приложения + короткий caption (например, `Альфа Вова`).
+- Бот пытается извлечь кандидаты категорий/процентов кэшбека и формирует только draft preview.
+- Сохранение в SQLite допускается только после явного подтверждения пользователя (`Сохранить` / `Отменить`).
+
+**Suggested decomposition (future, phased discovery)**
+- Phase A — discovery/spec only (UX, privacy, risk register, acceptance criteria).
+- Phase B — image intake UX draft (Telegram-side flow) без внешнего Vision вызова.
+- Phase C — Vision adapter за интерфейсом application/provider boundary, c mocked behavior в тестах.
+- Phase D — структурный extraction contract (JSON-only output contract).
+- Phase E — Python sanity checks + stop-word filtering до preview.
+- Phase F — confirm-gated save flow (draft preview → explicit confirm → save).
+- Phase G — production hardening: privacy/retention policy, cost/latency limits, observability без raw screenshots в логах.
+
+**Guardrails / non-goals for this candidate**
+- No implementation in current scope: без image handlers, OCR, Vision/LLM API calls, dependency changes.
+- Screenshot input трактуется как untrusted input.
+- Извлекаются только candidate cashback category/percent пары; нерелевантные финансовые блоки (кредиты/вклады/ставки/страховки/реклама) игнорируются.
+- Calendar/Google Calendar flows не затрагиваются.
+- Auto-import без explicit user confirmation запрещён.
+
 ---
 
 ## Re-planning cadence

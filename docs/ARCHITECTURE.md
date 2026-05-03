@@ -319,6 +319,23 @@ Telegram voice input относится к будущему scope и не реа
 - Предпочтительный кандидат STT для будущего этапа: ElevenLabs Scribe.
 - Нужны cost/safety guardrails на этапе внедрения: ограничения на длительность/размер voice-сообщения и отказ от обработки длинных лекций.
 
+## 11.2 Future architecture candidate: cashback screenshot parser (Vision LLM)
+
+Статус: backlog candidate only, **not implemented**.
+
+Целевая boundary-модель для будущего этапа:
+- Telegram image intake adapter принимает image metadata/file bytes и передаёт дальше только в контролируемый application flow.
+- Vision extraction должен жить за явным application/provider интерфейсом (без встраивания provider-specific логики в transport/domain).
+- Выход Vision-модели считается untrusted draft data, а не готовой записью.
+- Перед preview обязателен Python sanity/validation слой (category/percent checks + фильтры нерелевантных финансовых терминов).
+- Storage write layer достигается только после явного user confirmation.
+- Новый flow не должен обходить существующие cashback add/upsert validation правила.
+
+Обязательные будущие guardrails:
+- Не логировать raw screenshot bytes и не логировать full Vision payload с потенциально чувствительными банковскими данными.
+- До отдельного решения по privacy/retention предпочтителен ephemeral processing подход.
+- Нет Calendar side effects и нет Google Calendar interaction в этом feature flow.
+
 ## 12. Configuration / env model
 
 Единая config-модель включает:

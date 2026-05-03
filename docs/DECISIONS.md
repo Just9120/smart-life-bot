@@ -244,3 +244,18 @@
   - local development OAuth testing approach (tunnel/staging callback/other);
   - coexistence policy `oauth_user_mode` vs `service_account_shared_calendar_mode` (per deployment only vs per-user mixed operation).
 - **Rationale:** Эти решения критичны для безопасного production rollout и должны быть явно приняты, а не подразумеваться по умолчанию.
+
+## D-034: Cashback screenshot parser — Vision LLM vs OCR and privacy policy
+
+- **Status:** Pending
+- **Decision scope:** Перед любой runtime-реализацией screenshot parsing для cashback нужно принять архитектурные/продуктовые/security решения.
+- **Open items:**
+  - Vision LLM vs classic OCR as primary extraction strategy;
+  - provider/model selection и fallback strategy;
+  - ephemeral processing vs temporary/persistent screenshot storage;
+  - retention policy для image/payload-derived artifacts;
+  - redaction/logging policy (включая запрет raw screenshot logging);
+  - cost/latency budgets и runtime limits;
+  - prompt-injection/visual-jailbreak risk handling для untrusted screenshots;
+  - extraction-quality evaluation protocol до production rollout.
+- **Rationale:** Скриншоты банковских приложений несут privacy и quality risks; без явных решений feature не должен переходить из backlog в implementation.
