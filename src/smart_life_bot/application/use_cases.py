@@ -446,7 +446,7 @@ class HandleOAuthCallbackUseCase:
 
         state_token_hash = hashlib.sha256(request.state.encode("utf-8")).hexdigest()
         record = self.deps.oauth_state_repo.get_by_state_token_hash(state_token_hash)
-        if record is None:
+        if record is None or record.status != "pending":
             return OAuthCallbackResult(OAuthCallbackResultCode.INVALID_STATE, "OAuth callback отклонён: state недействителен или устарел.")
 
         if request.error:

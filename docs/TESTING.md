@@ -29,7 +29,7 @@ Regression testing — это не отдельный «магический и�
 - owner validation;
 - transition-period logic;
 - calendar preview formatting;
-- callback boundary skeleton: missing/invalid state, provider error mapping, token-exchange-pending stub, hashed state lookup;
+- callback boundary skeleton: missing/invalid state, provider error mapping, token-exchange-pending stub, hashed state lookup, and rejection of reused/non-pending state markers;
 - missing-date recovery/date picker helpers.
 
 ## 2.2 Application / use-case tests

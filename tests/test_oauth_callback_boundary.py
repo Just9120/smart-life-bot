@@ -73,6 +73,32 @@ def test_oauth_callback_provider_error_marks_state_error() -> None:
     updated = repo.get_or_create_for_user(user.id)
     assert updated.status == "error"
     assert updated.error_code == "provider_error"
+    assert updated.state_token_hash is None
+
+
+def test_oauth_callback_rejects_reused_state_after_provider_error() -> None:
+    use_case, repo, users = _build_use_case()
+    user = users.get_or_create_by_telegram_id(3005, timezone="UTC")
+    state = "reused-state-after-error"
+    repo.mark_pending(user.id, hashlib.sha256(state.encode("utf-8")).hexdigest())
+
+    first = use_case.execute(OAuthCallbackRequest(state=state, error="access_denied"))
+    assert first.code is OAuthCallbackResultCode.PROVIDER_ERROR
+
+    replay = use_case.execute(OAuthCallbackRequest(state=state, code="raw-auth-code"))
+    assert replay.code is OAuthCallbackResultCode.INVALID_STATE
+
+
+def test_oauth_callback_requires_pending_state_for_code() -> None:
+    use_case, repo, users = _build_use_case()
+    user = users.get_or_create_by_telegram_id(3006, timezone="UTC")
+    state = "non-pending-state"
+    state_hash = hashlib.sha256(state.encode("utf-8")).hexdigest()
+    repo.mark_pending(user.id, state_hash)
+    repo.mark_error(user.id, "provider_error")
+
+    result = use_case.execute(OAuthCallbackRequest(state=state, code="raw-auth-code"))
+    assert result.code is OAuthCallbackResultCode.INVALID_STATE
 
 
 def test_oauth_callback_code_returns_token_exchange_pending_without_connecting() -> None:

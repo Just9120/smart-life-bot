@@ -585,7 +585,7 @@ class SQLiteUserOAuthConnectionStateRepository:
         self._connection.execute(
             """
             UPDATE user_oauth_connection_state
-            SET status = 'error', error_code = ?, updated_at = ?
+            SET status = 'error', state_token_hash = NULL, error_code = ?, updated_at = ?
             WHERE user_id = ?
             """,
             (error_code, now_iso, base.user_id),
