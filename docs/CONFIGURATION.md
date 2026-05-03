@@ -130,3 +130,16 @@ Preflight проверяет конфигурацию, таймзону, SQLite 
 - recommended `GOOGLE_SERVICE_ACCOUNT_JSON=/opt/smart-life-bot/secrets/service-account.json`.
 
 Эта схема фиксирует стабильный container path для `GOOGLE_SERVICE_ACCOUNT_JSON`; фактический host path подключается через bind mount `./secrets/service-account.json` в `compose.yaml`.
+
+
+## 11. OAuth readiness notes (planned, not yet implemented)
+
+`oauth_user_mode` требует операционной готовности, даже до runtime implementation:
+- стабильный публичный HTTPS домен/поддомен для redirect URI;
+- зарегистрированный в Google Cloud OAuth client с точным `GOOGLE_OAUTH_REDIRECT_URI`;
+- env-ready значения `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`;
+- policy для token encryption/key management (пока pending decision).
+
+Важно: наличие этих env-переменных само по себе не означает, что OAuth flow уже реализован в runtime.
+
+Для long polling текущего MVP это совместимо: polling можно оставить для Telegram updates, а OAuth callback обработать отдельным HTTPS endpoint adapter-ом (будущий slice), без автоматического перехода на Telegram webhook.

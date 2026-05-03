@@ -230,3 +230,17 @@
 - **Decision:** No-code builders (например, Tilda/Webflow и аналоги) допустимы для landing/marketing страниц, но не рассматриваются как платформа для основного динамического приложения (auth, state, cashback data, calendar/OAuth flows, exports, offline sync).
 - **Decision:** D-030 задаёт offline-first направление для будущих клиентов; текущий D-032 фиксирует более широкую backend/frontend/transport стратегию и не меняет текущий MVP scope.
 - **Rationale:** Такой порядок эволюции снижает delivery/ops-риск, переиспользует существующий Python use-case слой и не блокирует текущую Telegram-ценность продукта.
+
+
+## D-033: OAuth Sprint 6 open implementation decisions
+
+- **Status:** Pending
+- **Decision scope:** Перед runtime-реализацией `oauth_user_mode` нужно зафиксировать набор операционных и security решений.
+- **Open items:**
+  - token encryption at rest и key-management strategy (host key vs KMS, rotation policy);
+  - callback hosting approach (shared process vs separate service/adapter);
+  - OAuth state/CSRF strategy (state format, TTL, one-time usage, storage location);
+  - final redirect URI/domain choice for production and staging;
+  - local development OAuth testing approach (tunnel/staging callback/other);
+  - coexistence policy `oauth_user_mode` vs `service_account_shared_calendar_mode` (per deployment only vs per-user mixed operation).
+- **Rationale:** Эти решения критичны для безопасного production rollout и должны быть явно приняты, а не подразумеваться по умолчанию.

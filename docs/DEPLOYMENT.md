@@ -169,3 +169,17 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 - Текущее runtime-поведение при старте: composition вызывает `create_sqlite_connection(settings.database_url)` и `init_sqlite_schema(connection)`, а schema init использует idempotent/non-destructive `CREATE TABLE IF NOT EXISTS` (это не reseed и не очистка данных).
 - Любые будущие schema changes должны идти только через явный migration-план с заранее продуманным backup/restore планом перед применением изменений в production.
 - Для smoke/test записей (включая cashback) используйте только продуктовые Telegram/UI/application flow (add/edit/delete/soft-delete), а не прямые destructive операции в SQLite.
+
+
+## 11. OAuth operational prerequisites (future Sprint 6 implementation)
+
+Для production `oauth_user_mode` понадобятся дополнительные инфраструктурные элементы:
+- публичный HTTPS callback endpoint (валидный TLS-сертификат);
+- стабильный домен/subdomain, который не меняется между deploy-итерациями;
+- корректная регистрация redirect URI в Google OAuth client settings;
+- reverse-proxy/Cloudflare конфигурация, которая не ломает callback query params/state;
+- отдельный deploy/health-check contour для callback adapter (если он будет отдельным процессом/сервисом).
+
+Текущий long-polling runtime Telegram не обязан мигрировать на webhook только из-за OAuth: callback endpoint может существовать как отдельный ingress-path/service при сохранении polling для bot updates.
+
+Эти требования документируют будущий scope и не означают, что callback runtime уже реализован.

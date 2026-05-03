@@ -198,6 +198,41 @@ Dependency rule:
 
 ## 8. Auth abstraction
 
+### 8.1 OAuth boundary model (target, pending implementation)
+
+- OAuth callback handling должен жить в отдельном infrastructure adapter слое (web/callback adapter), а не в Telegram transport.
+- Telegram transport отвечает только за UX-команды `connect/disconnect/status` и отображение auth-state, но не владеет OAuth протоколом/токен-обменом.
+- Application use-cases остаются auth-mode agnostic: orchestration parse/preview/confirm/cancel/edit не дублируется под OAuth/service-account.
+- `auth_mode` и user OAuth state влияют только на credential/client resolution в auth/provider layer.
+- `GoogleAuthProvider` / `AuthContext` должны эволюционировать к поддержке user-scoped OAuth credentials и явных ошибок `missing_auth`/`provider_auth_failure` без переноса Google-specific логики в domain.
+- `service_account_shared_calendar_mode` остается полностью поддержанным fallback path на период поэтапного внедрения OAuth.
+
+### 8.2 Token storage policy (design baseline, no implementation in this phase)
+
+Для `oauth_user_mode` в storage policy нужно хранить минимум:
+- access token (короткоживущий);
+- refresh token (если выдан);
+- token expiry/issued metadata;
+- provider account идентификатор (например, subject/email) для операционного контроля;
+- audit timestamps (`connected_at`, `updated_at`, `revoked_at` при disconnect).
+
+Нельзя логировать/экспортировать:
+- raw access/refresh tokens;
+- raw OAuth authorization code;
+- client secret;
+- полные credential payloads из `provider_credentials`.
+
+Концептуальный lifecycle refresh token:
+- при истечении access token выполняется refresh через provider adapter;
+- при refresh-failure credentials помечаются как invalid/reconnect-required;
+- user получает missing-auth/provider-auth guidance без утечки причин, требующих секрета.
+
+Текущий `provider_credentials.credentials_encrypted` можно использовать как placeholder-контракт хранения, но перед productionization нужны явные решения по:
+- алгоритму шифрования at rest;
+- управлению ключами (KMS/host-managed key rotation policy);
+- ротации/ревокации токенов и audit trail.
+
+
 Поддерживаются два режима:
 
 1. `oauth_user_mode` (target design)
