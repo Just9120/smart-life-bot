@@ -529,14 +529,35 @@ def test_cashback_query_deterministic_variants_and_boundaries():
     add.execute('Т-Банк, Владимир, Аптеки, 7%')
     add.execute('Альфа, Елена, АЗС, 3%')
 
-    assert query.execute('супермаркет').status == 'query_found'
-    assert query.execute('магазины продуктов').status == 'query_found'
-    assert query.execute('аптека').status == 'query_found'
-    assert query.execute('заправка').status == 'query_found'
-    assert query.execute('заправки').status == 'query_found'
-    assert query.execute('АЗС').status == 'query_found'
-    assert query.execute('аЗс').status == 'query_found'
-    assert query.execute('а-з-с').status == 'query_found'
+    supermarket = query.execute('супермаркет')
+    groceries = query.execute('магазины продуктов')
+    pharmacy = query.execute('аптека')
+    fuel_station = query.execute('заправка')
+    fuel_stations = query.execute('заправки')
+    azs_mixed_case = query.execute('аЗс')
+    azs_with_separators = query.execute('а-з-с')
+
+    assert supermarket.status == 'query_found'
+    assert '🏆 Кэшбек' in supermarket.text
+    assert 'Супермаркеты' in supermarket.text
+    assert groceries.status == 'query_found'
+    assert '🏆 Кэшбек' in groceries.text
+    assert 'Супермаркеты' in groceries.text
+    assert pharmacy.status == 'query_found'
+    assert '🏆 Кэшбек' in pharmacy.text
+    assert 'Аптеки' in pharmacy.text
+    assert fuel_station.status == 'query_found'
+    assert '🏆 Кэшбек' in fuel_station.text
+    assert 'АЗС' in fuel_station.text
+    assert fuel_stations.status == 'query_found'
+    assert '🏆 Кэшбек' in fuel_stations.text
+    assert 'АЗС' in fuel_stations.text
+    assert azs_mixed_case.status == 'query_found'
+    assert '🏆 Кэшбек' in azs_mixed_case.text
+    assert 'АЗС' in azs_mixed_case.text
+    assert azs_with_separators.status == 'query_found'
+    assert '🏆 Кэшбек' in azs_with_separators.text
+    assert 'АЗС' in azs_with_separators.text
     assert query.execute('аптека/медицина').status == 'query_not_found'
 
 
