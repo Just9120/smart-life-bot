@@ -29,6 +29,11 @@
 - `sqlite:///./data/smart_life_bot.db` (file-based SQLite, директория создается автоматически);
 - `sqlite:///:memory:` (in-memory для тестов).
 
+Операционные guardrails для `DATABASE_URL` в production:
+- `sqlite:///./data/smart_life_bot.db` указывает на persisted app state (не seed-данные), поэтому путь должен быть на persistent host storage/bind mount.
+- Изменение пути `DATABASE_URL` фактически переключает приложение на другой SQLite файл (может выглядеть как «пропали данные», хотя это другая БД).
+- Для production нельзя использовать `sqlite:///:memory:` (данные исчезают при остановке процесса/контейнера).
+
 Runtime composition layer использует `DATABASE_URL` напрямую при `build_runtime(settings)` и всегда выполняет инициализацию SQLite schema при bootstrap.
 Bootstrap-сообщение runtime не должно выводить raw `DATABASE_URL`; вместо этого используется безопасный признак конфигурации/back-end marker.
 
@@ -125,4 +130,3 @@ Preflight проверяет конфигурацию, таймзону, SQLite 
 - recommended `GOOGLE_SERVICE_ACCOUNT_JSON=/opt/smart-life-bot/secrets/service-account.json`.
 
 Эта схема фиксирует стабильный container path для `GOOGLE_SERVICE_ACCOUNT_JSON`; фактический host path подключается через bind mount `./secrets/service-account.json` в `compose.yaml`.
-

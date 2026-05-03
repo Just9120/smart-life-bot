@@ -156,3 +156,16 @@ Workflow: `Deploy VPS` (`.github/workflows/deploy.yml`)
 Это baseline deploy foundation (авто `push` в `main` + ручной `workflow_dispatch`), а не полный production rollout platform.
 
 По-прежнему out of scope: полноценные rollback playbooks, production monitoring/alerting stack, backups/restore automation и расширенная release orchestration.
+
+## 10. Production SQLite persistence policy (CD guardrail)
+
+- Production SQLite (по `DATABASE_URL`, обычно `./data/smart_life_bot.db`) — это **persisted runtime state**, а не disposable seed-данные.
+- CD deploy (`Deploy VPS`) — это поставка кода/рантайма (build + recreate container), а не data-reset процесс.
+- В рамках штатного CD/smoke **запрещено**:
+  - reseed БД;
+  - `truncate`/`delete`/`drop` данных;
+  - удалять/пересоздавать production SQLite файл;
+  - выполнять destructive cleanup для `./data` или production DB path.
+- Текущее runtime-поведение при старте: composition вызывает `create_sqlite_connection(settings.database_url)` и `init_sqlite_schema(connection)`, а schema init использует idempotent/non-destructive `CREATE TABLE IF NOT EXISTS` (это не reseed и не очистка данных).
+- Любые будущие schema changes должны идти только через явный migration-план с заранее продуманным backup/restore планом перед применением изменений в production.
+- Для smoke/test записей (включая cashback) используйте только продуктовые Telegram/UI/application flow (add/edit/delete/soft-delete), а не прямые destructive операции в SQLite.
