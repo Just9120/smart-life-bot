@@ -236,14 +236,22 @@ def test_cashback_export_xlsx_is_structurally_valid_and_contains_expected_values
         assert "xl/workbook.xml" in names
         assert "xl/_rels/workbook.xml.rels" in names
         assert "xl/worksheets/sheet1.xml" in names
+        assert "xl/styles.xml" in names
         worksheet_xml = archive.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        styles_xml = archive.read("xl/styles.xml").decode("utf-8")
 
+    assert "Кэшбек — май 2026" in worksheet_xml
+    assert "owner" in worksheet_xml
     assert "Владимир" in worksheet_xml
     assert "Тест &amp; Банк" in worksheet_xml
     assert "Кафе &lt;обед&gt;" in worksheet_xml
     assert "7.5%" in worksheet_xml
     assert "2026-05" in worksheet_xml
     assert "active" in worksheet_xml
+    assert "autoFilter" in worksheet_xml
+    assert "pane" in worksheet_xml
+    assert "<cols>" in worksheet_xml
+    assert "styleSheet" in styles_xml
 
 def test_explicit_month_parsing_variants():
     repo = _repo()

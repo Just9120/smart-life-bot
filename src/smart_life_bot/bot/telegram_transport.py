@@ -67,6 +67,9 @@ CALLBACK_CASHBACK_TRANSITION_CANCEL = "cashback:transition:cancel"
 CALLBACK_CASHBACK_ADD_START = "cashback:add:start"
 CALLBACK_CASHBACK_SEARCH_HINT = "cashback:search:hint"
 CALLBACK_CASHBACK_EXPORT_CURRENT = "cashback:export:current"
+CALLBACK_CASHBACK_EXPORT_PICKER_PREFIX = "cashback:export:picker:"
+CALLBACK_CASHBACK_EXPORT_SELECT_PREFIX = "cashback:export:select:"
+CALLBACK_CASHBACK_EXPORT_CANCEL = "cashback:export:cancel"
 CALLBACK_CASHBACK_EDIT_PERCENT_REQUEST_PREFIX = "cashback:edit-percent:request:"
 LABEL_CASHBACK_ADD = "➕ Добавить категорию"
 LABEL_CASHBACK_SEARCH = "🔎 Найти категорию"
@@ -568,10 +571,29 @@ class TelegramTransportRouter:
             self.active_feature_context[user.id] = "cashback"
             return TelegramTransportResponse(text="Напиши категорию, например: Аптеки.")
         if callback_data == CALLBACK_CASHBACK_EXPORT_CURRENT and self.export_cashback_categories is not None:
-            result = self.export_cashback_categories.execute()
+            selected_month = self.export_cashback_categories.default_month()
+            return TelegramTransportResponse(
+                text=f"Выбери месяц для экспорта XLSX. Текущий выбор: {format_month_label(selected_month)}.",
+                button_rows=self._build_cashback_export_picker_rows(selected_month),
+            )
+        if callback_data.startswith(CALLBACK_CASHBACK_EXPORT_PICKER_PREFIX) and self.export_cashback_categories is not None:
+            selected_month = callback_data.removeprefix(CALLBACK_CASHBACK_EXPORT_PICKER_PREFIX)
+            if parse_year_month(selected_month) is None:
+                return TelegramTransportResponse(text="Не удалось определить месяц для экспорта. Открой «📤 Экспорт XLSX» заново.")
+            return TelegramTransportResponse(
+                text=f"Выбери месяц для экспорта XLSX. Текущий выбор: {format_month_label(selected_month)}.",
+                button_rows=self._build_cashback_export_picker_rows(selected_month),
+            )
+        if callback_data.startswith(CALLBACK_CASHBACK_EXPORT_SELECT_PREFIX) and self.export_cashback_categories is not None:
+            selected_month = callback_data.removeprefix(CALLBACK_CASHBACK_EXPORT_SELECT_PREFIX)
+            if parse_year_month(selected_month) is None:
+                return TelegramTransportResponse(text="Не удалось определить месяц для экспорта. Открой «📤 Экспорт XLSX» заново.")
+            result = self.export_cashback_categories.execute(selected_month)
             if result.status != "ok" or result.content is None or result.file_name is None:
                 return TelegramTransportResponse(text=result.text)
             return TelegramTransportResponse(text=result.text, document_name=result.file_name, document_bytes=result.content)
+        if callback_data == CALLBACK_CASHBACK_EXPORT_CANCEL:
+            return TelegramTransportResponse(text="Экспорт отменён. Открой «📤 Экспорт XLSX», когда будешь готов.")
         if callback_data.startswith(CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX) and self.list_active_cashback_categories is not None:
             owner_token = callback_data.removeprefix(CALLBACK_CASHBACK_LIST_OWNER_CURRENT_PREFIX)
             owner_name = self._decode_owner_filter(owner_token)
@@ -712,6 +734,15 @@ class TelegramTransportRouter:
                 ("⚡ Auto", CALLBACK_SETTINGS_PARSER_AUTO),
                 ("🤖 LLM", CALLBACK_SETTINGS_PARSER_LLM),
             ),
+        )
+
+    def _build_cashback_export_picker_rows(self, selected_month: str) -> tuple[tuple[tuple[str, str], ...], ...]:
+        prev_month = shift_year_month(selected_month, delta=-1)
+        next_month = shift_year_month(selected_month, delta=1)
+        return (
+            (("⬅️", f"{CALLBACK_CASHBACK_EXPORT_PICKER_PREFIX}{prev_month}"), (format_month_label(selected_month), f"{CALLBACK_CASHBACK_EXPORT_PICKER_PREFIX}{selected_month}"), ("➡️", f"{CALLBACK_CASHBACK_EXPORT_PICKER_PREFIX}{next_month}")),
+            (("✅ Выгрузить этот месяц", f"{CALLBACK_CASHBACK_EXPORT_SELECT_PREFIX}{selected_month}"),),
+            (("↩️ Назад", CALLBACK_CASHBACK_EXPORT_CANCEL),),
         )
 
     def _build_cashback_action_button_rows(self, result) -> tuple[tuple[tuple[str, str], ...], ...]:

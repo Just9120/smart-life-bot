@@ -10,6 +10,9 @@ from smart_life_bot.bot import (
     CALLBACK_REMINDERS,
     CALLBACK_CASHBACK_LIST_MONTH_PREFIX,
     CALLBACK_CASHBACK_EXPORT_CURRENT,
+    CALLBACK_CASHBACK_EXPORT_PICKER_PREFIX,
+    CALLBACK_CASHBACK_EXPORT_SELECT_PREFIX,
+    CALLBACK_CASHBACK_EXPORT_CANCEL,
 )
 from smart_life_bot.application.cashback_use_cases import AddCashbackCategoryUseCase
 from smart_life_bot.cashback.sqlite import SQLiteCashbackCategoriesRepository
@@ -294,7 +297,8 @@ def test_regression_cashback_export_is_read_only_and_no_calendar_calls() -> None
     router.handle_text_message(telegram_user_id=92017, text="Альфа, Владимир, 2026-05, Супермаркеты, 5%")
     before = router.list_active_cashback_categories.execute(month="2026-05")
 
-    response = router.handle_callback(telegram_user_id=92017, callback_data=CALLBACK_CASHBACK_EXPORT_CURRENT)
+    picker = router.handle_callback(telegram_user_id=92017, callback_data=CALLBACK_CASHBACK_EXPORT_CURRENT)
+    response = router.handle_callback(telegram_user_id=92017, callback_data=picker.button_rows[1][0][1])
 
     after = router.list_active_cashback_categories.execute(month="2026-05")
     assert response.document_bytes is not None
