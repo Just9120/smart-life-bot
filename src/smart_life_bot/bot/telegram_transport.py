@@ -879,17 +879,17 @@ def _build_draft_buttons(draft: EventDraft, *, supports_custom_reminders: bool =
         if draft.start_at is None:
             return (
                 ("📅 Выбрать дату", CALLBACK_CALENDAR_DATE_START),
-                ("✏️ Edit", CALLBACK_EDIT),
-                ("❌ Cancel", CALLBACK_CANCEL),
+                ("✏️ Изменить", CALLBACK_EDIT),
+                ("❌ Отменить", CALLBACK_CANCEL),
             )
         return (
-            ("✏️ Edit", CALLBACK_EDIT),
-            ("❌ Cancel", CALLBACK_CANCEL),
+            ("✏️ Изменить", CALLBACK_EDIT),
+            ("❌ Отменить", CALLBACK_CANCEL),
         )
     buttons = [("✅ Создать событие", CALLBACK_CONFIRM), ("⏱ Длительность", CALLBACK_DURATION)]
     if supports_custom_reminders:
         buttons.append(("🔔 Уведомления", CALLBACK_REMINDERS))
-    buttons.extend([("✏️ Edit", CALLBACK_EDIT), ("❌ Cancel", CALLBACK_CANCEL)])
+    buttons.extend([("✏️ Изменить", CALLBACK_EDIT), ("❌ Отменить", CALLBACK_CANCEL)])
     return tuple(buttons)
 
 

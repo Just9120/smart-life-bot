@@ -171,16 +171,16 @@ def test_transport_response_buttons_convert_to_inline_keyboard_markup() -> None:
     markup = transport_buttons_to_inline_markup(
         (
             ("✅ Создать событие", CALLBACK_CONFIRM),
-            ("✏️ Edit", CALLBACK_EDIT),
-            ("❌ Cancel", CALLBACK_CANCEL),
+            ("✏️ Изменить", CALLBACK_EDIT),
+            ("❌ Отменить", CALLBACK_CANCEL),
         )
     )
 
     assert isinstance(markup, InlineKeyboardMarkup)
     assert [[button.text for button in row] for row in markup.inline_keyboard] == [
         ["✅ Создать событие"],
-        ["✏️ Edit"],
-        ["❌ Cancel"],
+        ["✏️ Изменить"],
+        ["❌ Отменить"],
     ]
     assert [[button.callback_data for button in row] for row in markup.inline_keyboard] == [
         [CALLBACK_CONFIRM],

@@ -39,14 +39,61 @@ def normalize_category_key(value: str) -> str:
     return re.sub(r"\s+", " ", value)
 
 
+def normalize_category_display(value: str) -> str:
+    cleaned = re.sub(r"\s+", " ", value.strip())
+    if not cleaned:
+        return ""
+    if re.fullmatch(r"[А-ЯA-Z]{2,}(?:[\s-][А-ЯA-Z]{2,})*", cleaned):
+        return cleaned
+    return cleaned[:1].upper() + cleaned[1:]
+
+
 def normalize_category_search_base(value: str) -> str:
     key = normalize_category_key(value)
     key = re.sub(r"[\-–—/\\]+", " ", key)
     return re.sub(r"\s+", " ", key).strip()
 
+def _normalize_bank_alias_key(value: str) -> str:
+    base = normalize_category_key(value)
+    base = re.sub(r"[\-–—]+", " ", base)
+    base = re.sub(r"[^a-zа-я0-9\s]+", " ", base)
+    base = re.sub(r"\s+", " ", base).strip()
+    if base == "банк":
+        return ""
+    tokens = [t for t in base.split() if t]
+    if len(tokens) > 1 and tokens[-1] == "банк":
+        tokens = tokens[:-1]
+    return " ".join(tokens)
+
+
 def normalize_bank_name(value: str) -> str:
     cleaned = re.sub(r"\s+", " ", value.strip())
     cleaned = re.sub(r"\s*-\s*", "-", cleaned)
+    alias_key = _normalize_bank_alias_key(cleaned)
+    aliases = {
+        "альфа": "Альфа-Банк",
+        "т": "Т-Банк",
+        "тинькофф": "Т-Банк",
+        "сбер": "Сбербанк",
+        "сбербанк": "Сбербанк",
+        "втб": "ВТБ",
+        "газпромбанк": "Газпромбанк",
+        "озон": "Озон Банк",
+        "ozon": "Озон Банк",
+        "яндекс": "Яндекс Банк",
+        "yandex": "Яндекс Банк",
+        "мтс": "МТС Банк",
+        "совкомбанк": "Совкомбанк",
+        "почта": "Почта Банк",
+        "райф": "Райффайзенбанк",
+        "райффайзен": "Райффайзенбанк",
+        "райффайзенбанк": "Райффайзенбанк",
+        "росбанк": "Росбанк",
+        "псб": "ПСБ",
+        "уралсиб": "Уралсиб",
+    }
+    if alias_key in aliases:
+        return aliases[alias_key]
     canonical_key = re.sub(r"[\s-]+", "", cleaned).lower().replace("ё", "е")
     if canonical_key == "тбанк":
         return "Т-Банк"
@@ -99,7 +146,7 @@ def parse_structured_add(text: str, today: date) -> ParsedAdd | None:
             category, percent_raw = parts[2], parts[3]
         percent = parse_percent_value(percent_raw)
         if percent is not None:
-            return ParsedAdd(bank=bank, owner=owner, category=category, percent=percent, month=month)
+            return ParsedAdd(bank=bank, owner=owner, category=normalize_category_display(category), percent=percent, month=month)
 
     return _parse_space_fallback(text, today)
 
@@ -171,7 +218,7 @@ def _parse_space_fallback(text: str, today: date) -> ParsedAdd | None:
     return ParsedAdd(
         bank=" ".join(bank_tokens),
         owner=owner,
-        category=" ".join(category_tokens),
+        category=normalize_category_display(" ".join(category_tokens)),
         percent=percent,
         month=month,
     )
@@ -180,12 +227,29 @@ def _parse_space_fallback(text: str, today: date) -> ParsedAdd | None:
 def _extract_bank_from_space_tokens(tokens: list[str]) -> tuple[str | None, int]:
     if not tokens:
         return None, 0
-    one = normalize_bank_name(tokens[0])
-    if len(tokens) > 1:
-        two = normalize_bank_name(f"{tokens[0]} {tokens[1]}")
-        if two == "Т-Банк":
-            return two, 2
-    return one, 1
+    known = {
+        "Альфа-Банк",
+        "Т-Банк",
+        "Сбербанк",
+        "ВТБ",
+        "Газпромбанк",
+        "Озон Банк",
+        "Яндекс Банк",
+        "МТС Банк",
+        "Совкомбанк",
+        "Почта Банк",
+        "Райффайзенбанк",
+        "Росбанк",
+        "ПСБ",
+        "Уралсиб",
+    }
+    max_take = min(3, len(tokens))
+    for take in range(max_take, 0, -1):
+        raw = " ".join(tokens[:take])
+        candidate = normalize_bank_name(raw)
+        if candidate in known or candidate != raw.strip():
+            return candidate, take
+    return normalize_bank_name(tokens[0]), 1
 
 
 def _parse_pairs_tokens(tokens: list[str]) -> tuple[tuple[str, float], ...]:
@@ -199,7 +263,7 @@ def _parse_pairs_tokens(tokens: list[str]) -> tuple[tuple[str, float], ...]:
         category = " ".join(chunk[:-1]).strip()
         if not category:
             return ()
-        pairs.append((category, percent))
+        pairs.append((normalize_category_display(category), percent))
         chunk = []
     if chunk:
         return ()
@@ -218,7 +282,7 @@ def _parse_pairs_segments(parts: list[str]) -> tuple[tuple[str, float], ...]:
         category = " ".join(tokens[:-1]).strip()
         if not category:
             return ()
-        pairs.append((category, percent))
+        pairs.append((normalize_category_display(category), percent))
     return tuple(pairs)
 
 

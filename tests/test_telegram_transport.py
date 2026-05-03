@@ -427,7 +427,7 @@ def test_telegram_cashback_add_and_query_flow() -> None:
     assert "Добавил кэшбек" in add.text
     query = router.handle_text_message(telegram_user_id=90601, text="супер маркеты")
     assert "🏆 Кэшбек" in query.text
-    assert "Владимир — Альфа — 5%" in query.text
+    assert "Владимир — Альфа-Банк — 5%" in query.text
 
 
 def test_calendar_text_flow_regression_still_returns_preview() -> None:
@@ -496,8 +496,8 @@ def test_service_account_mode_hides_reminders_and_keeps_duration() -> None:
     response = router.handle_text_message(telegram_user_id=90512, text="Team sync")
     assert ("✅ Создать событие", CALLBACK_CONFIRM) in response.buttons
     assert ("⏱ Длительность", CALLBACK_DURATION) in response.buttons
-    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
-    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert ("✏️ Изменить", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Отменить", CALLBACK_CANCEL) in response.buttons
     assert ("🔔 Уведомления", CALLBACK_REMINDERS) not in response.buttons
 
 
@@ -654,8 +654,8 @@ def test_preview_buttons_hide_confirm_when_start_at_missing() -> None:
 
     assert ("✅ Создать событие", CALLBACK_CONFIRM) not in response.buttons
     assert ("📅 Выбрать дату", CALLBACK_CALENDAR_DATE_START) in response.buttons
-    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
-    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert ("✏️ Изменить", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Отменить", CALLBACK_CANCEL) in response.buttons
     assert "Чтобы создать событие, сначала выбери дату и время." in response.text
 
 
@@ -787,8 +787,8 @@ def test_preview_buttons_hide_confirm_when_timezone_invalid() -> None:
         response = router.handle_text_message(telegram_user_id=90013, text=text)
 
         assert ("✅ Создать событие", CALLBACK_CONFIRM) not in response.buttons
-        assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
-        assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+        assert ("✏️ Изменить", CALLBACK_EDIT) in response.buttons
+        assert ("❌ Отменить", CALLBACK_CANCEL) in response.buttons
         assert "Используйте /edit timezone Europe/Amsterdam." in response.text
 
 
@@ -799,8 +799,8 @@ def test_preview_buttons_hide_confirm_when_timezone_is_none() -> None:
     response = router.handle_text_message(telegram_user_id=90014, text="None timezone")
 
     assert ("✅ Создать событие", CALLBACK_CONFIRM) not in response.buttons
-    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
-    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert ("✏️ Изменить", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Отменить", CALLBACK_CANCEL) in response.buttons
     assert "Используйте /edit timezone Europe/Amsterdam." in response.text
 
 
@@ -811,8 +811,8 @@ def test_preview_buttons_hide_confirm_when_time_range_invalid() -> None:
     response = router.handle_text_message(telegram_user_id=90015, text="Invalid range")
 
     assert ("✅ Создать событие", CALLBACK_CONFIRM) not in response.buttons
-    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
-    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert ("✏️ Изменить", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Отменить", CALLBACK_CANCEL) in response.buttons
     assert "end_at должен быть позже start_at." in response.text
 
 
@@ -823,8 +823,8 @@ def test_preview_buttons_hide_confirm_when_datetime_awareness_mixed() -> None:
     response = router.handle_text_message(telegram_user_id=90016, text="Mixed awareness")
 
     assert ("✅ Создать событие", CALLBACK_CONFIRM) not in response.buttons
-    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
-    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert ("✏️ Изменить", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Отменить", CALLBACK_CANCEL) in response.buttons
     assert "в одном формате timezone-awareness" in response.text
 
 
@@ -836,8 +836,8 @@ def test_edit_start_at_restores_confirm_button() -> None:
     response = router.handle_text_message(telegram_user_id=90011, text="/edit start_at 2026-02-14T11:30:00+00:00")
 
     assert ("✅ Создать событие", CALLBACK_CONFIRM) in response.buttons
-    assert ("✏️ Edit", CALLBACK_EDIT) in response.buttons
-    assert ("❌ Cancel", CALLBACK_CANCEL) in response.buttons
+    assert ("✏️ Изменить", CALLBACK_EDIT) in response.buttons
+    assert ("❌ Отменить", CALLBACK_CANCEL) in response.buttons
 
 
 def test_edit_invalid_start_at_keeps_confirm_hidden() -> None:
@@ -1165,7 +1165,7 @@ def test_cashback_delete_buttons_are_unambiguous_with_global_list_numbering() ->
     router.handle_text_message(telegram_user_id=90607, text="Альфа, Владимир, май, АЗС, 2%")
     router.handle_text_message(telegram_user_id=90607, text="Т-Банк, Елена, май, Супермаркеты, 7%")
     listed = router.handle_text_message(telegram_user_id=90607, text="📋 Активные категории")
-    assert "1. Владимир — Альфа — 2%" in listed.text
+    assert "1. Владимир — Альфа-Банк — 2%" in listed.text
     assert "2. Елена — Т-Банк — 7%" in listed.text
     assert "#1" not in listed.text
     delete_buttons = [button for button in _flatten_buttons(listed) if button[0].startswith("🗑 Удалить ")]
@@ -1177,7 +1177,7 @@ def test_cashback_delete_buttons_are_unambiguous_with_global_list_numbering() ->
     confirm = router.handle_callback(telegram_user_id=90607, callback_data="cashback:delete:confirm:2")
     assert "Готово, убрал категорию из активных." in confirm.text
     assert "Активные кэшбек-категории — май 2026" in confirm.text
-    assert "1. Владимир — Альфа — 2%" in confirm.text
+    assert "1. Владимир — Альфа-Банк — 2%" in confirm.text
     assert "#2" not in confirm.text
     confirm_delete_buttons = [button for button in _flatten_buttons(confirm) if button[0].startswith("🗑 Удалить ")]
     assert confirm_delete_buttons == [("🗑 Удалить №1", "cashback:delete:request:1")]
