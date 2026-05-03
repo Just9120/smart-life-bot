@@ -117,3 +117,7 @@ pytest -q
 - Broad fuzzy matching и LLM fallback для cashback search.
 - Vision LLM parser для кэшбек-скриншотов (future backlog, не реализован).
 - Автоматизация schema migrations и backup/restore orchestration.
+
+## LLM context bundles
+
+This repository includes a local devtool for generating Markdown context bundles for LLM audits, handoffs, and documentation-vs-code checks. See docs/CONTEXT_BUNDLES.md for usage, presets, safety exclusions, and examples.
