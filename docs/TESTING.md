@@ -183,7 +183,8 @@ Regression testing — это не отдельный «магический и�
 
 ## 7) Future OAuth regression coverage (Sprint 6 target)
 
-Текущий статус Slice 6.1 (foundation implemented) уже покрыт automated-тестами:
+Текущий статус Slice 6.1/6.2/6.3a уже покрыт automated-тестами:
+- Slice 6.3a boundary tests: redaction checks для OAuth authorization/access/refresh/id tokens, use-case outcomes for provider/storage-not-configured paths, и fake provider+repository success path без Google SDK/API и без SQLite token persistence.
 - storage: default OAuth state + базовые transitions (`not_connected`/`pending`/disconnect);
 - Telegram transport: personal calendar UX stubs (`🔐 ...`, `Подключить`/`Отключить`/`Статус`);
 - python-telegram adapter: exact callback routing только для `oauth:connect`, `oauth:disconnect`, `oauth:status`;

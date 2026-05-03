@@ -9,6 +9,12 @@ import secrets
 
 from smart_life_bot.calendar.models import CalendarEventCreateRequest
 from smart_life_bot.auth.callback_models import OAuthCallbackRequest, OAuthCallbackResult, OAuthCallbackResultCode
+from smart_life_bot.auth.token_models import (
+    OAuthTokenExchangeRequest,
+    OAuthTokenExchangeResult,
+    OAuthTokenExchangeResultCode,
+)
+from smart_life_bot.auth.interfaces import OAuthTokenExchangeProvider, OAuthTokenRepository
 from smart_life_bot.domain.enums import ConversationState, EventLogErrorCategory, EventLogStatus, ParserMode
 from smart_life_bot.domain.models import ConversationStateSnapshot, EventDraft
 from smart_life_bot.storage.interfaces import EventLogEntry, UserPreferencesRecord
@@ -471,4 +477,53 @@ class HandleOAuthCallbackUseCase:
             message="OAuth callback обработан без code/error; состояние подключения не изменено.",
             user_id=record.user_id,
             redirect_hint="oauth-status",
+        )
+
+
+@dataclass(slots=True)
+class ExchangeOAuthCodeUseCase:
+    exchange_provider: OAuthTokenExchangeProvider | None = None
+    token_repository: OAuthTokenRepository | None = None
+
+    def execute(self, request: OAuthTokenExchangeRequest) -> OAuthTokenExchangeResult:
+        if request.user_id <= 0 or not request.authorization_code.strip() or not request.redirect_uri.strip():
+            return OAuthTokenExchangeResult(
+                code=OAuthTokenExchangeResultCode.INVALID_REQUEST,
+                message="OAuth token exchange request is invalid.",
+                user_id=request.user_id if request.user_id > 0 else None,
+                provider=request.provider,
+            )
+
+        if self.exchange_provider is None:
+            return OAuthTokenExchangeResult(
+                code=OAuthTokenExchangeResultCode.PROVIDER_NOT_CONFIGURED,
+                message="OAuth token exchange provider is not configured.",
+                user_id=request.user_id,
+                provider=request.provider,
+            )
+
+        try:
+            token_bundle = self.exchange_provider.exchange_code(request)
+        except Exception:
+            return OAuthTokenExchangeResult(
+                code=OAuthTokenExchangeResultCode.EXCHANGE_FAILED,
+                message="OAuth token exchange failed.",
+                user_id=request.user_id,
+                provider=request.provider,
+            )
+
+        if self.token_repository is None:
+            return OAuthTokenExchangeResult(
+                code=OAuthTokenExchangeResultCode.TOKEN_STORAGE_NOT_CONFIGURED,
+                message="OAuth token exchange succeeded but token storage is not configured.",
+                user_id=request.user_id,
+                provider=token_bundle.provider,
+            )
+
+        self.token_repository.save_token_bundle(user_id=request.user_id, token_bundle=token_bundle)
+        return OAuthTokenExchangeResult(
+            code=OAuthTokenExchangeResultCode.SUCCESS,
+            message="OAuth token exchange boundary completed.",
+            user_id=request.user_id,
+            provider=token_bundle.provider,
         )

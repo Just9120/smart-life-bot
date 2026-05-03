@@ -30,7 +30,7 @@
 - Планируемый production hostname: выделенный subdomain существующего домена через Cloudflare.
 - Целевая OAuth-архитектура требует корректного HTTPS endpoint.
 
-## 6. Примечания по деплою auth-mode
+## 6. Примечания по деплою auth-mode (Future / not implemented in current runtime)
 
 - Целевой режим: `oauth_user_mode`, требует защищенный внешний callback endpoint.
 - Fallback-режим: `service_account_shared_calendar_mode`, может работать без OAuth и без домена в персональной конфигурации (например, long polling).

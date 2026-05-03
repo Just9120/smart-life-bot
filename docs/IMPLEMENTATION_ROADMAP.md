@@ -174,7 +174,14 @@
 - Google token exchange остается mock/stub.
 - Raw OAuth code/token material не сохраняется; state validation опирается на hashed state token lookup.
 
-### Slice 6.3 — Google OAuth exchange + token persistence behind interface
+### Slice 6.3a — Token exchange/persistence boundary skeleton (implemented)
+
+- Добавлены transport-agnostic boundary модели token exchange + redaction-safe token value objects.
+- Добавлены интерфейсы exchange provider/repository и application use-case skeleton без Google SDK/API вызовов.
+- В этом срезе нет реального code→token exchange и нет real token persistence (access/refresh tokens не сохраняются).
+- Calendar/Cashback runtime behavior и Telegram OAuth UX stubs не меняются.
+
+### Slice 6.3b — Google OAuth exchange + token persistence behind interface (future)
 
 **Scope**
 - Реализовать provider adapter для code exchange/refresh behind auth interfaces.
