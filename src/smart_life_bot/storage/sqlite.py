@@ -526,6 +526,13 @@ class SQLiteUserOAuthConnectionStateRepository:
         ).fetchone()
         return _row_to_oauth_state_record(row) if row is not None else None
 
+    def get_by_state_token_hash(self, state_token_hash: str) -> UserOAuthConnectionStateRecord | None:
+        row = self._connection.execute(
+            "SELECT * FROM user_oauth_connection_state WHERE state_token_hash = ?",
+            (state_token_hash,),
+        ).fetchone()
+        return _row_to_oauth_state_record(row) if row is not None else None
+
     def get_or_create_for_user(self, user_id: int) -> UserOAuthConnectionStateRecord:
         existing = self.get_for_user(user_id)
         if existing is not None:
